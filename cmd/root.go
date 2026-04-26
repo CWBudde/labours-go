@@ -18,6 +18,11 @@ var rootCmd = &cobra.Command{
 	Run:   runLaboursCommand,
 }
 
+var (
+	sentimentFallbackEnabled    bool
+	devsParallelFallbackEnabled bool
+)
+
 func Execute() error {
 	return rootCmd.Execute()
 }
@@ -163,6 +168,8 @@ func runLaboursCommand(cmd *cobra.Command, args []string) {
 	validateDateRange(startDate, endDate)
 
 	modes := resolveModes()
+	sentimentFallbackEnabled = commandBoolFlag(cmd, "sentiment-fallback")
+	devsParallelFallbackEnabled = commandBoolFlag(cmd, "devs-parallel-fallback")
 
 	// Handle Python compatibility: if --sentiment flag is set, add sentiment mode
 	if viper.GetBool("sentiment") {
@@ -172,6 +179,17 @@ func runLaboursCommand(cmd *cobra.Command, args []string) {
 
 	reader := detectAndReadInput(input, inputFormat)
 	executeModes(modes, reader, viper.GetString("output"), startDate, endDate)
+}
+
+func commandBoolFlag(cmd *cobra.Command, name string) bool {
+	flag := cmd.Flag(name)
+	if flag == nil && cmd.Root() != nil {
+		flag = cmd.Root().PersistentFlags().Lookup(name)
+	}
+	if flag != nil && flag.Changed {
+		return flag.Value.String() == "true"
+	}
+	return viper.GetBool(name)
 }
 
 func listThemes() {

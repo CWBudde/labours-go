@@ -314,7 +314,7 @@ func temporalActivity(reader readers.Reader, output string, startTime, endTime *
 }
 
 func devsParallel(reader readers.Reader, output string, startTime, endTime *time.Time) error {
-	return modes.DevsParallel(reader, output, viper.GetInt("max-people"), boolFlagValue("devs-parallel-fallback"))
+	return modes.DevsParallel(reader, output, viper.GetInt("max-people"), devsParallelFallbackEnabled)
 }
 
 func runTimes(reader readers.Reader, output string, startTime, endTime *time.Time) error {
@@ -338,7 +338,7 @@ func hotspotRisk(reader readers.Reader, output string, startTime, endTime *time.
 }
 
 func sentiment(reader readers.Reader, output string, startTime, endTime *time.Time) error {
-	return modes.Sentiment(reader, output, boolFlagValue("sentiment-fallback"))
+	return modes.Sentiment(reader, output, sentimentFallbackEnabled)
 }
 
 func runAllModes(reader readers.Reader, output string, startTime, endTime *time.Time) error {

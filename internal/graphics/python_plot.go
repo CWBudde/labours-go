@@ -22,9 +22,6 @@ func PlotBurndownPythonStyle(data *burndown.ProcessedBurndown, output string, re
 		data.Name, len(data.Matrix), len(data.DateRange), data.Granularity, data.Sampling)
 	p.X.Label.Text = "Time"
 	p.Y.Label.Text = "Lines of code"
-	if relative {
-		p.Y.Label.Text = "Relative Fraction"
-	}
 
 	// Apply theme styling
 	applyThemeToPlot(p)
@@ -44,11 +41,9 @@ func PlotBurndownPythonStyle(data *burndown.ProcessedBurndown, output string, re
 		timeValues[i] = float64(date.Unix())
 	}
 
-	// Normalize matrix if relative mode is enabled (like Python does)
+	// Python mutates the matrix after stackplot(), so the rendered reference
+	// remains unnormalized and is only clipped by ylim(0, 1).
 	matrix := data.Matrix
-	if relative {
-		matrix = normalizeMatrixColumns(data.Matrix)
-	}
 
 	if !viper.GetBool("quiet") {
 		fmt.Printf("DEBUG MATRIX ANALYSIS:\n")
@@ -88,8 +83,8 @@ func PlotBurndownPythonStyle(data *burndown.ProcessedBurndown, output string, re
 		}
 	}
 
-	// Create stacked areas (from top to bottom for proper rendering)
-	for i := numSeries - 1; i >= 0; i-- {
+	// Create stacked areas in data order so the legend matches matplotlib.
+	for i := 0; i < numSeries; i++ {
 		// Create data points for this layer
 		var topPoints plotter.XYs
 		var bottomPoints plotter.XYs
@@ -131,11 +126,8 @@ func PlotBurndownPythonStyle(data *burndown.ProcessedBurndown, output string, re
 	}
 
 	// Configure legend position (matches Python behavior)
-	legendLoc := 2 // upper left
-	if relative {
-		legendLoc = 3 // lower left
-	}
-	_ = legendLoc // TODO: Implement legend positioning
+	p.Legend.Left = true
+	p.Legend.Top = !relative
 
 	width, height := GetPythonPlotSize(16, 12)
 	if err := SavePNGWithBackground(p, width, height, output, color.Transparent); err != nil {
@@ -143,39 +135,6 @@ func PlotBurndownPythonStyle(data *burndown.ProcessedBurndown, output string, re
 	}
 
 	return nil
-}
-
-// normalizeMatrixColumns normalizes each column to sum to 1 (matches Python's relative mode)
-func normalizeMatrixColumns(matrix [][]float64) [][]float64 {
-	if len(matrix) == 0 {
-		return matrix
-	}
-
-	normalized := make([][]float64, len(matrix))
-	for i := range matrix {
-		normalized[i] = make([]float64, len(matrix[i]))
-		copy(normalized[i], matrix[i])
-	}
-
-	// Normalize each column (time point) to sum to 1
-	numCols := len(matrix[0])
-	for j := 0; j < numCols; j++ {
-		sum := 0.0
-		for i := 0; i < len(matrix); i++ {
-			if j < len(matrix[i]) {
-				sum += matrix[i][j]
-			}
-		}
-		if sum > 0 {
-			for i := 0; i < len(matrix); i++ {
-				if j < len(normalized[i]) {
-					normalized[i][j] /= sum
-				}
-			}
-		}
-	}
-
-	return normalized
 }
 
 // configureBurndownTimeAxis sets up the time axis to match Python's matplotlib behavior

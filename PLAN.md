@@ -40,7 +40,7 @@ Critical gaps found during inspection and follow-up implementation:
 - The CLI now normalizes output paths before dispatch: single-file modes receive a concrete file path, and multi-asset modes receive the requested directory or the parent directory of a requested file path.
 - The default-report protobuf fixture now runs through every default mode without CLI-level mode failures; visual parity remains to be proven.
 - `hercules report --all --strict` with the copied SIVA fixture now exits successfully with no "mode not implemented" or hard mode errors from the Go binary. It still prints expected missing-data warnings for repository/file/person burndown analyses absent from that fixture.
-- `go test ./...` currently fails only in the visual Python compatibility/regression tests. The latest tracked baseline is 203 passed, 12 failed, 1 skipped.
+- `go test ./...` currently fails only in the visual Python compatibility/regression tests. The latest tracked baseline is 213 passed, 11 failed, 1 skipped.
 - README and CLAUDE status claims were corrected in Phase 0 so they no longer describe the project as production-ready.
 
 ## Hercules Contract to Match
@@ -122,7 +122,7 @@ Therefore every mode must accept a single output file path and write that path, 
 | `devs-efforts` | Implemented | Verify Python parity and output names. |
 | `old-vs-new` | Implemented | Verify against Python resampling and line classification. |
 | `languages` | Implemented | Language totals are now derived from Devs ticks for protobuf and compact YAML; temporal chart parity remains. |
-| `devs-parallel` | Approximate | NaN failures are guarded, but Python `load_devs_parallel` and `show_devs_parallel` still need to be ported and the synthetic fallback removed from the compatibility path. |
+| `devs-parallel` | Approximate | NaN failures are guarded and synthetic fallback is explicitly gated, but Python `load_devs_parallel` and `show_devs_parallel` still need to be ported. |
 | `run-times` | Implemented | Verify text output and JSON behavior. Not used by report. |
 | `bus-factor` | Basic implementation | Improve Python parity and subsystem output. |
 | `ownership-concentration` | Basic implementation | Improve Python parity and subsystem output. |
@@ -307,7 +307,7 @@ Status as of 2026-04-26:
 - `sentiment` and `devs-parallel` now sanitize zero/empty values so `gonum/plot` no longer rejects NaN bar data.
 - `devs-parallel` no longer synthesizes data by default when people burndown is missing; the legacy synthetic path requires explicit `--devs-parallel-fallback`, and the current Go analysis respects `--max-people`.
 - `hercules report --all --strict --labours-cmd ./labours` exits 0 on `/tmp/labours-go-hercules.siva` and writes report assets under `/tmp/labours-go-hercules-report-all-phase4`.
-- Current full test baseline after Phase 4 shotness co-occurrence work: `go test ./...` reports 204 passed, 12 failed, 1 skipped. Remaining failures are the pre-existing visual compatibility failures.
+- Current full test baseline after Phase 4 fallback-gating work: `go test ./...` reports 213 passed, 11 failed, 1 skipped. Remaining failures are the pre-existing visual compatibility failures.
 - Remaining Phase 4 work is semantic parity: real multi-repository fixtures, real sentiment fixture validation, and a Python-compatible `devs-parallel` ranking/plot implementation.
 
 Tasks:
