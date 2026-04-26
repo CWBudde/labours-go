@@ -16,57 +16,62 @@ import (
 
 // Map of mode names to their handlers
 var modeHandlers = map[string]func(reader readers.Reader, output string, startTime, endTime *time.Time) error{
-	"burndown-project":  burndownProject,
-	"burndown-file":     burndownFile,
-	"burndown-person":   burndownPerson,
-	"overwrites-matrix": overwritesMatrix,
-	"ownership":         ownershipBurndown,
-	"couples-files":     couplesFiles,
-	"couples-people":    couplesPeople,
-	"couples-shotness":  couplesShotness,
-	"shotness":          shotness,
-	"devs":              devs,
-	"devs-efforts":      devsEfforts,
-	"old-vs-new":        oldVsNew,
-	"languages":         languages,
-	"devs-parallel":     devsParallel,
-	"run-times":         runTimes,
-	"sentiment":         sentiment,
-	"all":               runAllModes,
+	"burndown-project":        burndownProject,
+	"burndown-file":           burndownFile,
+	"burndown-person":         burndownPerson,
+	"overwrites-matrix":       overwritesMatrix,
+	"ownership":               ownershipBurndown,
+	"couples-files":           couplesFiles,
+	"couples-people":          couplesPeople,
+	"couples-shotness":        couplesShotness,
+	"shotness":                shotness,
+	"devs":                    devs,
+	"devs-efforts":            devsEfforts,
+	"old-vs-new":              oldVsNew,
+	"languages":               languages,
+	"temporal-activity":       temporalActivity,
+	"devs-parallel":           devsParallel,
+	"run-times":               runTimes,
+	"bus-factor":              busFactor,
+	"ownership-concentration": ownershipConcentration,
+	"knowledge-diffusion":     knowledgeDiffusion,
+	"hotspot-risk":            hotspotRisk,
+	"sentiment":               sentiment,
+	"all":                     runAllModes,
 }
 
 func executeModes(modes []string, reader readers.Reader, output string, startTime, endTime *time.Time) {
 	// Check if JSON output is requested
 	jsonOutput := strings.HasSuffix(strings.ToLower(output), ".json")
-	
+
 	// Initialize progress tracking for multiple modes
 	quiet := viper.GetBool("quiet")
 	progEstimator := progress.NewProgressEstimator(!quiet)
-	
+
 	// If JSON output, collect all results and save as JSON
 	if jsonOutput {
 		results := make(map[string]interface{})
-		
+
 		if len(modes) > 1 {
 			progEstimator.StartMultiOperation(len(modes), "Analysis Modes")
 		}
-		
+
 		for _, mode := range modes {
 			if len(modes) > 1 {
 				progEstimator.NextOperation(fmt.Sprintf("Running %s", mode))
 			}
-			
+
 			if !quiet {
 				fmt.Printf("Running mode: %s\n", mode)
 			}
-			
+
 			// For JSON output, collect data instead of generating plots
 			if modeFunc, ok := modeHandlers[mode]; ok {
 				// Create temporary directory for this mode's data
 				tempDir := filepath.Join(os.TempDir(), "labours-json-"+mode)
 				os.MkdirAll(tempDir, 0755)
 				defer os.RemoveAll(tempDir)
-				
+
 				if err := modeFunc(reader, tempDir, startTime, endTime); err != nil {
 					fmt.Printf("Error in mode %s: %v\n", mode, err)
 					results[mode] = map[string]interface{}{
@@ -77,17 +82,17 @@ func executeModes(modes []string, reader readers.Reader, output string, startTim
 					results[mode] = extractModeDataForJSON(reader, mode)
 				}
 			} else {
-				fmt.Printf("Unknown mode: %s\n", mode)
+				printModeUnavailable(mode)
 				results[mode] = map[string]interface{}{
-					"error": "unknown mode",
+					"error": "mode not implemented",
 				}
 			}
 		}
-		
+
 		if len(modes) > 1 {
 			progEstimator.FinishMultiOperation()
 		}
-		
+
 		// Save results as JSON
 		if err := saveJSONResults(results, output); err != nil {
 			fmt.Printf("Error saving JSON results: %v\n", err)
@@ -99,27 +104,24 @@ func executeModes(modes []string, reader readers.Reader, output string, startTim
 		if len(modes) > 1 {
 			// Start multi-mode progress tracking
 			progEstimator.StartMultiOperation(len(modes), "Analysis Modes")
-			
+
 			for _, mode := range modes {
 				progEstimator.NextOperation(fmt.Sprintf("Running %s", mode))
-				
+
 				if !quiet {
 					fmt.Printf("Running mode: %s\n", mode)
 				}
-				
+
 				if modeFunc, ok := modeHandlers[mode]; ok {
-					// Apply format detection and generate appropriate output path
-					format := detectOutputFormat(output)
-					formattedOutput := generateOutputPath(output, format)
-					
+					formattedOutput := planModeOutput(output, mode, len(modes))
 					if err := modeFunc(reader, formattedOutput, startTime, endTime); err != nil {
 						fmt.Printf("Error in mode %s: %v\n", mode, err)
 					}
 				} else {
-					fmt.Printf("Unknown mode: %s\n", mode)
+					printModeUnavailable(mode)
 				}
 			}
-			
+
 			progEstimator.FinishMultiOperation()
 		} else {
 			// Single mode - let the individual mode handle its own progress
@@ -127,21 +129,26 @@ func executeModes(modes []string, reader readers.Reader, output string, startTim
 				if !quiet {
 					fmt.Printf("Running mode: %s\n", mode)
 				}
-				
+
 				if modeFunc, ok := modeHandlers[mode]; ok {
-					// Apply format detection and generate appropriate output path
-					format := detectOutputFormat(output)
-					formattedOutput := generateOutputPath(output, format)
-					
+					formattedOutput := planModeOutput(output, mode, len(modes))
 					if err := modeFunc(reader, formattedOutput, startTime, endTime); err != nil {
 						fmt.Printf("Error in mode %s: %v\n", mode, err)
 					}
 				} else {
-					fmt.Printf("Unknown mode: %s\n", mode)
+					printModeUnavailable(mode)
 				}
 			}
 		}
 	}
+}
+
+func printModeUnavailable(mode string) {
+	if isValidMode(mode) {
+		fmt.Printf("Mode not implemented yet: %s\n", mode)
+		return
+	}
+	fmt.Printf("Unknown mode: %s\n", mode)
 }
 
 func burndownProject(reader readers.Reader, output string, startTime, endTime *time.Time) error {
@@ -154,7 +161,7 @@ func burndownProject(reader readers.Reader, output string, startTime, endTime *t
 func burndownFile(reader readers.Reader, output string, startTime, endTime *time.Time) error {
 	relative := viper.GetBool("relative")
 	resample := viper.GetString("resample")
-	// Use Python-compatible implementation  
+	// Use Python-compatible implementation
 	return modes.GenerateBurndownFilePython(reader, output, relative, resample)
 }
 
@@ -209,12 +216,34 @@ func languages(reader readers.Reader, output string, startTime, endTime *time.Ti
 	return modes.Languages(reader, output)
 }
 
+func temporalActivity(reader readers.Reader, output string, startTime, endTime *time.Time) error {
+	legendThreshold := viper.GetInt("temporal-legend-threshold")
+	singleColumnThreshold := viper.GetInt("temporal-legend-single-col-threshold")
+	return modes.TemporalActivity(reader, output, legendThreshold, singleColumnThreshold)
+}
+
 func devsParallel(reader readers.Reader, output string, startTime, endTime *time.Time) error {
 	return modes.DevsParallel(reader, output)
 }
 
 func runTimes(reader readers.Reader, output string, startTime, endTime *time.Time) error {
 	return modes.RunTimes(reader, output)
+}
+
+func busFactor(reader readers.Reader, output string, startTime, endTime *time.Time) error {
+	return modes.BusFactor(reader, output)
+}
+
+func ownershipConcentration(reader readers.Reader, output string, startTime, endTime *time.Time) error {
+	return modes.OwnershipConcentration(reader, output)
+}
+
+func knowledgeDiffusion(reader readers.Reader, output string, startTime, endTime *time.Time) error {
+	return modes.KnowledgeDiffusion(reader, output)
+}
+
+func hotspotRisk(reader readers.Reader, output string, startTime, endTime *time.Time) error {
+	return modes.HotspotRisk(reader, output)
 }
 
 func sentiment(reader readers.Reader, output string, startTime, endTime *time.Time) error {
@@ -232,31 +261,31 @@ func runAllModes(reader readers.Reader, output string, startTime, endTime *time.
 		devsEfforts,
 		languages,
 	}
-	
+
 	modeNames := []string{
 		"burndown-project",
-		"devs", 
+		"devs",
 		"ownership",
 		"couples-files",
 		"devs-efforts",
 		"languages",
 	}
-	
+
 	if !viper.GetBool("quiet") {
 		fmt.Printf("Running 'all' mode: executing %d analysis modes\n", len(allModes))
 	}
-	
+
 	for i, modeFunc := range allModes {
 		if !viper.GetBool("quiet") {
 			fmt.Printf("  Running %s...\n", modeNames[i])
 		}
-		
+
 		if err := modeFunc(reader, output, startTime, endTime); err != nil {
 			fmt.Printf("  Error in mode %s: %v\n", modeNames[i], err)
 			// Continue with other modes even if one fails
 		}
 	}
-	
+
 	return nil
 }
 
@@ -272,9 +301,9 @@ func extractModeDataForJSON(reader readers.Reader, mode string) interface{} {
 	case "burndown-project":
 		if header, name, matrix, err := reader.GetProjectBurndownWithHeader(); err == nil {
 			return map[string]interface{}{
-				"header":     header,
-				"name":       name,
-				"matrix":     matrix,
+				"header": header,
+				"name":   name,
+				"matrix": matrix,
 			}
 		}
 	case "ownership":
@@ -318,7 +347,7 @@ func extractModeDataForJSON(reader readers.Reader, mode string) interface{} {
 			}
 		}
 	}
-	
+
 	return map[string]interface{}{
 		"message": "No data available for JSON export",
 	}
@@ -334,16 +363,16 @@ func saveJSONResults(results map[string]interface{}, outputPath string) error {
 
 	encoder := json.NewEncoder(file)
 	encoder.SetIndent("", "  ") // Pretty print
-	
+
 	// Add metadata
 	output := map[string]interface{}{
 		"meta": map[string]interface{}{
-			"generated_by":    "labours-go",
-			"generated_at":    time.Now().Format(time.RFC3339),
-			"modes_executed":  len(results),
+			"generated_by":   "labours-go",
+			"generated_at":   time.Now().Format(time.RFC3339),
+			"modes_executed": len(results),
 		},
 		"results": results,
 	}
-	
+
 	return encoder.Encode(output)
 }

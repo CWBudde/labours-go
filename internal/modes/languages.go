@@ -2,7 +2,10 @@ package modes
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"sort"
+	"strings"
 
 	"gonum.org/v1/plot"
 	"gonum.org/v1/plot/plotter"
@@ -49,7 +52,7 @@ func plotLanguages(languageStats []readers.LanguageStat, output string) error {
 	// Prepare data for the bar chart
 	names := make([]string, len(languageStats))
 	values := make(plotter.Values, len(languageStats))
-	
+
 	for i, stat := range languageStats {
 		names[i] = stat.Language
 		values[i] = float64(stat.Lines)
@@ -80,12 +83,18 @@ func plotLanguages(languageStats []readers.LanguageStat, output string) error {
 
 	// Save the plot with dynamic sizing
 	width, height := graphics.GetPlotSize(graphics.ChartTypeDefault)
-	if err := graphics.SavePlotWithFormat(p, width, height, output); err != nil {
+	outputs, err := languageOutputPaths(output)
+	if err != nil {
 		return err
 	}
 
-	fmt.Printf("Language chart saved to %s\n", output)
-	
+	for _, outputPath := range outputs {
+		if err := graphics.SavePlotWithFormat(p, width, height, outputPath); err != nil {
+			return err
+		}
+		fmt.Printf("Language chart saved to %s\n", outputPath)
+	}
+
 	// Print text summary
 	fmt.Println("\nLanguage Statistics:")
 	fmt.Println("====================")
@@ -93,13 +102,37 @@ func plotLanguages(languageStats []readers.LanguageStat, output string) error {
 	for _, stat := range languageStats {
 		totalLines += stat.Lines
 	}
-	
+
 	for i, stat := range languageStats {
 		percentage := float64(stat.Lines) / float64(totalLines) * 100
 		fmt.Printf("%2d. %-15s %8d lines (%5.1f%%)\n", i+1, stat.Language, stat.Lines, percentage)
 	}
-	
+
 	fmt.Printf("\nTotal: %d lines across %d languages\n", totalLines, len(languageStats))
 
 	return nil
+}
+
+func languageOutputPaths(output string) ([]string, error) {
+	if output == "" {
+		output = "."
+	}
+
+	ext := strings.ToLower(filepath.Ext(output))
+	if ext != "" {
+		if dir := filepath.Dir(output); dir != "." {
+			if err := os.MkdirAll(dir, 0755); err != nil {
+				return nil, fmt.Errorf("failed to create output directory %s: %v", dir, err)
+			}
+		}
+		return []string{output}, nil
+	}
+
+	if err := os.MkdirAll(output, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create output directory %s: %v", output, err)
+	}
+	return []string{
+		filepath.Join(output, "languages.png"),
+		filepath.Join(output, "languages.svg"),
+	}, nil
 }

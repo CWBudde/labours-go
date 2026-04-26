@@ -40,12 +40,15 @@ func initializeFlags() {
 	rootCmd.PersistentFlags().Bool("relative", false, "Occupy 100% height for every measurement")
 	rootCmd.PersistentFlags().String("tmpdir", "", "Temporary directory for intermediate files")
 	rootCmd.PersistentFlags().StringSliceP("modes", "m", []string{}, "What to plot, can be repeated")
+	rootCmd.PersistentFlags().StringSlice("mode", []string{}, "What to plot; Python-compatible alias for --modes")
 	rootCmd.PersistentFlags().String("resample", "year", "Resample time series method")
 	rootCmd.PersistentFlags().String("start-date", "", "Start date for time-based plots")
 	rootCmd.PersistentFlags().String("end-date", "", "End date for time-based plots")
 	rootCmd.PersistentFlags().Bool("disable-projector", false, "Do not run Tensorflow Projector")
 	rootCmd.PersistentFlags().Int("max-people", 20, "Maximum developers in matrix and people plots")
 	rootCmd.PersistentFlags().Bool("order-ownership-by-time", false, "Sort developers in the ownership plot by their first appearance in the history.")
+	rootCmd.PersistentFlags().Int("temporal-legend-threshold", 32, "Maximum number of developers to show legend for in temporal activity charts. 0 disables the limit.")
+	rootCmd.PersistentFlags().Int("temporal-legend-single-col-threshold", 10, "Maximum number of developers for single-column legend in temporal activity charts.")
 	rootCmd.PersistentFlags().Bool("sentiment", false, "Include sentiment analysis in the output (Python compatibility)")
 
 	// Progress and output control flags
@@ -149,10 +152,14 @@ func runLaboursCommand(cmd *cobra.Command, args []string) {
 	}
 
 	input, inputFormat := viper.GetString("input"), viper.GetString("input-format")
+	inputFormat, err := normalizeInputFormat(inputFormat)
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
+	}
 	startDate, endDate := parseDates()
 	validateDateRange(startDate, endDate)
 
-	reader := detectAndReadInput(input, inputFormat)
 	modes := resolveModes()
 
 	// Handle Python compatibility: if --sentiment flag is set, add sentiment mode
@@ -161,6 +168,7 @@ func runLaboursCommand(cmd *cobra.Command, args []string) {
 		fmt.Println("Added sentiment analysis mode (--sentiment flag)")
 	}
 
+	reader := detectAndReadInput(input, inputFormat)
 	executeModes(modes, reader, viper.GetString("output"), startDate, endDate)
 }
 
@@ -233,32 +241,32 @@ func handleHerculesIntegration(repoPath string) {
 func mapStyleToTheme(style string) string {
 	styleToTheme := map[string]string{
 		// Core matplotlib built-in styles
-		"default":              "default", // matplotlib default
-		"classic":              "default", // classic matplotlib -> default
-		"ggplot":               "default", // ggplot is our default
-		"dark_background":      "dark",    // dark background -> dark theme
-		"grayscale":            "minimal", // grayscale -> minimal
-		"bmh":                  "vibrant", // Bayesian Methods for Hackers -> vibrant
-		"fivethirtyeight":      "vibrant", // FiveThirtyEight -> vibrant
-		"fast":                 "default", // fast style -> default
+		"default":         "default", // matplotlib default
+		"classic":         "default", // classic matplotlib -> default
+		"ggplot":          "default", // ggplot is our default
+		"dark_background": "dark",    // dark background -> dark theme
+		"grayscale":       "minimal", // grayscale -> minimal
+		"bmh":             "vibrant", // Bayesian Methods for Hackers -> vibrant
+		"fivethirtyeight": "vibrant", // FiveThirtyEight -> vibrant
+		"fast":            "default", // fast style -> default
 
 		// Seaborn styles (original and v0.8+ variants)
-		"seaborn":              "minimal", // seaborn-like -> minimal
-		"seaborn-v0_8":         "minimal", // newer seaborn -> minimal
-		"seaborn-bright":       "vibrant", // seaborn bright -> vibrant
-		"seaborn-colorblind":   "default", // seaborn colorblind -> default
-		"seaborn-dark":         "dark",    // seaborn dark -> dark
-		"seaborn-darkgrid":     "dark",    // seaborn dark grid -> dark
-		"seaborn-pastel":       "minimal", // seaborn pastel -> minimal
-		"seaborn-white":        "minimal", // seaborn white -> minimal
-		"seaborn-whitegrid":    "default", // seaborn white grid -> default
-		"seaborn-paper":        "minimal", // seaborn paper -> minimal
-		"seaborn-poster":       "vibrant", // seaborn poster -> vibrant
-		"seaborn-talk":         "default", // seaborn talk -> default
-		"seaborn-notebook":     "default", // seaborn notebook -> default
-		"seaborn-muted":        "minimal", // seaborn muted -> minimal
-		"seaborn-deep":         "dark",    // seaborn deep -> dark
-		"seaborn-ticks":        "default", // seaborn ticks -> default
+		"seaborn":            "minimal", // seaborn-like -> minimal
+		"seaborn-v0_8":       "minimal", // newer seaborn -> minimal
+		"seaborn-bright":     "vibrant", // seaborn bright -> vibrant
+		"seaborn-colorblind": "default", // seaborn colorblind -> default
+		"seaborn-dark":       "dark",    // seaborn dark -> dark
+		"seaborn-darkgrid":   "dark",    // seaborn dark grid -> dark
+		"seaborn-pastel":     "minimal", // seaborn pastel -> minimal
+		"seaborn-white":      "minimal", // seaborn white -> minimal
+		"seaborn-whitegrid":  "default", // seaborn white grid -> default
+		"seaborn-paper":      "minimal", // seaborn paper -> minimal
+		"seaborn-poster":     "vibrant", // seaborn poster -> vibrant
+		"seaborn-talk":       "default", // seaborn talk -> default
+		"seaborn-notebook":   "default", // seaborn notebook -> default
+		"seaborn-muted":      "minimal", // seaborn muted -> minimal
+		"seaborn-deep":       "dark",    // seaborn deep -> dark
+		"seaborn-ticks":      "default", // seaborn ticks -> default
 
 		// Tableau styles
 		"tableau-colorblind10": "default", // tableau -> default
@@ -268,47 +276,47 @@ func mapStyleToTheme(style string) string {
 		"tab20c":               "minimal", // tableau 20c -> minimal
 
 		// Solarized styles
-		"Solarize_Light2":      "minimal", // Solarized light -> minimal
-		"solarized":            "minimal", // general solarized -> minimal
-		"solarized-light":      "minimal", // solarized light -> minimal
-		"solarized-dark":       "dark",    // solarized dark -> dark
+		"Solarize_Light2": "minimal", // Solarized light -> minimal
+		"solarized":       "minimal", // general solarized -> minimal
+		"solarized-light": "minimal", // solarized light -> minimal
+		"solarized-dark":  "dark",    // solarized dark -> dark
 
 		// Additional matplotlib styles
-		"cyberpunk":            "dark",    // cyberpunk style -> dark
-		"science":              "minimal", // science style -> minimal
-		"ieee":                 "minimal", // IEEE format -> minimal
-		"nature":               "default", // nature format -> default
-		"grid":                 "default", // with grid -> default
-		"no-latex":             "default", // no LaTeX -> default
+		"cyberpunk": "dark",    // cyberpunk style -> dark
+		"science":   "minimal", // science style -> minimal
+		"ieee":      "minimal", // IEEE format -> minimal
+		"nature":    "default", // nature format -> default
+		"grid":      "default", // with grid -> default
+		"no-latex":  "default", // no LaTeX -> default
 
 		// Common style variants and aliases (case-insensitive)
-		"dark":         "dark",
-		"light":        "default",
-		"minimal":      "minimal",
-		"vibrant":      "vibrant",
-		"colorful":     "vibrant",
-		"monochrome":   "minimal",
-		"black":        "dark",
-		"white":        "minimal",
-		"bright":       "vibrant",
-		"muted":        "minimal",
-		"pastel":       "minimal",
-		"deep":         "dark",
-		"paper":        "minimal",
-		"poster":       "vibrant",
-		"talk":         "default",
-		"notebook":     "default",
-		"whitegrid":    "default",
-		"darkgrid":     "dark",
-		"ticks":        "default",
+		"dark":       "dark",
+		"light":      "default",
+		"minimal":    "minimal",
+		"vibrant":    "vibrant",
+		"colorful":   "vibrant",
+		"monochrome": "minimal",
+		"black":      "dark",
+		"white":      "minimal",
+		"bright":     "vibrant",
+		"muted":      "minimal",
+		"pastel":     "minimal",
+		"deep":       "dark",
+		"paper":      "minimal",
+		"poster":     "vibrant",
+		"talk":       "default",
+		"notebook":   "default",
+		"whitegrid":  "default",
+		"darkgrid":   "dark",
+		"ticks":      "default",
 
 		// Color scheme aliases
-		"blues":        "minimal",
-		"greens":       "minimal",
-		"greys":        "minimal",
-		"oranges":      "vibrant",
-		"purples":      "vibrant",
-		"reds":         "vibrant",
+		"blues":   "minimal",
+		"greens":  "minimal",
+		"greys":   "minimal",
+		"oranges": "vibrant",
+		"purples": "vibrant",
+		"reds":    "vibrant",
 	}
 
 	return styleToTheme[strings.ToLower(style)]

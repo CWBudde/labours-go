@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 	"strings"
 )
 
@@ -85,22 +86,62 @@ func transposeMatrix(matrix [][]int) [][]int {
 	if len(matrix) == 0 || len(matrix[0]) == 0 {
 		return [][]int{}
 	}
-	
+
 	rows := len(matrix)
 	cols := len(matrix[0])
-	
+
 	// Create transposed matrix
 	transposed := make([][]int, cols)
 	for i := range transposed {
 		transposed[i] = make([]int, rows)
 	}
-	
+
 	// Fill transposed matrix
 	for i := 0; i < rows; i++ {
 		for j := 0; j < cols; j++ {
 			transposed[j][i] = matrix[i][j]
 		}
 	}
-	
+
 	return transposed
+}
+
+func aggregateLanguageStats(timeSeries *DeveloperTimeSeriesData) ([]LanguageStat, error) {
+	if timeSeries == nil {
+		return nil, fmt.Errorf("no developer time series data found")
+	}
+
+	totals := make(map[string]int)
+	for _, dayStats := range timeSeries.Days {
+		for _, stats := range dayStats {
+			for language, values := range stats.Languages {
+				if language == "" {
+					continue
+				}
+				for _, value := range values {
+					totals[language] += value
+				}
+			}
+		}
+	}
+
+	if len(totals) == 0 {
+		return nil, fmt.Errorf("no language stats found in developer time series")
+	}
+
+	languages := make([]LanguageStat, 0, len(totals))
+	for language, lines := range totals {
+		languages = append(languages, LanguageStat{
+			Language: language,
+			Lines:    lines,
+		})
+	}
+	sort.Slice(languages, func(i, j int) bool {
+		if languages[i].Lines == languages[j].Lines {
+			return languages[i].Language < languages[j].Language
+		}
+		return languages[i].Lines > languages[j].Lines
+	})
+
+	return languages, nil
 }

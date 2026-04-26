@@ -33,12 +33,13 @@ Critical gaps found during inspection:
 
 - Hercules `report` default modes include modes this repo does not implement: `temporal-activity`, `bus-factor`, `ownership-concentration`, `knowledge-diffusion`, `hotspot-risk`.
 - Hercules `report --all` additionally includes `burndown-repository` and `burndown-repos-combined`, also missing here.
-- The local `pb.proto` is behind `../hercules/internal/pb/pb.proto`. Missing messages include repository burndown fields, temporal activity, bus factor, ownership concentration, knowledge diffusion, hotspot risk, refactoring proxy, onboarding, code churn, commits, sentiment, imports, and others.
-- Reader interface does not expose the data needed by the missing report modes.
+- The local `pb.proto` was behind `../hercules/internal/pb/pb.proto` when this plan started. Phase 1 has synced the schema and regenerated Go bindings; remaining work is using those payloads in modes.
+- Reader accessors for default report payloads now exist. Missing report modes still need to consume them.
 - Some implemented modes are semantic approximations, not Python-labours ports. Notable examples: `sentiment` derives heuristic sentiment from dev/language stats instead of reading `CommentSentimentResults`; `devs-parallel` can synthesize data instead of using the same ownership/coupling/devs calculations as Python.
 - Coupling modes currently generate Go-native plots/assets, while Python `labours` trains embeddings and writes projector assets unless disabled.
-- Several modes assume `output` is a directory and write nested files, but Hercules `report` passes a concrete file path per mode.
-- `go test ./...` currently fails: 145 passed, 15 failed, 1 skipped. Failures are in `internal/modes` language output tests and `test/visual` Python compatibility/regression tests.
+- The CLI now normalizes output paths before dispatch: single-file modes receive a concrete file path, and multi-asset modes receive the requested directory or the parent directory of a requested file path.
+- The default-report protobuf fixture now runs through every default mode without CLI-level mode failures; visual parity and full Hercules `report` integration remain to be proven.
+- `go test ./...` currently fails: 196 passed, 12 failed, 1 skipped. Remaining failures are in `test/visual` Python compatibility/regression tests.
 - README and CLAUDE status claims were corrected in Phase 0 so they no longer describe the project as production-ready.
 
 ## Hercules Contract to Match
@@ -112,20 +113,20 @@ Therefore every mode must accept a single output file path and write that path, 
 | `ownership` | Implemented | Verify against `files_ownership`/people burndown Python logic and `--order-ownership-by-time`. |
 | `couples-files` | Implemented differently | Decide compatibility target: projector embeddings/assets, static plots, or both. Ensure report file output works. |
 | `couples-people` | Implemented differently | Same as couples-files; verify matrix preprocessing and projector behavior. |
-| `couples-shotness` | Partial | Python uses shotness co-occurrence embeddings; protobuf reader currently reports not implemented. |
+| `couples-shotness` | Partial | Python uses shotness co-occurrence embeddings; protobuf reader now exposes shotness co-occurrence data, but mode/output parity remains. |
 | `shotness` | Implemented | Verify printed stats and optional output behavior against Python. |
 | `sentiment` | Not compatible | Parse `CommentSentimentResults`; port Python chart/stats behavior. Remove heuristic replacement from compatibility path. |
-| `temporal-activity` | Missing | Implement reader, mode, chart layout, date filters, legend threshold flags. |
+| `temporal-activity` | Basic implementation | Improve chart parity, date filters, and legend threshold behavior. |
 | `devs` | Implemented | Verify aggregate/time-series math, language parsing, `--max-people`, JSON output. |
 | `devs-efforts` | Implemented | Verify Python parity and output names. |
 | `old-vs-new` | Implemented | Verify against Python resampling and line classification. |
-| `languages` | Implemented but tests fail | Fix reader data extraction and output behavior; Python derives language stats from devs data. |
+| `languages` | Implemented | Language totals are now derived from Devs ticks for protobuf and compact YAML; temporal chart parity remains. |
 | `devs-parallel` | Approximate | Port Python `load_devs_parallel` and `show_devs_parallel`; remove synthetic fallback from compatibility path. |
 | `run-times` | Implemented | Verify text output and JSON behavior. Not used by report. |
-| `bus-factor` | Missing | Parse `BusFactorAnalysisResults`; implement chart/stats mode. |
-| `ownership-concentration` | Missing | Parse `OwnershipConcentrationResults`; implement Gini/HHI charts and subsystem output. |
-| `knowledge-diffusion` | Missing | Parse `KnowledgeDiffusionResults`; implement distribution/time charts. |
-| `hotspot-risk` | Missing | Parse `HotspotRiskResults`; implement ranking output/chart. |
+| `bus-factor` | Basic implementation | Improve Python parity and subsystem output. |
+| `ownership-concentration` | Basic implementation | Improve Python parity and subsystem output. |
+| `knowledge-diffusion` | Basic implementation | Improve optional top files/time trend parity. |
+| `hotspot-risk` | Basic implementation | Improve table-like output and risk metric parity. |
 | `refactoring-proxy` | Missing locally, in Python CLI | Parse `RefactoringProxyResults`; implement if aiming beyond Hercules report. |
 
 ## Phase 0: Baseline and Truth Cleanup
@@ -201,32 +202,52 @@ Acceptance criteria:
 
 Goal: command-line behavior matches Python `labours` closely enough for scripts and Hercules report.
 
+Status as of 2026-04-26:
+
+- `--mode` is registered as a Python-compatible alias alongside existing `--modes`/`-m`.
+- `--temporal-legend-threshold` and `--temporal-legend-single-col-threshold` are registered.
+- Mode parsing now handles repeated values and comma-separated values through one testable resolver.
+- Known Python/Hercules mode names are validated before input files are read; unknown modes fail early.
+- `--input-format` is validated as `auto`, `yaml`, or `pb` before input files are read.
+- `--backend Agg` is treated as a rendering backend hint and leaves output extension detection to the requested output path.
+- Output planning now preserves a single-mode file path, expands directory output to a per-mode file path, makes multi-mode file output use sibling per-mode files, and passes multi-asset modes a directory so their assets are written next to the requested file path.
+- `languages` directory output now writes `languages.png` and `languages.svg`, fixing the prior `internal/modes` language output failures.
+- Current full test baseline after Phase 2 output work: `go test ./...` reports 187 passed, 12 failed, 1 skipped. Remaining failures are the pre-existing visual compatibility failures.
+
 Tasks:
 
-- [ ] Add missing `-m/--mode` alias behavior while preserving current `--modes` if desired.
-- [ ] Add missing mode choices and reject unknown modes consistently.
-- [ ] Add `--temporal-legend-threshold`.
-- [ ] Add `--temporal-legend-single-col-threshold`.
-- [ ] Validate supported `--input-format` values: `yaml`, `pb`, `auto`.
-- [ ] Implement Python-compatible date parsing tolerance where practical, or document accepted date formats and test them.
-- [ ] Ensure `--backend Agg` is accepted as a rendering backend hint and does not change extension detection incorrectly.
+- [x] Add missing `-m/--mode` alias behavior while preserving current `--modes` if desired.
+- [x] Add missing mode choices and reject unknown modes consistently.
+- [x] Add `--temporal-legend-threshold`.
+- [x] Add `--temporal-legend-single-col-threshold`.
+- [x] Validate supported `--input-format` values: `yaml`, `pb`, `auto`.
+- [x] Implement Python-compatible date parsing tolerance where practical, or document accepted date formats and test them.
+- [x] Ensure `--backend Agg` is accepted as a rendering backend hint and does not change extension detection incorrectly.
 - [ ] Preserve Python behavior for no modes, warnings, stdout summaries, and non-fatal missing analyses.
-- [ ] Normalize single-mode output so a file path writes that file.
-- [ ] Normalize multi-asset mode output so assets are written next to the requested file path with stable names.
-- [ ] Keep directory output supported.
+- [x] Normalize single-mode output so a file path writes that file.
+- [x] Normalize multi-asset mode output so assets are written next to the requested file path with stable names.
+- [x] Keep directory output supported.
 - [ ] Ensure JSON extension writes real data instead of an image where Python does.
 
 Acceptance criteria:
 
-- [ ] Every invocation shape used by Hercules report succeeds for implemented modes.
-- [ ] CLI compatibility tests compare help output.
-- [ ] CLI compatibility tests compare flag acceptance.
+- [x] Every invocation shape used by Hercules report succeeds for implemented modes at the CLI/output dispatch layer.
+- [x] CLI compatibility tests compare important help/flag registration.
+- [x] CLI compatibility tests compare flag acceptance.
 - [ ] CLI compatibility tests compare missing-data warnings.
-- [ ] CLI compatibility tests compare output locations.
+- [x] CLI compatibility tests compare output locations.
 
 ## Phase 3: Core Report Modes
 
 Goal: `hercules report` default modes produce useful assets with no failures.
+
+Status as of 2026-04-26:
+
+- `languages` now derives totals from `DevsAnalysisResults` tick language stats for protobuf input.
+- YAML dev time-series parsing now supports current compact Hercules tick entries of the form `[commits, added, removed, changed, languages]`.
+- Basic single-file plot modes are wired for `temporal-activity`, `bus-factor`, `ownership-concentration`, `knowledge-diffusion`, and `hotspot-risk`.
+- The real default report fixture runs through the full default mode list with the local `./labours` binary and writes chart/assets under `/tmp/labours-go-phase3-default`.
+- Current full test baseline after Phase 3 work: `go test ./...` reports 196 passed, 12 failed, 1 skipped. Remaining failures are the pre-existing visual compatibility failures.
 
 Priority order:
 
@@ -236,24 +257,24 @@ Priority order:
 
 Tasks:
 
-- [ ] Fix `languages` to derive language totals from `DevsAnalysisResults` ticks/languages.
-- [ ] Fix `languages` to support YAML and protobuf consistently.
-- [ ] Fix current `languages` output-file test failures.
-- [ ] Fix output-file semantics in coupling and multi-asset modes.
+- [x] Fix `languages` to derive language totals from `DevsAnalysisResults` ticks/languages.
+- [x] Fix `languages` to support YAML and protobuf consistently.
+- [x] Fix current `languages` output-file test failures.
+- [x] Fix CLI output-file semantics in coupling and multi-asset modes.
 - [ ] Verify/fix burndown modes against current Hercules protobuf tick size.
 - [ ] Verify/fix burndown modes against current Hercules protobuf matrix orientation.
 - [ ] Verify/fix ownership against Python calculations.
 - [ ] Verify/fix overwrites matrix against Python calculations.
-- [ ] Port `temporal-activity` mode using `TemporalActivityResults`.
-- [ ] Make `temporal-activity` support aggregate and per-tick formats.
+- [x] Port `temporal-activity` mode using `TemporalActivityResults`.
+- [x] Make `temporal-activity` support aggregate and per-tick formats.
 - [ ] Make `temporal-activity` respect date filters and legend threshold flags.
-- [ ] Port `bus-factor` mode using snapshots/subsystems/threshold/tick size.
+- [x] Port `bus-factor` mode using snapshots/subsystems/threshold/tick size.
 - [ ] Make `bus-factor` plot time series and subsystem summary.
-- [ ] Port `ownership-concentration` mode using Gini/HHI snapshots and subsystem metrics.
-- [ ] Make `ownership-concentration` plot both concentration metrics.
-- [ ] Port `knowledge-diffusion` mode using file diffusion and editor count distribution.
+- [x] Port `ownership-concentration` mode using Gini/HHI snapshots and subsystem metrics.
+- [x] Make `ownership-concentration` plot both concentration metrics.
+- [x] Port `knowledge-diffusion` mode using file diffusion and editor count distribution.
 - [ ] Make `knowledge-diffusion` plot distribution plus optional top files/time trend.
-- [ ] Port `hotspot-risk` mode using file risks.
+- [x] Port `hotspot-risk` mode using file risks.
 - [ ] Make `hotspot-risk` plot ranked risk bars/table-like output.
 
 Acceptance criteria:

@@ -20,15 +20,15 @@ func (r *YamlReader) Read(file io.Reader) error {
 	// Initialize progress tracking for YAML reading
 	quiet := viper.GetBool("quiet")
 	progEstimator := progress.NewProgressEstimator(!quiet)
-	
+
 	progEstimator.StartOperation("Reading YAML data", 1)
-	
+
 	decoder := yaml.NewDecoder(file)
 	if err := decoder.Decode(&r.data); err != nil {
 		progEstimator.FinishOperation()
 		return fmt.Errorf("error decoding YAML: %v", err)
 	}
-	
+
 	progEstimator.UpdateProgress(1)
 	progEstimator.FinishOperation()
 	return nil
@@ -151,7 +151,7 @@ func (r *YamlReader) GetFileCooccurrence() ([]string, [][]int, error) {
 	if !ok {
 		return nil, nil, fmt.Errorf("missing Couples data in YAML")
 	}
-	
+
 	// Try Python-style nested structure first: files_coocc["index"] and files_coocc["matrix"]
 	if filesCoocc, exists := couplesData["files_coocc"].(map[string]interface{}); exists {
 		fileIndex, indexOk := filesCoocc["index"].([]string)
@@ -167,7 +167,7 @@ func (r *YamlReader) GetFileCooccurrence() ([]string, [][]int, error) {
 				indexOk = true
 			}
 		}
-		
+
 		if indexOk {
 			// Handle both string matrix and map-based sparse matrix format
 			if matrixStr, ok := filesCoocc["matrix"].(string); ok {
@@ -181,7 +181,7 @@ func (r *YamlReader) GetFileCooccurrence() ([]string, [][]int, error) {
 			}
 		}
 	}
-	
+
 	// Fallback to flat structure (original Go format)
 	fileIndex, ok := couplesData["file_couples_index"].([]string)
 	if !ok {
@@ -201,7 +201,7 @@ func (r *YamlReader) GetPeopleCooccurrence() ([]string, [][]int, error) {
 	if !ok {
 		return nil, nil, fmt.Errorf("missing Couples data in YAML")
 	}
-	
+
 	// Try Python-style nested structure first: people_coocc["index"] and people_coocc["matrix"]
 	if peopleCoocc, exists := couplesData["people_coocc"].(map[string]interface{}); exists {
 		peopleIndex, indexOk := peopleCoocc["index"].([]string)
@@ -217,7 +217,7 @@ func (r *YamlReader) GetPeopleCooccurrence() ([]string, [][]int, error) {
 				indexOk = true
 			}
 		}
-		
+
 		if indexOk {
 			// Handle both string matrix and map-based sparse matrix format
 			if matrixStr, ok := peopleCoocc["matrix"].(string); ok {
@@ -231,7 +231,7 @@ func (r *YamlReader) GetPeopleCooccurrence() ([]string, [][]int, error) {
 			}
 		}
 	}
-	
+
 	// Fallback to flat structure (original Go format)
 	peopleIndex, ok := couplesData["people_couples_index"].([]string)
 	if !ok {
@@ -252,7 +252,7 @@ func (r *YamlReader) GetShotnessCooccurrence() ([]string, [][]int, error) {
 		return nil, nil, err
 	}
 
-	// Create index using Python format: "file:name" 
+	// Create index using Python format: "file:name"
 	var index []string
 	for _, record := range shotnessRecords {
 		name := fmt.Sprintf("%s:%s", record.File, record.Name)
@@ -312,14 +312,14 @@ func (r *YamlReader) GetShotnessRecords() ([]ShotnessRecord, error) {
 		if !ok {
 			continue // Skip invalid records
 		}
-		
+
 		counters := make(map[int32]int32)
 		if countData, ok := record["counters"].(map[interface{}]interface{}); ok {
 			for timeKey, count := range countData {
 				// Convert time key and count to int32
 				var timeInt int32
 				var countInt int32
-				
+
 				switch t := timeKey.(type) {
 				case int:
 					timeInt = int32(t)
@@ -330,7 +330,7 @@ func (r *YamlReader) GetShotnessRecords() ([]ShotnessRecord, error) {
 				default:
 					continue // Skip invalid time keys
 				}
-				
+
 				switch c := count.(type) {
 				case int:
 					countInt = int32(c)
@@ -341,7 +341,7 @@ func (r *YamlReader) GetShotnessRecords() ([]ShotnessRecord, error) {
 				default:
 					continue // Skip invalid counts
 				}
-				
+
 				counters[timeInt] = countInt
 			}
 		}
@@ -374,10 +374,10 @@ func (r *YamlReader) GetDeveloperStats() ([]DeveloperStat, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Convert time series data to flat stats (aggregated)
 	developerMap := make(map[string]*DeveloperStat)
-	
+
 	for _, dayStats := range devData.Days {
 		for devIdx, stats := range dayStats {
 			if devIdx < len(devData.People) {
@@ -399,12 +399,12 @@ func (r *YamlReader) GetDeveloperStats() ([]DeveloperStat, error) {
 			}
 		}
 	}
-	
+
 	var result []DeveloperStat
 	for _, stats := range developerMap {
 		result = append(result, *stats)
 	}
-	
+
 	return result, nil
 }
 
@@ -415,7 +415,7 @@ func (r *YamlReader) GetDeveloperTimeSeriesData() (*DeveloperTimeSeriesData, err
 	if !ok {
 		return nil, fmt.Errorf("missing Devs data in YAML")
 	}
-	
+
 	// Get people list (dev names)
 	var people []string
 	if peopleData, ok := devsData["people"].([]interface{}); ok {
@@ -433,93 +433,49 @@ func (r *YamlReader) GetDeveloperTimeSeriesData() (*DeveloperTimeSeriesData, err
 	} else {
 		return nil, fmt.Errorf("missing people/dev_index in Devs")
 	}
-	
+
 	// Get ticks (time series data)
-	ticks, ok := devsData["ticks"].(map[interface{}]interface{})
+	ticks, ok := asMap(devsData["ticks"])
 	if !ok {
 		return nil, fmt.Errorf("missing ticks in Devs")
 	}
-	
+
 	days := make(map[int]map[int]DevDay)
-	
+
 	for dayKey, dayData := range ticks {
 		dayInt, ok := convertToInt(dayKey)
 		if !ok {
 			continue
 		}
-		
-		dayMap, ok := dayData.(map[interface{}]interface{})
+
+		dayMap, ok := asMap(dayData)
 		if !ok {
 			continue
 		}
-		
-		devs, ok := dayMap["devs"].(map[interface{}]interface{})
-		if !ok {
-			continue
+
+		devs := dayMap
+		if nestedDevs, ok := lookupMap(dayMap, "devs"); ok {
+			devs = nestedDevs
 		}
-		
+
 		dayDevs := make(map[int]DevDay)
-		
+
 		for devKey, devData := range devs {
 			devInt, ok := convertToInt(devKey)
 			if !ok {
 				continue
 			}
-			
-			devMap, ok := devData.(map[interface{}]interface{})
+
+			devDay, ok := parseYamlDevDay(devData)
 			if !ok {
 				continue
 			}
-			
-			// Parse DevDay data
-			var commits, added, removed, changed int
-			var languages map[string][]int
-			
-			if c, ok := convertToInt(devMap["commits"]); ok {
-				commits = c
-			}
-			if a, ok := convertToInt(devMap["added"]); ok {
-				added = a
-			}
-			if r, ok := convertToInt(devMap["removed"]); ok {
-				removed = r
-			}
-			if c, ok := convertToInt(devMap["changed"]); ok {
-				changed = c
-			}
-			
-			// Parse languages if present
-			if langData, ok := devMap["languages"].(map[interface{}]interface{}); ok {
-				languages = make(map[string][]int)
-				for langKey, langStats := range langData {
-					if langStr, ok := langKey.(string); ok {
-						if langList, ok := langStats.([]interface{}); ok && len(langList) >= 3 {
-							var langStats []int
-							for _, stat := range langList {
-								if statInt, ok := convertToInt(stat); ok {
-									langStats = append(langStats, statInt)
-								}
-							}
-							if len(langStats) >= 3 {
-								languages[langStr] = langStats
-							}
-						}
-					}
-				}
-			}
-			
-			dayDevs[devInt] = DevDay{
-				Commits:       commits,
-				LinesAdded:    added,
-				LinesRemoved:  removed,
-				LinesModified: changed,
-				Languages:     languages,
-			}
+			dayDevs[devInt] = devDay
 		}
-		
+
 		days[dayInt] = dayDevs
 	}
-	
+
 	return &DeveloperTimeSeriesData{
 		People: people,
 		Days:   days,
@@ -527,8 +483,11 @@ func (r *YamlReader) GetDeveloperTimeSeriesData() (*DeveloperTimeSeriesData, err
 }
 
 func (r *YamlReader) GetLanguageStats() ([]LanguageStat, error) {
-	// Stub: Language stats data is typically not present in YAML files.
-	return nil, fmt.Errorf("language stats not implemented for YAML")
+	timeSeries, err := r.GetDeveloperTimeSeriesData()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get developer time series data: %v", err)
+	}
+	return aggregateLanguageStats(timeSeries)
 }
 
 func (r *YamlReader) GetRuntimeStats() (map[string]float64, error) {
@@ -566,7 +525,7 @@ func parseCoooccurrenceMatrix(data []interface{}) [][]int {
 	if len(data) == 0 {
 		return [][]int{}
 	}
-	
+
 	// Find maximum column index to determine matrix size
 	maxCol := 0
 	for _, rowData := range data {
@@ -578,13 +537,13 @@ func parseCoooccurrenceMatrix(data []interface{}) [][]int {
 			}
 		}
 	}
-	
+
 	// Create dense matrix
 	matrix := make([][]int, len(data))
 	for i := range matrix {
 		matrix[i] = make([]int, maxCol+1)
 	}
-	
+
 	// Fill in non-zero values
 	for rowIdx, rowData := range data {
 		if rowMap, ok := rowData.(map[interface{}]interface{}); ok {
@@ -599,7 +558,7 @@ func parseCoooccurrenceMatrix(data []interface{}) [][]int {
 			}
 		}
 	}
-	
+
 	return matrix
 }
 
@@ -622,30 +581,163 @@ func convertToInt(val interface{}) (int, bool) {
 	return 0, false
 }
 
+func asMap(value interface{}) (map[interface{}]interface{}, bool) {
+	switch typed := value.(type) {
+	case map[interface{}]interface{}:
+		return typed, true
+	case map[string]interface{}:
+		result := make(map[interface{}]interface{}, len(typed))
+		for key, val := range typed {
+			result[key] = val
+		}
+		return result, true
+	default:
+		return nil, false
+	}
+}
+
+func lookupMap(values map[interface{}]interface{}, key string) (map[interface{}]interface{}, bool) {
+	for candidateKey, value := range values {
+		if candidateKey == key {
+			return asMap(value)
+		}
+	}
+	return nil, false
+}
+
+func parseYamlDevDay(value interface{}) (DevDay, bool) {
+	if values, ok := value.([]interface{}); ok {
+		return parseYamlDevDayList(values)
+	}
+
+	devMap, ok := asMap(value)
+	if !ok {
+		return DevDay{}, false
+	}
+
+	var day DevDay
+	if commits, ok := lookupInt(devMap, "commits"); ok {
+		day.Commits = commits
+	}
+	if added, ok := lookupInt(devMap, "added"); ok {
+		day.LinesAdded = added
+	}
+	if removed, ok := lookupInt(devMap, "removed"); ok {
+		day.LinesRemoved = removed
+	}
+	if changed, ok := lookupInt(devMap, "changed"); ok {
+		day.LinesModified = changed
+	}
+	if languages, ok := lookupLanguages(devMap, "languages"); ok {
+		day.Languages = languages
+	}
+	return day, true
+}
+
+func parseYamlDevDayList(values []interface{}) (DevDay, bool) {
+	if len(values) < 4 {
+		return DevDay{}, false
+	}
+
+	var day DevDay
+	if commits, ok := convertToInt(values[0]); ok {
+		day.Commits = commits
+	}
+	if added, ok := convertToInt(values[1]); ok {
+		day.LinesAdded = added
+	}
+	if removed, ok := convertToInt(values[2]); ok {
+		day.LinesRemoved = removed
+	}
+	if changed, ok := convertToInt(values[3]); ok {
+		day.LinesModified = changed
+	}
+	if len(values) >= 5 {
+		if languages, ok := parseYamlLanguages(values[4]); ok {
+			day.Languages = languages
+		}
+	}
+	return day, true
+}
+
+func lookupInt(values map[interface{}]interface{}, key string) (int, bool) {
+	for candidateKey, value := range values {
+		if candidateKey == key {
+			return convertToInt(value)
+		}
+	}
+	return 0, false
+}
+
+func lookupLanguages(values map[interface{}]interface{}, key string) (map[string][]int, bool) {
+	for candidateKey, value := range values {
+		if candidateKey == key {
+			return parseYamlLanguages(value)
+		}
+	}
+	return nil, false
+}
+
+func parseYamlLanguages(value interface{}) (map[string][]int, bool) {
+	languageMap, ok := asMap(value)
+	if !ok {
+		return nil, false
+	}
+
+	languages := make(map[string][]int)
+	for languageKey, statsValue := range languageMap {
+		language, ok := languageKey.(string)
+		if !ok {
+			continue
+		}
+		stats, ok := parseYamlIntList(statsValue)
+		if !ok || len(stats) < 3 {
+			continue
+		}
+		languages[language] = stats[:3]
+	}
+	return languages, true
+}
+
+func parseYamlIntList(value interface{}) ([]int, bool) {
+	rawValues, ok := value.([]interface{})
+	if !ok {
+		return nil, false
+	}
+
+	values := make([]int, 0, len(rawValues))
+	for _, rawValue := range rawValues {
+		if intValue, ok := convertToInt(rawValue); ok {
+			values = append(values, intValue)
+		}
+	}
+	return values, true
+}
+
 // GetBurndownParameters retrieves burndown parameters for YAML reader
 func (r *YamlReader) GetBurndownParameters() (burndown.BurndownParameters, error) {
 	burndownData, ok := r.data["Burndown"].(map[string]interface{})
 	if !ok {
 		return burndown.BurndownParameters{}, fmt.Errorf("missing Burndown data in YAML")
 	}
-	
+
 	// Extract parameters from YAML - these ARE present in hercules YAML output
-	var sampling int = 1      // Default
-	var granularity int = 1   // Default  
+	var sampling int = 1         // Default
+	var granularity int = 1      // Default
 	var tickSize float64 = 86400 // Default (24 hours)
-	
+
 	if val, exists := burndownData["sampling"]; exists {
 		if intVal, ok := val.(int); ok {
 			sampling = intVal
 		}
 	}
-	
+
 	if val, exists := burndownData["granularity"]; exists {
 		if intVal, ok := val.(int); ok {
 			granularity = intVal
 		}
 	}
-	
+
 	if val, exists := burndownData["tick_size"]; exists {
 		if intVal, ok := val.(int); ok {
 			tickSize = float64(intVal)
@@ -653,7 +745,7 @@ func (r *YamlReader) GetBurndownParameters() (burndown.BurndownParameters, error
 			tickSize = floatVal
 		}
 	}
-	
+
 	return burndown.BurndownParameters{
 		Sampling:    sampling,
 		Granularity: granularity,
@@ -668,11 +760,11 @@ func (r *YamlReader) GetProjectBurndownWithHeader() (burndown.BurndownHeader, st
 	if len(matrix) == 0 {
 		return burndown.BurndownHeader{}, "", nil, fmt.Errorf("no project burndown data")
 	}
-	
+
 	// Get header info
 	start, last := r.GetHeader()
 	params, _ := r.GetBurndownParameters()
-	
+
 	header := burndown.BurndownHeader{
 		Start:       start,
 		Last:        last,
@@ -680,6 +772,6 @@ func (r *YamlReader) GetProjectBurndownWithHeader() (burndown.BurndownHeader, st
 		Granularity: params.Granularity,
 		TickSize:    params.TickSize,
 	}
-	
+
 	return header, name, matrix, nil
 }

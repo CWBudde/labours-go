@@ -273,9 +273,11 @@ func (r *ProtobufReader) GetDeveloperStats() ([]DeveloperStat, error) {
 
 // GetLanguageStats retrieves language statistics
 func (r *ProtobufReader) GetLanguageStats() ([]LanguageStat, error) {
-	// Language stats might be part of other analysis results
-	// For now, return empty as this data structure may not exist in protobuf
-	return nil, fmt.Errorf("no language stats found in protobuf format")
+	timeSeries, err := r.GetDeveloperTimeSeriesData()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get developer time series data: %v", err)
+	}
+	return aggregateLanguageStats(timeSeries)
 }
 
 // GetRuntimeStats retrieves runtime statistics
@@ -645,11 +647,15 @@ func (r *ProtobufReader) GetDeveloperTimeSeriesData() (*DeveloperTimeSeriesData,
 
 			// Convert protobuf DevTick to Go DevDay format (matches Python's DevDay structure)
 			dayDevs[int(devIndex)] = DevDay{
-				Commits:       int(devTick.Commits),
-				LinesAdded:    int(devTick.Stats.Added),
-				LinesRemoved:  int(devTick.Stats.Removed),
-				LinesModified: int(devTick.Stats.Changed),
-				Languages:     languages,
+				Commits:   int(devTick.Commits),
+				Languages: languages,
+			}
+			if devTick.Stats != nil {
+				devDay := dayDevs[int(devIndex)]
+				devDay.LinesAdded = int(devTick.Stats.Added)
+				devDay.LinesRemoved = int(devTick.Stats.Removed)
+				devDay.LinesModified = int(devTick.Stats.Changed)
+				dayDevs[int(devIndex)] = devDay
 			}
 		}
 
