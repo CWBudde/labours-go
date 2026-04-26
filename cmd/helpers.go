@@ -127,7 +127,7 @@ func resolveModes() []string {
 func resolveModesFrom(rawModes []string) ([]string, error) {
 	modes := splitModeValues(rawModes)
 	if len(modes) == 0 {
-		return nil, fmt.Errorf("no modes specified. Available modes:\n%s\nUse --mode or --modes to specify what to run.", formatAvailableModes())
+		return nil, nil
 	}
 
 	// Handle mode aliases for Python compatibility
@@ -262,16 +262,17 @@ func generateOutputPath(basePath string, format string) string {
 }
 
 var multiAssetModes = map[string]struct{}{
-	"burndown-file":    {},
-	"couples-files":    {},
-	"couples-people":   {},
-	"couples-shotness": {},
-	"devs-efforts":     {},
-	"devs-parallel":    {},
-	"old-vs-new":       {},
-	"run-times":        {},
-	"sentiment":        {},
-	"shotness":         {},
+	"burndown-file":       {},
+	"burndown-repository": {},
+	"couples-files":       {},
+	"couples-people":      {},
+	"couples-shotness":    {},
+	"devs-efforts":        {},
+	"devs-parallel":       {},
+	"old-vs-new":          {},
+	"run-times":           {},
+	"sentiment":           {},
+	"shotness":            {},
 }
 
 func planModeOutput(baseOutput, mode string, modeCount int) string {

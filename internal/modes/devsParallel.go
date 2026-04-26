@@ -15,14 +15,14 @@ import (
 )
 
 type ParallelismMetrics struct {
-	TotalPeriods        int
-	ParallelPeriods     int
-	ParallelismIndex    float64
-	PeakConcurrency     int
-	AverageConcurrency  float64
-	DeveloperOverlaps   map[string]map[string]float64
-	PeriodConcurrency   []int
-	ActiveDevelopers    []string
+	TotalPeriods       int
+	ParallelPeriods    int
+	ParallelismIndex   float64
+	PeakConcurrency    int
+	AverageConcurrency float64
+	DeveloperOverlaps  map[string]map[string]float64
+	PeriodConcurrency  []int
+	ActiveDevelopers   []string
 }
 
 // DevsParallel analyzes parallel development patterns and visualizes when developers work concurrently
@@ -81,11 +81,11 @@ func calculateParallelismMetrics(peopleBurndown []readers.PeopleBurndown) Parall
 	// Create a matrix of developer activity over time
 	developers := make([]string, len(peopleBurndown))
 	activityMatrix := make([][]bool, len(peopleBurndown))
-	
+
 	for i, person := range peopleBurndown {
 		developers[i] = person.Person
 		activityMatrix[i] = make([]bool, maxPeriods)
-		
+
 		// Mark periods where developer was active (had any commits/changes)
 		for j, period := range person.Matrix {
 			if j >= maxPeriods {
@@ -118,7 +118,7 @@ func calculateParallelismMetrics(peopleBurndown []readers.PeopleBurndown) Parall
 		}
 		periodConcurrency[period] = concurrent
 		totalConcurrency += concurrent
-		
+
 		if concurrent > 1 {
 			parallelPeriods++
 		}
@@ -136,12 +136,12 @@ func calculateParallelismMetrics(peopleBurndown []readers.PeopleBurndown) Parall
 				developerOverlaps[dev1][dev2] = 1.0
 				continue
 			}
-			
+
 			// Count periods where both developers were active
 			overlap := 0
 			dev1Active := 0
 			dev2Active := 0
-			
+
 			for period := 0; period < maxPeriods; period++ {
 				if activityMatrix[i][period] {
 					dev1Active++
@@ -153,7 +153,7 @@ func calculateParallelismMetrics(peopleBurndown []readers.PeopleBurndown) Parall
 					overlap++
 				}
 			}
-			
+
 			// Calculate Jaccard similarity coefficient
 			union := dev1Active + dev2Active - overlap
 			if union > 0 {
@@ -188,6 +188,10 @@ func calculateParallelismMetrics(peopleBurndown []readers.PeopleBurndown) Parall
 
 // plotParallelActivity creates a timeline showing concurrent developer activity
 func plotParallelActivity(metrics ParallelismMetrics, output string) error {
+	if len(metrics.PeriodConcurrency) == 0 {
+		metrics.PeriodConcurrency = []int{0}
+	}
+
 	p := plot.New()
 	p.Title.Text = "Parallel Development Activity Over Time"
 	p.X.Label.Text = "Time Period"
@@ -216,7 +220,7 @@ func plotParallelActivity(metrics ParallelismMetrics, output string) error {
 		areaPoints[i+1] = pt
 	}
 	areaPoints[len(areaPoints)-1] = plotter.XY{X: pts[len(pts)-1].X, Y: 0}
-	
+
 	polygon, err := plotter.NewPolygon(areaPoints)
 	if err == nil {
 		// Create a semi-transparent version of the color
@@ -281,6 +285,9 @@ func plotDeveloperConcurrency(metrics ParallelismMetrics, output string) error {
 		}
 		if count > 0 {
 			devOverlapAvgs[i] = total / float64(count)
+		}
+		if math.IsNaN(devOverlapAvgs[i]) || math.IsInf(devOverlapAvgs[i], 0) {
+			devOverlapAvgs[i] = 0
 		}
 	}
 
@@ -349,7 +356,7 @@ func generateSyntheticParallelAnalysis(reader readers.Reader, output string) err
 	// Generate synthetic data based on developer stats
 	for i, dev := range developerStats {
 		metrics.ActiveDevelopers = append(metrics.ActiveDevelopers, dev.Name)
-		
+
 		// Initialize overlaps
 		metrics.DeveloperOverlaps[dev.Name] = make(map[string]float64)
 		for j, otherDev := range developerStats {
@@ -357,7 +364,10 @@ func generateSyntheticParallelAnalysis(reader readers.Reader, output string) err
 				metrics.DeveloperOverlaps[dev.Name][otherDev.Name] = 1.0
 			} else {
 				// Synthetic overlap based on relative activity
-				ratio := float64(min(dev.Commits, otherDev.Commits)) / float64(max(dev.Commits, otherDev.Commits))
+				ratio := 0.0
+				if max(dev.Commits, otherDev.Commits) > 0 {
+					ratio = float64(min(dev.Commits, otherDev.Commits)) / float64(max(dev.Commits, otherDev.Commits))
+				}
 				overlap := ratio * (0.3 + 0.4*math.Sin(float64(i+j)*0.5)) // Add some variation
 				metrics.DeveloperOverlaps[dev.Name][otherDev.Name] = math.Max(0, math.Min(1, overlap))
 			}
@@ -392,7 +402,7 @@ func generateSyntheticParallelAnalysis(reader readers.Reader, output string) err
 func printParallelismSummary(metrics ParallelismMetrics) {
 	fmt.Println("\n=== Parallel Development Summary ===")
 	fmt.Printf("Total Time Periods: %d\n", metrics.TotalPeriods)
-	fmt.Printf("Periods with Parallel Activity: %d (%.1f%%)\n", 
+	fmt.Printf("Periods with Parallel Activity: %d (%.1f%%)\n",
 		metrics.ParallelPeriods, metrics.ParallelismIndex)
 	fmt.Printf("Peak Concurrent Developers: %d\n", metrics.PeakConcurrency)
 	fmt.Printf("Average Concurrent Developers: %.2f\n", metrics.AverageConcurrency)
@@ -400,21 +410,21 @@ func printParallelismSummary(metrics ParallelismMetrics) {
 
 	if len(metrics.ActiveDevelopers) > 1 {
 		fmt.Println("\nTop Developer Collaborations:")
-		
+
 		type overlap struct {
 			pair    string
 			overlap float64
 		}
-		
+
 		var overlaps []overlap
 		processed := make(map[string]bool)
-		
+
 		for dev1, others := range metrics.DeveloperOverlaps {
 			for dev2, ovr := range others {
 				if dev1 != dev2 {
 					pairKey := dev1 + "-" + dev2
 					reversePairKey := dev2 + "-" + dev1
-					
+
 					if !processed[pairKey] && !processed[reversePairKey] {
 						overlaps = append(overlaps, overlap{
 							pair:    fmt.Sprintf("%s ↔ %s", dev1, dev2),
@@ -426,11 +436,11 @@ func printParallelismSummary(metrics ParallelismMetrics) {
 				}
 			}
 		}
-		
+
 		sort.Slice(overlaps, func(i, j int) bool {
 			return overlaps[i].overlap > overlaps[j].overlap
 		})
-		
+
 		maxDisplay := min(5, len(overlaps))
 		for i := 0; i < maxDisplay; i++ {
 			fmt.Printf("  %s: %.3f\n", overlaps[i].pair, overlaps[i].overlap)

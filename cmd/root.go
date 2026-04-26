@@ -82,9 +82,9 @@ func initConfig() {
 	viper.AddConfigPath("$HOME/.labours-go")
 
 	if err := viper.ReadInConfig(); err == nil {
-		fmt.Println("Using config file:", viper.ConfigFileUsed())
-	} else {
-		fmt.Println("No configuration file found, using defaults.")
+		if viper.GetBool("verbose") {
+			fmt.Println("Using config file:", viper.ConfigFileUsed())
+		}
 	}
 
 	// Load user themes from standard directories

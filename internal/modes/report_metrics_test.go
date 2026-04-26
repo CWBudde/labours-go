@@ -14,13 +14,14 @@ import (
 func TestReportMetricModesCreateOutputFiles(t *testing.T) {
 	reader := &reportMetricsReader{}
 	tests := []struct {
-		name string
-		run  func(string) error
+		name   string
+		run    func(string) error
+		extras []string
 	}{
 		{
 			name: "temporal-activity",
 			run: func(output string) error {
-				return TemporalActivity(reader, output, 32, 10)
+				return TemporalActivity(reader, output, 32, 10, nil, nil)
 			},
 		},
 		{
@@ -28,6 +29,7 @@ func TestReportMetricModesCreateOutputFiles(t *testing.T) {
 			run: func(output string) error {
 				return BusFactor(reader, output)
 			},
+			extras: []string{"bus-factor_subsystems.png"},
 		},
 		{
 			name: "ownership-concentration",
@@ -40,27 +42,41 @@ func TestReportMetricModesCreateOutputFiles(t *testing.T) {
 			run: func(output string) error {
 				return KnowledgeDiffusion(reader, output)
 			},
+			extras: []string{"knowledge-diffusion_silos.png", "knowledge-diffusion_trend.png"},
 		},
 		{
 			name: "hotspot-risk",
 			run: func(output string) error {
 				return HotspotRisk(reader, output)
 			},
+			extras: []string{"hotspot-risk_table.tsv"},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			output := filepath.Join(t.TempDir(), tt.name+".png")
+			dir := t.TempDir()
+			output := filepath.Join(dir, tt.name+".png")
 			if err := tt.run(output); err != nil {
 				t.Fatalf("%s() unexpected error: %v", tt.name, err)
 			}
-			if info, err := os.Stat(output); err != nil {
-				t.Fatalf("expected output file %s: %v", output, err)
-			} else if info.Size() == 0 {
-				t.Fatalf("expected non-empty output file %s", output)
+			assertNonEmptyFile(t, output)
+			for _, extra := range tt.extras {
+				assertNonEmptyFile(t, filepath.Join(dir, extra))
 			}
 		})
+	}
+}
+
+func assertNonEmptyFile(t *testing.T, path string) {
+	t.Helper()
+
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("expected output file %s: %v", path, err)
+	}
+	if info.Size() == 0 {
+		t.Fatalf("expected non-empty output file %s", path)
 	}
 }
 
@@ -126,6 +142,11 @@ func (r *reportMetricsReader) GetTemporalActivity() (*readers.TemporalActivityDa
 				},
 			},
 		},
+		Ticks: map[int]map[int]readers.TemporalActivityTick{
+			0: {0: {Commits: 2, Lines: 20, Hour: 1}},
+			1: {0: {Commits: 3, Lines: 30, Hour: 2}},
+		},
+		TickSize: int64(24 * 60 * 60 * 1_000_000_000),
 	}, nil
 }
 
@@ -157,8 +178,8 @@ func (r *reportMetricsReader) GetKnowledgeDiffusion() (*readers.KnowledgeDiffusi
 	return &readers.KnowledgeDiffusionData{
 		People: []string{"alice", "bob"},
 		Files: map[string]readers.KnowledgeDiffusionFile{
-			"main.go": {UniqueEditors: 2, RecentEditors: 1},
-			"doc.md":  {UniqueEditors: 1, RecentEditors: 1},
+			"main.go": {UniqueEditors: 2, RecentEditors: 1, UniqueEditorsOverTime: map[int]int{0: 1, 1: 2}},
+			"doc.md":  {UniqueEditors: 1, RecentEditors: 1, UniqueEditorsOverTime: map[int]int{0: 1}},
 		},
 		Distribution: map[int]int{1: 1, 2: 1},
 		WindowMonths: 6,

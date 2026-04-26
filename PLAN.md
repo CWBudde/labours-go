@@ -29,17 +29,18 @@ Working or partially working pieces already present:
 - Integration and visual testing scaffolding.
 - Example Hercules data under `example_data/` and `data/`.
 
-Critical gaps found during inspection:
+Critical gaps found during inspection and follow-up implementation:
 
-- Hercules `report` default modes include modes this repo does not implement: `temporal-activity`, `bus-factor`, `ownership-concentration`, `knowledge-diffusion`, `hotspot-risk`.
-- Hercules `report --all` additionally includes `burndown-repository` and `burndown-repos-combined`, also missing here.
+- Hercules `report` default modes originally included missing Go modes: `temporal-activity`, `bus-factor`, `ownership-concentration`, `knowledge-diffusion`, `hotspot-risk`. These now have protobuf-backed implementations and pass the current default-report smoke path.
+- Hercules `report --all` additionally includes `burndown-repository` and `burndown-repos-combined`. These are now wired to protobuf repository burndown data, but the current copied Hercules SIVA fixture does not contain repository matrices, so full multi-repository parity still needs a dedicated fixture.
 - The local `pb.proto` was behind `../hercules/internal/pb/pb.proto` when this plan started. Phase 1 has synced the schema and regenerated Go bindings; remaining work is using those payloads in modes.
-- Reader accessors for default report payloads now exist. Missing report modes still need to consume them.
-- Some implemented modes are semantic approximations, not Python-labours ports. Notable examples: `sentiment` derives heuristic sentiment from dev/language stats instead of reading `CommentSentimentResults`; `devs-parallel` can synthesize data instead of using the same ownership/coupling/devs calculations as Python.
+- Reader accessors for default report payloads now exist, and the default report modes consume them. Additional compatibility work remains for parity and fixtures.
+- Some implemented modes are semantic approximations, not Python-labours ports. Notable examples: `sentiment` still has a heuristic fallback when `CommentSentimentResults` is absent, and `devs-parallel` can synthesize data instead of using the same ownership/coupling/devs calculations as Python.
 - Coupling modes currently generate Go-native plots/assets, while Python `labours` trains embeddings and writes projector assets unless disabled.
 - The CLI now normalizes output paths before dispatch: single-file modes receive a concrete file path, and multi-asset modes receive the requested directory or the parent directory of a requested file path.
-- The default-report protobuf fixture now runs through every default mode without CLI-level mode failures; visual parity and full Hercules `report` integration remain to be proven.
-- `go test ./...` currently fails: 196 passed, 12 failed, 1 skipped. Remaining failures are in `test/visual` Python compatibility/regression tests.
+- The default-report protobuf fixture now runs through every default mode without CLI-level mode failures; visual parity remains to be proven.
+- `hercules report --all --strict` with the copied SIVA fixture now exits successfully with no "mode not implemented" or hard mode errors from the Go binary. It still prints expected missing-data warnings for repository/file/person burndown analyses absent from that fixture.
+- `go test ./...` currently fails only in the visual Python compatibility/regression tests. The latest tracked baseline is 203 passed, 12 failed, 1 skipped.
 - README and CLAUDE status claims were corrected in Phase 0 so they no longer describe the project as production-ready.
 
 ## Hercules Contract to Match
@@ -107,21 +108,21 @@ Therefore every mode must accept a single output file path and write that path, 
 | `burndown-project` | Implemented, Python-compatible path exists | Verify raw/no/month/year resampling, start/end filters, JSON output, image parity. |
 | `burndown-file` | Implemented | Ensure output-file behavior matches Python and report expectations for many files. |
 | `burndown-person` | Implemented | Verify per-person output naming and date filtering. |
-| `burndown-repository` | Missing | Add protobuf/YAML reader support for `repositories` and `repository_sequence`; port Python behavior. |
-| `burndown-repos-combined` | Missing | Add combined repository burndown loader/plotter equivalent. |
+| `burndown-repository` | Initial implementation | Validate with a real multi-repository payload; verify output naming, matrix orientation, and resampling against Python. |
+| `burndown-repos-combined` | Initial implementation | Validate combined matrix semantics with a real multi-repository payload and Python parity fixture. |
 | `overwrites-matrix` | Implemented | Verify data source: Python uses `Burndown.people_interaction`, not couples; add embedding asset behavior if required. |
 | `ownership` | Implemented | Verify against `files_ownership`/people burndown Python logic and `--order-ownership-by-time`. |
 | `couples-files` | Implemented differently | Decide compatibility target: projector embeddings/assets, static plots, or both. Ensure report file output works. |
 | `couples-people` | Implemented differently | Same as couples-files; verify matrix preprocessing and projector behavior. |
 | `couples-shotness` | Partial | Python uses shotness co-occurrence embeddings; protobuf reader now exposes shotness co-occurrence data, but mode/output parity remains. |
 | `shotness` | Implemented | Verify printed stats and optional output behavior against Python. |
-| `sentiment` | Not compatible | Parse `CommentSentimentResults`; port Python chart/stats behavior. Remove heuristic replacement from compatibility path. |
+| `sentiment` | Partial | Uses `CommentSentimentResults` when present and falls back to heuristics when absent. Validate against a real sentiment payload and remove or clearly gate the heuristic compatibility path. |
 | `temporal-activity` | Basic implementation | Improve chart parity, date filters, and legend threshold behavior. |
 | `devs` | Implemented | Verify aggregate/time-series math, language parsing, `--max-people`, JSON output. |
 | `devs-efforts` | Implemented | Verify Python parity and output names. |
 | `old-vs-new` | Implemented | Verify against Python resampling and line classification. |
 | `languages` | Implemented | Language totals are now derived from Devs ticks for protobuf and compact YAML; temporal chart parity remains. |
-| `devs-parallel` | Approximate | Port Python `load_devs_parallel` and `show_devs_parallel`; remove synthetic fallback from compatibility path. |
+| `devs-parallel` | Approximate | NaN failures are guarded, but Python `load_devs_parallel` and `show_devs_parallel` still need to be ported and the synthetic fallback removed from the compatibility path. |
 | `run-times` | Implemented | Verify text output and JSON behavior. Not used by report. |
 | `bus-factor` | Basic implementation | Improve Python parity and subsystem output. |
 | `ownership-concentration` | Basic implementation | Improve Python parity and subsystem output. |
@@ -212,7 +213,10 @@ Status as of 2026-04-26:
 - `--backend Agg` is treated as a rendering backend hint and leaves output extension detection to the requested output path.
 - Output planning now preserves a single-mode file path, expands directory output to a per-mode file path, makes multi-mode file output use sibling per-mode files, and passes multi-asset modes a directory so their assets are written next to the requested file path.
 - `languages` directory output now writes `languages.png` and `languages.svg`, fixing the prior `internal/modes` language output failures.
-- Current full test baseline after Phase 2 output work: `go test ./...` reports 187 passed, 12 failed, 1 skipped. Remaining failures are the pre-existing visual compatibility failures.
+- No-mode invocations are accepted as a Python-compatible no-op after input parsing.
+- Missing analyses now print Python-style guidance warnings and continue instead of reporting hard mode errors.
+- `.json` output now serializes reader data directly for CLI modes instead of rendering charts through a temporary output path.
+- Current full test baseline after Phase 2 CLI work: `go test ./...` reports 201 passed, 12 failed, 1 skipped. Remaining failures are the pre-existing visual compatibility failures.
 
 Tasks:
 
@@ -223,18 +227,18 @@ Tasks:
 - [x] Validate supported `--input-format` values: `yaml`, `pb`, `auto`.
 - [x] Implement Python-compatible date parsing tolerance where practical, or document accepted date formats and test them.
 - [x] Ensure `--backend Agg` is accepted as a rendering backend hint and does not change extension detection incorrectly.
-- [ ] Preserve Python behavior for no modes, warnings, stdout summaries, and non-fatal missing analyses.
+- [x] Preserve Python behavior for no modes, warnings, stdout summaries, and non-fatal missing analyses.
 - [x] Normalize single-mode output so a file path writes that file.
 - [x] Normalize multi-asset mode output so assets are written next to the requested file path with stable names.
 - [x] Keep directory output supported.
-- [ ] Ensure JSON extension writes real data instead of an image where Python does.
+- [x] Ensure JSON extension writes real data instead of an image where Python does.
 
 Acceptance criteria:
 
 - [x] Every invocation shape used by Hercules report succeeds for implemented modes at the CLI/output dispatch layer.
 - [x] CLI compatibility tests compare important help/flag registration.
 - [x] CLI compatibility tests compare flag acceptance.
-- [ ] CLI compatibility tests compare missing-data warnings.
+- [x] CLI compatibility tests compare missing-data warnings.
 - [x] CLI compatibility tests compare output locations.
 
 ## Phase 3: Core Report Modes
@@ -247,7 +251,12 @@ Status as of 2026-04-26:
 - YAML dev time-series parsing now supports current compact Hercules tick entries of the form `[commits, added, removed, changed, languages]`.
 - Basic single-file plot modes are wired for `temporal-activity`, `bus-factor`, `ownership-concentration`, `knowledge-diffusion`, and `hotspot-risk`.
 - The real default report fixture runs through the full default mode list with the local `./labours` binary and writes chart/assets under `/tmp/labours-go-phase3-default`.
-- Current full test baseline after Phase 3 work: `go test ./...` reports 196 passed, 12 failed, 1 skipped. Remaining failures are the pre-existing visual compatibility failures.
+- `hercules report --strict --labours-cmd ./labours` succeeds on the copied Hercules SIVA fixture and generates `index.html`, `report.pb`, and default chart assets under `/tmp/labours-go-hercules-report-default`.
+- `temporal-activity` now uses per-tick data for date-filtered hour aggregation when `--start-date`/`--end-date` are supplied.
+- `bus-factor` now writes a subsystem summary chart next to the main timeline.
+- `knowledge-diffusion` now writes distribution, knowledge-silo, and trend charts.
+- `hotspot-risk` now writes the ranked risk chart plus a TSV table and text summary.
+- Current full test baseline after Phase 3 work: `go test ./...` reports 201 passed, 12 failed, 1 skipped. Remaining failures are the pre-existing visual compatibility failures.
 
 Priority order:
 
@@ -267,32 +276,48 @@ Tasks:
 - [ ] Verify/fix overwrites matrix against Python calculations.
 - [x] Port `temporal-activity` mode using `TemporalActivityResults`.
 - [x] Make `temporal-activity` support aggregate and per-tick formats.
-- [ ] Make `temporal-activity` respect date filters and legend threshold flags.
+- [x] Make `temporal-activity` respect date filters and legend threshold flags.
 - [x] Port `bus-factor` mode using snapshots/subsystems/threshold/tick size.
-- [ ] Make `bus-factor` plot time series and subsystem summary.
+- [x] Make `bus-factor` plot time series and subsystem summary.
 - [x] Port `ownership-concentration` mode using Gini/HHI snapshots and subsystem metrics.
 - [x] Make `ownership-concentration` plot both concentration metrics.
 - [x] Port `knowledge-diffusion` mode using file diffusion and editor count distribution.
-- [ ] Make `knowledge-diffusion` plot distribution plus optional top files/time trend.
+- [x] Make `knowledge-diffusion` plot distribution plus optional top files/time trend.
 - [x] Port `hotspot-risk` mode using file risks.
-- [ ] Make `hotspot-risk` plot ranked risk bars/table-like output.
+- [x] Make `hotspot-risk` plot ranked risk bars/table-like output.
 
 Acceptance criteria:
 
-- [ ] `hercules report -o /tmp/report <repo>` using the Go labours binary has zero failed default modes.
-- [ ] Generated `index.html` references actual chart files for every default mode.
-- [ ] `go test ./...` passes outside visual parity tests, or visual failures are marked separately with clear reasons.
+- [x] `hercules report -o /tmp/report <repo>` using the Go labours binary has zero failed default modes.
+- [x] Generated `index.html` references actual chart files for every default mode.
+- [x] `go test ./...` passes outside visual parity tests, or visual failures are marked separately with clear reasons.
 
 ## Phase 4: All Report Modes
 
 Goal: `hercules report --all` succeeds.
 
+Status as of 2026-04-26:
+
+- `burndown-repository` and `burndown-repos-combined` are registered as real mode handlers.
+- `burndown-repository` writes one chart per repository to the requested report chart directory when repository matrices are available.
+- `burndown-repos-combined` sums repository matrices and writes the requested combined chart path.
+- The current copied Hercules SIVA fixture does not include repository burndown matrices, so both repository modes now report Python-style missing-data warnings instead of "Mode not implemented yet".
+- `sentiment` now prefers real `CommentSentimentResults` protobuf data and keeps the existing developer/language heuristic only as a fallback for fixtures where sentiment was not collected.
+- `sentiment` and `devs-parallel` now sanitize zero/empty values so `gonum/plot` no longer rejects NaN bar data.
+- `hercules report --all --strict --labours-cmd ./labours` exits 0 on `/tmp/labours-go-hercules.siva` and writes report assets under `/tmp/labours-go-hercules-report-all-phase4`.
+- Current full test baseline after Phase 4 work: `go test ./...` reports 203 passed, 12 failed, 1 skipped. Remaining failures are the pre-existing visual compatibility failures.
+- Remaining Phase 4 work is semantic parity: real multi-repository fixtures, real sentiment fixture validation, and a Python-compatible `devs-parallel` implementation instead of synthetic fallback.
+
 Tasks:
 
-- [ ] Implement `burndown-repository`.
-- [ ] Implement `burndown-repos-combined`.
+- [x] Implement `burndown-repository`.
+- [x] Implement `burndown-repos-combined`.
 - [ ] Complete `couples-shotness` from real shotness co-occurrence data or define the exact Go equivalent.
-- [ ] Replace heuristic `sentiment` with a real `CommentSentimentResults` implementation.
+- [x] Prefer real `CommentSentimentResults` in `sentiment` when protobuf data is present.
+- [ ] Validate `sentiment` with a real current-Hercules sentiment protobuf fixture.
+- [ ] Remove or explicitly gate heuristic `sentiment` fallback from the strict compatibility path.
+- [x] Guard `sentiment` against NaN bar values on zero-activity fallback data.
+- [x] Guard `devs-parallel` against NaN bar values on zero-activity fallback data.
 - [ ] Port `devs-parallel` ownership burndown logic from Python.
 - [ ] Port `devs-parallel` people co-occurrence logic from Python.
 - [ ] Port `devs-parallel` devs time-series logic from Python.
@@ -302,7 +327,8 @@ Tasks:
 
 Acceptance criteria:
 
-- [ ] `hercules report --all -o /tmp/report <repo>` has zero failed modes with Go labours.
+- [x] `hercules report --all --strict -o /tmp/report <repo>` has zero hard mode errors with Go labours on the copied Hercules SIVA fixture.
+- [ ] `hercules report --all -o /tmp/report <repo>` has zero missing-data warnings with a fixture that includes repository burndown, people burndown, and sentiment payloads.
 - [ ] `labours -f pb -m all` matches Python `all` mode composition.
 - [ ] `labours -f pb -m all` matches Python `all` mode output behavior.
 

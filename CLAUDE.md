@@ -29,27 +29,27 @@ Implemented or partially implemented modes:
 - `devs-efforts`
 - `old-vs-new`
 - `languages`
-- `devs-parallel`
-- `run-times`
-- `sentiment`
-
-Known missing modes for current Hercules report parity:
-
-- `burndown-repository`
-- `burndown-repos-combined`
 - `temporal-activity`
 - `bus-factor`
 - `ownership-concentration`
 - `knowledge-diffusion`
 - `hotspot-risk`
+- `burndown-repository`
+- `burndown-repos-combined`
+- `devs-parallel`
+- `run-times`
+- `sentiment`
+
+Known missing modes outside the current Hercules report list:
+
+- `refactoring-proxy`
 
 Known compatibility risks:
 
-- `pb.proto` is behind `../hercules/internal/pb/pb.proto`.
-- `sentiment` is currently heuristic and not a port of Python's `CommentSentimentResults` path.
+- Repository burndown modes need validation with a real multi-repository Hercules payload.
+- `sentiment` uses `CommentSentimentResults` when present, but still has a heuristic fallback for payloads without collected sentiment data.
 - `devs-parallel` is approximate and can synthesize data instead of matching Python's calculations.
-- Some modes treat `output` as a directory, but Hercules report passes one concrete file path per mode.
-- The current test baseline includes failures. See `PLAN.md`.
+- The current test baseline includes visual compatibility failures. See `PLAN.md`.
 
 ## Build and Development Commands
 

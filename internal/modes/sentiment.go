@@ -2,6 +2,7 @@ package modes
 
 import (
 	"fmt"
+	"math"
 	"path/filepath"
 	"sort"
 
@@ -14,12 +15,12 @@ import (
 
 // SentimentResult represents sentiment analysis for a developer or file
 type SentimentResult struct {
-	Entity    string
-	Type      string // "developer" or "language"
-	Positive  float64
-	Neutral   float64
-	Negative  float64
-	Score     float64 // Overall sentiment score (-1 to 1)
+	Entity   string
+	Type     string // "developer" or "language"
+	Positive float64
+	Neutral  float64
+	Negative float64
+	Score    float64 // Overall sentiment score (-1 to 1)
 }
 
 // Sentiment generates sentiment analysis based on available repository data
@@ -29,21 +30,31 @@ func Sentiment(reader readers.Reader, output string) error {
 
 	// Collect sentiment results from different data sources
 	var sentimentResults []SentimentResult
-
-	// Analyze developer sentiment based on activity patterns
-	devResults, err := analyzeDeveloperSentiment(reader)
-	if err != nil {
-		fmt.Printf("Warning: Could not analyze developer sentiment: %v\n", err)
-	} else {
-		sentimentResults = append(sentimentResults, devResults...)
+	if sentimentReader, ok := reader.(readers.SentimentReader); ok {
+		ticks, err := sentimentReader.GetSentimentByTick()
+		if err == nil && len(ticks) > 0 {
+			sentimentResults = append(sentimentResults, sentimentResultsFromTicks(ticks)...)
+		}
+		if err != nil {
+			fmt.Printf("Warning: Could not read collected sentiment data: %v\n", err)
+		}
 	}
 
-	// Analyze language sentiment based on usage patterns
-	langResults, err := analyzeLanguageSentiment(reader)
-	if err != nil {
-		fmt.Printf("Warning: Could not analyze language sentiment: %v\n", err)
-	} else {
-		sentimentResults = append(sentimentResults, langResults...)
+	if len(sentimentResults) == 0 {
+		// Fall back to the older heuristic path for fixtures without CommentSentimentResults.
+		devResults, err := analyzeDeveloperSentiment(reader)
+		if err != nil {
+			fmt.Printf("Warning: Could not analyze developer sentiment: %v\n", err)
+		} else {
+			sentimentResults = append(sentimentResults, devResults...)
+		}
+
+		langResults, err := analyzeLanguageSentiment(reader)
+		if err != nil {
+			fmt.Printf("Warning: Could not analyze language sentiment: %v\n", err)
+		} else {
+			sentimentResults = append(sentimentResults, langResults...)
+		}
 	}
 
 	if len(sentimentResults) == 0 {
@@ -66,6 +77,39 @@ func Sentiment(reader readers.Reader, output string) error {
 	return nil
 }
 
+func sentimentResultsFromTicks(ticks map[int]readers.SentimentTick) []SentimentResult {
+	keys := make([]int, 0, len(ticks))
+	for tick := range ticks {
+		keys = append(keys, tick)
+	}
+	sort.Ints(keys)
+
+	results := make([]SentimentResult, 0, len(keys))
+	for _, tick := range keys {
+		value := float64(ticks[tick].Value)
+		if !isFinite(value) {
+			continue
+		}
+		score := clamp(value, -1, 1)
+		positive := 0.0
+		negative := 0.0
+		if score > 0 {
+			positive = score
+		} else if score < 0 {
+			negative = -score
+		}
+		results = append(results, normalizeSentimentResult(SentimentResult{
+			Entity:   fmt.Sprintf("tick %d", tick),
+			Type:     "tick",
+			Positive: positive,
+			Neutral:  1 - math.Abs(score),
+			Negative: negative,
+			Score:    score,
+		}))
+	}
+	return results
+}
+
 // analyzeDeveloperSentiment analyzes sentiment based on developer activity patterns
 func analyzeDeveloperSentiment(reader readers.Reader) ([]SentimentResult, error) {
 	devStats, err := reader.GetDeveloperStats()
@@ -82,22 +126,27 @@ func analyzeDeveloperSentiment(reader readers.Reader) ([]SentimentResult, error)
 		totalAdded += dev.LinesAdded
 		totalRemoved += dev.LinesRemoved
 	}
+	_ = totalAdded
+	_ = totalRemoved
+	if totalCommits <= 0 {
+		totalCommits = 1
+	}
 
 	for _, dev := range devStats {
 		// Calculate activity ratios
 		commitRatio := float64(dev.Commits) / float64(totalCommits)
-		changeRatio := float64(dev.LinesAdded) / float64(dev.LinesAdded + dev.LinesRemoved + 1)
-		
+		changeRatio := float64(dev.LinesAdded) / float64(dev.LinesAdded+dev.LinesRemoved+1)
+
 		// Sentiment heuristics based on activity patterns:
 		// - High commit activity = positive engagement
-		// - Balanced add/remove ratio = positive code quality focus  
+		// - Balanced add/remove ratio = positive code quality focus
 		// - Many languages = positive exploration/learning
 		// - Many files touched = positive collaboration
-		
-		positive := commitRatio * 0.3 + changeRatio * 0.3 + 
-				   float64(len(dev.Languages))/10.0 * 0.2 + 
-				   float64(dev.FilesTouched)/100.0 * 0.2
-		
+
+		positive := commitRatio*0.3 + changeRatio*0.3 +
+			float64(len(dev.Languages))/10.0*0.2 +
+			float64(dev.FilesTouched)/100.0*0.2
+
 		// Factors that might indicate negative sentiment:
 		// - Very high removal ratio (frustration/cleanup)
 		// - Very low commit activity (disengagement)
@@ -108,7 +157,7 @@ func analyzeDeveloperSentiment(reader readers.Reader) ([]SentimentResult, error)
 		if commitRatio < 0.01 && len(devStats) > 5 {
 			negative += 0.2 // Very low activity
 		}
-		
+
 		neutral := 1.0 - positive - negative
 		if neutral < 0 {
 			// Normalize if we went over 1.0
@@ -120,14 +169,14 @@ func analyzeDeveloperSentiment(reader readers.Reader) ([]SentimentResult, error)
 
 		score := positive - negative // Overall sentiment score
 
-		results = append(results, SentimentResult{
+		results = append(results, normalizeSentimentResult(SentimentResult{
 			Entity:   dev.Name,
 			Type:     "developer",
 			Positive: positive,
 			Neutral:  neutral,
 			Negative: negative,
 			Score:    score,
-		})
+		}))
 	}
 
 	return results, nil
@@ -146,6 +195,9 @@ func analyzeLanguageSentiment(reader readers.Reader) ([]SentimentResult, error) 
 	totalLines := 0
 	for _, lang := range langStats {
 		totalLines += lang.Lines
+	}
+	if totalLines <= 0 {
+		return nil, fmt.Errorf("no non-zero language statistics available")
 	}
 
 	// Language sentiment heuristics based on common perceptions and usage patterns
@@ -174,16 +226,16 @@ func analyzeLanguageSentiment(reader readers.Reader) ([]SentimentResult, error) 
 
 	for _, lang := range langStats {
 		usage := float64(lang.Lines) / float64(totalLines)
-		
+
 		// Get base sentiment for this language (default neutral)
 		baseSentiment := languageSentimentMap[lang.Language]
 		if _, exists := languageSentimentMap[lang.Language]; !exists {
 			baseSentiment = 0.0 // Neutral for unknown languages
 		}
-		
+
 		// Weight sentiment by usage - more used languages have more impact
 		weightedSentiment := baseSentiment * usage * 2.0 // Amplify for visibility
-		
+
 		var positive, negative, neutral float64
 		if weightedSentiment > 0 {
 			positive = weightedSentiment
@@ -192,23 +244,64 @@ func analyzeLanguageSentiment(reader readers.Reader) ([]SentimentResult, error) 
 			positive = 0.0
 			negative = -weightedSentiment
 		}
-		
+
 		neutral = 1.0 - positive - negative
 		if neutral < 0 {
 			neutral = 0.0
 		}
 
-		results = append(results, SentimentResult{
+		results = append(results, normalizeSentimentResult(SentimentResult{
 			Entity:   lang.Language,
 			Type:     "language",
 			Positive: positive,
 			Neutral:  neutral,
 			Negative: negative,
 			Score:    weightedSentiment,
-		})
+		}))
 	}
 
 	return results, nil
+}
+
+func normalizeSentimentResult(result SentimentResult) SentimentResult {
+	result.Positive = nonNegativeFinite(result.Positive)
+	result.Neutral = nonNegativeFinite(result.Neutral)
+	result.Negative = nonNegativeFinite(result.Negative)
+	if !isFinite(result.Score) {
+		result.Score = 0
+	}
+
+	total := result.Positive + result.Neutral + result.Negative
+	switch {
+	case total == 0:
+		result.Neutral = 1
+	case total > 1:
+		result.Positive /= total
+		result.Neutral /= total
+		result.Negative /= total
+	}
+	return result
+}
+
+func nonNegativeFinite(value float64) float64 {
+	if !isFinite(value) || value < 0 {
+		return 0
+	}
+	return value
+}
+
+func isFinite(value float64) bool {
+	return !math.IsNaN(value) && !math.IsInf(value, 0)
+}
+
+func clamp(value, minValue, maxValue float64) float64 {
+	if value < minValue {
+		return minValue
+	}
+	if value > maxValue {
+		return maxValue
+	}
+	return value
 }
 
 // plotSentimentOverview creates a stacked bar chart showing overall sentiment distribution
@@ -230,6 +323,7 @@ func plotSentimentOverview(results []SentimentResult, output string) error {
 	negativeVals := make(plotter.Values, len(results))
 
 	for i, result := range results {
+		result = normalizeSentimentResult(result)
 		entities[i] = fmt.Sprintf("%s (%s)", result.Entity, result.Type)
 		positiveVals[i] = result.Positive
 		neutralVals[i] = result.Neutral
@@ -332,6 +426,7 @@ func plotSentimentForType(results []SentimentResult, title, output, filename str
 	// Create scatter plot of sentiment scores
 	pts := make(plotter.XYs, len(results))
 	for i, result := range results {
+		result = normalizeSentimentResult(result)
 		pts[i].X = float64(i)
 		pts[i].Y = result.Score
 	}
@@ -390,6 +485,7 @@ func printSentimentSummary(results []SentimentResult) {
 	var devCount, langCount int
 
 	for _, result := range results {
+		result = normalizeSentimentResult(result)
 		totalPositive += result.Positive
 		totalNeutral += result.Neutral
 		totalNegative += result.Negative

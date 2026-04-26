@@ -61,10 +61,13 @@ func TestResolveModesFromRejectsUnknownMode(t *testing.T) {
 	}
 }
 
-func TestResolveModesFromRejectsEmptyModes(t *testing.T) {
-	_, err := resolveModesFrom(nil)
-	if err == nil {
-		t.Fatal("expected empty mode error")
+func TestResolveModesFromAllowsEmptyModes(t *testing.T) {
+	modes, err := resolveModesFrom(nil)
+	if err != nil {
+		t.Fatalf("unexpected empty mode error: %v", err)
+	}
+	if len(modes) != 0 {
+		t.Fatalf("resolveModesFrom(nil) = %#v, want empty modes", modes)
 	}
 }
 

@@ -21,11 +21,11 @@ What is already present:
 
 Known gaps:
 
-- Current Hercules report modes are not all implemented. Missing report modes include `temporal-activity`, `bus-factor`, `ownership-concentration`, `knowledge-diffusion`, `hotspot-risk`, `burndown-repository`, and `burndown-repos-combined`.
-- The local protobuf schema is behind `../hercules/internal/pb/pb.proto`.
-- Some modes are approximations rather than direct Python-labours ports, notably `sentiment` and `devs-parallel`.
-- Some modes still need output-path compatibility work because Hercules report passes one concrete output file per mode.
-- `go test ./...` currently has known failures in language output tests and visual compatibility tests. See [PLAN.md](./PLAN.md) for the current baseline and completion plan.
+- Current Hercules report modes are wired, but several still need Python-labours semantic and visual parity work.
+- Repository burndown modes need validation with a real multi-repository Hercules payload.
+- `sentiment` uses `CommentSentimentResults` when present, but still has a heuristic fallback for payloads without collected sentiment data.
+- `devs-parallel` is still approximate and can synthesize fallback data instead of matching Python's calculations.
+- `go test ./...` currently has known failures in visual compatibility tests. See [PLAN.md](./PLAN.md) for the current baseline and completion plan.
 
 ## Build
 
@@ -84,19 +84,19 @@ Implemented or partially implemented modes:
 - `devs-efforts`
 - `old-vs-new`
 - `languages`
-- `devs-parallel`
-- `run-times`
-- `sentiment`
-
-Missing modes needed for full current Hercules parity:
-
-- `burndown-repository`
-- `burndown-repos-combined`
 - `temporal-activity`
 - `bus-factor`
 - `ownership-concentration`
 - `knowledge-diffusion`
 - `hotspot-risk`
+- `burndown-repository`
+- `burndown-repos-combined`
+- `devs-parallel`
+- `run-times`
+- `sentiment`
+
+Missing modes outside the current Hercules report list:
+
 - `refactoring-proxy`
 
 ## Development Workflow

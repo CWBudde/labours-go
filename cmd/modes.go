@@ -2,9 +2,9 @@ package cmd
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -19,6 +19,8 @@ var modeHandlers = map[string]func(reader readers.Reader, output string, startTi
 	"burndown-project":        burndownProject,
 	"burndown-file":           burndownFile,
 	"burndown-person":         burndownPerson,
+	"burndown-repository":     burndownRepository,
+	"burndown-repos-combined": burndownReposCombined,
 	"overwrites-matrix":       overwritesMatrix,
 	"ownership":               ownershipBurndown,
 	"couples-files":           couplesFiles,
@@ -41,6 +43,10 @@ var modeHandlers = map[string]func(reader readers.Reader, output string, startTi
 }
 
 func executeModes(modes []string, reader readers.Reader, output string, startTime, endTime *time.Time) {
+	if len(modes) == 0 {
+		return
+	}
+
 	// Check if JSON output is requested
 	jsonOutput := strings.HasSuffix(strings.ToLower(output), ".json")
 
@@ -50,7 +56,7 @@ func executeModes(modes []string, reader readers.Reader, output string, startTim
 
 	// If JSON output, collect all results and save as JSON
 	if jsonOutput {
-		results := make(map[string]interface{})
+		results := make(map[string]interface{}, len(modes))
 
 		if len(modes) > 1 {
 			progEstimator.StartMultiOperation(len(modes), "Analysis Modes")
@@ -62,31 +68,26 @@ func executeModes(modes []string, reader readers.Reader, output string, startTim
 			}
 
 			if !quiet {
-				fmt.Printf("Running mode: %s\n", mode)
+				fmt.Printf("Running: %s\n", mode)
 			}
 
-			// For JSON output, collect data instead of generating plots
-			if modeFunc, ok := modeHandlers[mode]; ok {
-				// Create temporary directory for this mode's data
-				tempDir := filepath.Join(os.TempDir(), "labours-json-"+mode)
-				os.MkdirAll(tempDir, 0755)
-				defer os.RemoveAll(tempDir)
-
-				if err := modeFunc(reader, tempDir, startTime, endTime); err != nil {
-					fmt.Printf("Error in mode %s: %v\n", mode, err)
-					results[mode] = map[string]interface{}{
-						"error": err.Error(),
-					}
-				} else {
-					// Extract data from the mode (this would need to be enhanced per mode)
-					results[mode] = extractModeDataForJSON(reader, mode)
-				}
-			} else {
+			if _, ok := modeHandlers[mode]; !ok {
 				printModeUnavailable(mode)
 				results[mode] = map[string]interface{}{
 					"error": "mode not implemented",
 				}
+				continue
 			}
+
+			data, err := extractModeDataForJSON(reader, mode)
+			if err != nil {
+				handleModeError(mode, err)
+				results[mode] = map[string]interface{}{
+					"error": err.Error(),
+				}
+				continue
+			}
+			results[mode] = data
 		}
 
 		if len(modes) > 1 {
@@ -109,13 +110,13 @@ func executeModes(modes []string, reader readers.Reader, output string, startTim
 				progEstimator.NextOperation(fmt.Sprintf("Running %s", mode))
 
 				if !quiet {
-					fmt.Printf("Running mode: %s\n", mode)
+					fmt.Printf("Running: %s\n", mode)
 				}
 
 				if modeFunc, ok := modeHandlers[mode]; ok {
 					formattedOutput := planModeOutput(output, mode, len(modes))
 					if err := modeFunc(reader, formattedOutput, startTime, endTime); err != nil {
-						fmt.Printf("Error in mode %s: %v\n", mode, err)
+						handleModeError(mode, err)
 					}
 				} else {
 					printModeUnavailable(mode)
@@ -127,13 +128,13 @@ func executeModes(modes []string, reader readers.Reader, output string, startTim
 			// Single mode - let the individual mode handle its own progress
 			for _, mode := range modes {
 				if !quiet {
-					fmt.Printf("Running mode: %s\n", mode)
+					fmt.Printf("Running: %s\n", mode)
 				}
 
 				if modeFunc, ok := modeHandlers[mode]; ok {
 					formattedOutput := planModeOutput(output, mode, len(modes))
 					if err := modeFunc(reader, formattedOutput, startTime, endTime); err != nil {
-						fmt.Printf("Error in mode %s: %v\n", mode, err)
+						handleModeError(mode, err)
 					}
 				} else {
 					printModeUnavailable(mode)
@@ -149,6 +150,82 @@ func printModeUnavailable(mode string) {
 		return
 	}
 	fmt.Printf("Unknown mode: %s\n", mode)
+}
+
+func handleModeError(mode string, err error) {
+	if warning, ok := missingAnalysisWarning(mode, err); ok {
+		fmt.Println(warning)
+		return
+	}
+	fmt.Printf("Error in mode %s: %v\n", mode, err)
+}
+
+func missingAnalysisWarning(mode string, err error) (string, bool) {
+	if !isMissingAnalysisError(err) {
+		return "", false
+	}
+
+	burndownWarning := "Burndown stats were not collected. Re-run hercules with --burndown."
+	burndownFilesWarning := "Burndown stats for files were not collected. Re-run hercules with --burndown --burndown-files."
+	burndownPeopleWarning := "Burndown stats for people were not collected. Re-run hercules with --burndown --burndown-people."
+	couplesWarning := "Coupling stats were not collected. Re-run hercules with --couples."
+	shotnessWarning := "Structural hotness stats were not collected. Re-run hercules with --shotness. Also check --languages - the output may be empty."
+	devsWarning := "Devs stats were not collected. Re-run hercules with --devs."
+
+	switch mode {
+	case "burndown-project":
+		return "project: " + burndownWarning, true
+	case "burndown-file":
+		return "files: " + burndownFilesWarning, true
+	case "burndown-person", "ownership", "overwrites-matrix":
+		prefix := map[string]string{
+			"burndown-person":   "people",
+			"ownership":         "ownership",
+			"overwrites-matrix": "overwrites_matrix",
+		}[mode]
+		return prefix + ": " + burndownPeopleWarning, true
+	case "burndown-repository":
+		return "repositories: burndown data not available or repositories not tracked", true
+	case "burndown-repos-combined":
+		return "repositories-combined: burndown data not available or repositories not tracked", true
+	case "couples-files", "couples-people":
+		return couplesWarning, true
+	case "couples-shotness", "shotness":
+		return shotnessWarning, true
+	case "sentiment":
+		return "Sentiment stats were not collected. Re-run hercules with --sentiment.", true
+	case "devs", "devs-efforts", "old-vs-new", "languages":
+		return devsWarning, true
+	case "temporal-activity":
+		return "Temporal activity stats were not collected. Re-run hercules with --temporal-activity.", true
+	case "bus-factor":
+		return "Bus factor stats were not collected. Re-run hercules with --bus-factor.", true
+	case "ownership-concentration":
+		return "Ownership concentration stats were not collected. Re-run hercules with --ownership-concentration.", true
+	case "knowledge-diffusion":
+		return "Knowledge diffusion stats were not collected. Re-run hercules with --knowledge-diffusion.", true
+	case "hotspot-risk":
+		return "Hotspot risk scores were not collected. Re-run hercules with --hotspot-risk.", true
+	case "refactoring-proxy":
+		return "Refactoring proxy data was not collected. Re-run hercules with --refactoring-proxy.", true
+	}
+
+	return "", false
+}
+
+func isMissingAnalysisError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, readers.ErrAnalysisMissing) {
+		return true
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "missing") ||
+		strings.Contains(msg, "not collected") ||
+		strings.Contains(msg, "not found") ||
+		strings.Contains(msg, "no ") ||
+		strings.Contains(msg, "does not expose")
 }
 
 func burndownProject(reader readers.Reader, output string, startTime, endTime *time.Time) error {
@@ -169,6 +246,18 @@ func burndownPerson(reader readers.Reader, output string, startTime, endTime *ti
 	relative := viper.GetBool("relative")
 	resample := viper.GetString("resample")
 	return modes.BurndownPerson(reader, output, relative, startTime, endTime, resample)
+}
+
+func burndownRepository(reader readers.Reader, output string, startTime, endTime *time.Time) error {
+	relative := viper.GetBool("relative")
+	resample := viper.GetString("resample")
+	return modes.GenerateBurndownRepositoryPython(reader, output, relative, resample)
+}
+
+func burndownReposCombined(reader readers.Reader, output string, startTime, endTime *time.Time) error {
+	relative := viper.GetBool("relative")
+	resample := viper.GetString("resample")
+	return modes.GenerateBurndownReposCombinedPython(reader, output, relative, resample)
 }
 
 func overwritesMatrix(reader readers.Reader, output string, startTime, endTime *time.Time) error {
@@ -219,7 +308,7 @@ func languages(reader readers.Reader, output string, startTime, endTime *time.Ti
 func temporalActivity(reader readers.Reader, output string, startTime, endTime *time.Time) error {
 	legendThreshold := viper.GetInt("temporal-legend-threshold")
 	singleColumnThreshold := viper.GetInt("temporal-legend-single-col-threshold")
-	return modes.TemporalActivity(reader, output, legendThreshold, singleColumnThreshold)
+	return modes.TemporalActivity(reader, output, legendThreshold, singleColumnThreshold, startTime, endTime)
 }
 
 func devsParallel(reader readers.Reader, output string, startTime, endTime *time.Time) error {
@@ -289,68 +378,160 @@ func runAllModes(reader readers.Reader, output string, startTime, endTime *time.
 	return nil
 }
 
-// extractModeDataForJSON extracts raw data from the reader for JSON output
-func extractModeDataForJSON(reader readers.Reader, mode string) interface{} {
+// extractModeDataForJSON extracts raw reader data for JSON output without rendering plots.
+func extractModeDataForJSON(reader readers.Reader, mode string) (interface{}, error) {
 	switch mode {
 	case "devs":
-		if stats, err := reader.GetDeveloperStats(); err == nil {
-			return map[string]interface{}{
-				"developer_stats": stats,
-			}
+		stats, err := reader.GetDeveloperStats()
+		if err != nil {
+			return nil, err
 		}
+		return map[string]interface{}{"developer_stats": stats}, nil
+	case "devs-efforts", "old-vs-new", "devs-parallel":
+		data, err := reader.GetDeveloperTimeSeriesData()
+		if err != nil {
+			return nil, err
+		}
+		return map[string]interface{}{"developer_time_series": data}, nil
 	case "burndown-project":
-		if header, name, matrix, err := reader.GetProjectBurndownWithHeader(); err == nil {
-			return map[string]interface{}{
-				"header": header,
-				"name":   name,
-				"matrix": matrix,
-			}
+		header, name, matrix, err := reader.GetProjectBurndownWithHeader()
+		if err != nil {
+			return nil, err
 		}
+		return map[string]interface{}{"type": "burndown", "target": "project", "header": header, "name": name, "matrix": matrix}, nil
+	case "burndown-file":
+		files, err := reader.GetFilesBurndown()
+		if err != nil {
+			return nil, err
+		}
+		return map[string]interface{}{"type": "burndown", "target": "file", "files": files}, nil
+	case "burndown-person":
+		people, err := reader.GetPeopleBurndown()
+		if err != nil {
+			return nil, err
+		}
+		return map[string]interface{}{"type": "burndown", "target": "person", "people": people}, nil
+	case "burndown-repository", "burndown-repos-combined":
+		repoReader, ok := reader.(readers.RepositoryBurndownReader)
+		if !ok {
+			return nil, fmt.Errorf("reader does not expose repository burndown data")
+		}
+		repos, err := repoReader.GetRepositoriesBurndown()
+		if err != nil {
+			return nil, err
+		}
+		return map[string]interface{}{"type": "burndown", "target": "repository", "repositories": repos}, nil
 	case "ownership":
-		if names, matrices, err := reader.GetOwnershipBurndown(); err == nil {
-			return map[string]interface{}{
-				"file_names": names,
-				"matrices":   matrices,
-			}
+		names, matrices, err := reader.GetOwnershipBurndown()
+		if err != nil {
+			return nil, err
 		}
+		return map[string]interface{}{"type": "ownership", "file_names": names, "matrices": matrices}, nil
+	case "overwrites-matrix":
+		people, matrix, err := reader.GetPeopleInteraction()
+		if err != nil {
+			return nil, err
+		}
+		return map[string]interface{}{"type": "overwrites_matrix", "people": people, "matrix": matrix}, nil
 	case "couples-files":
-		if names, matrix, err := reader.GetFileCooccurrence(); err == nil {
-			return map[string]interface{}{
-				"file_names":      names,
-				"coupling_matrix": matrix,
-			}
+		names, matrix, err := reader.GetFileCooccurrence()
+		if err != nil {
+			return nil, err
 		}
+		return map[string]interface{}{"file_names": names, "coupling_matrix": matrix}, nil
 	case "couples-people":
-		if names, matrix, err := reader.GetPeopleCooccurrence(); err == nil {
-			return map[string]interface{}{
-				"people_names":    names,
-				"coupling_matrix": matrix,
-			}
+		names, matrix, err := reader.GetPeopleCooccurrence()
+		if err != nil {
+			return nil, err
 		}
+		return map[string]interface{}{"people_names": names, "coupling_matrix": matrix}, nil
 	case "couples-shotness":
-		if names, matrix, err := reader.GetShotnessCooccurrence(); err == nil {
-			return map[string]interface{}{
-				"entity_names":    names,
-				"coupling_matrix": matrix,
-			}
+		names, matrix, err := reader.GetShotnessCooccurrence()
+		if err != nil {
+			return nil, err
 		}
+		return map[string]interface{}{"entity_names": names, "coupling_matrix": matrix}, nil
+	case "shotness":
+		records, err := reader.GetShotnessRecords()
+		if err != nil {
+			return nil, err
+		}
+		return map[string]interface{}{"shotness_records": records}, nil
 	case "run-times":
-		if stats, err := reader.GetRuntimeStats(); err == nil {
-			return map[string]interface{}{
-				"runtime_stats": stats,
-			}
+		stats, err := reader.GetRuntimeStats()
+		if err != nil {
+			return nil, err
 		}
+		return map[string]interface{}{"runtime_stats": stats}, nil
 	case "languages":
-		if stats, err := reader.GetLanguageStats(); err == nil {
-			return map[string]interface{}{
-				"language_stats": stats,
-			}
+		stats, err := reader.GetLanguageStats()
+		if err != nil {
+			return nil, err
 		}
+		return map[string]interface{}{"language_stats": stats}, nil
+	case "sentiment":
+		sentimentReader, ok := reader.(readers.SentimentReader)
+		if !ok {
+			return nil, fmt.Errorf("reader does not expose sentiment data")
+		}
+		data, err := sentimentReader.GetSentimentByTick()
+		if err != nil {
+			return nil, err
+		}
+		return map[string]interface{}{"sentiment_by_tick": data}, nil
+	case "temporal-activity":
+		temporalReader, ok := reader.(readers.TemporalActivityReader)
+		if !ok {
+			return nil, fmt.Errorf("reader does not expose temporal activity data")
+		}
+		data, err := temporalReader.GetTemporalActivity()
+		if err != nil {
+			return nil, err
+		}
+		return map[string]interface{}{"temporal_activity": data}, nil
+	case "bus-factor":
+		busFactorReader, ok := reader.(readers.BusFactorReader)
+		if !ok {
+			return nil, fmt.Errorf("reader does not expose bus factor data")
+		}
+		data, err := busFactorReader.GetBusFactor()
+		if err != nil {
+			return nil, err
+		}
+		return map[string]interface{}{"bus_factor": data}, nil
+	case "ownership-concentration":
+		ownershipReader, ok := reader.(readers.OwnershipConcentrationReader)
+		if !ok {
+			return nil, fmt.Errorf("reader does not expose ownership concentration data")
+		}
+		data, err := ownershipReader.GetOwnershipConcentration()
+		if err != nil {
+			return nil, err
+		}
+		return map[string]interface{}{"ownership_concentration": data}, nil
+	case "knowledge-diffusion":
+		diffusionReader, ok := reader.(readers.KnowledgeDiffusionReader)
+		if !ok {
+			return nil, fmt.Errorf("reader does not expose knowledge diffusion data")
+		}
+		data, err := diffusionReader.GetKnowledgeDiffusion()
+		if err != nil {
+			return nil, err
+		}
+		return map[string]interface{}{"knowledge_diffusion": data}, nil
+	case "hotspot-risk":
+		hotspotReader, ok := reader.(readers.HotspotRiskReader)
+		if !ok {
+			return nil, fmt.Errorf("reader does not expose hotspot risk data")
+		}
+		data, err := hotspotReader.GetHotspotRisk()
+		if err != nil {
+			return nil, err
+		}
+		return map[string]interface{}{"hotspot_risk": data}, nil
 	}
 
-	return map[string]interface{}{
-		"message": "No data available for JSON export",
-	}
+	return nil, fmt.Errorf("JSON output is not implemented for mode %s", mode)
 }
 
 // saveJSONResults saves the analysis results as JSON

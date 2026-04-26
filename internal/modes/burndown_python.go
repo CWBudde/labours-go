@@ -19,7 +19,7 @@ func GenerateBurndownProjectPython(reader readers.Reader, output string, relativ
 	// Initialize progress tracking
 	quiet := viper.GetBool("quiet")
 	progEstimator := progress.NewProgressEstimator(!quiet)
-	
+
 	totalPhases := 4 // validation, data loading, processing, plotting
 	progEstimator.StartMultiOperation(totalPhases, "Python-Compatible Burndown Analysis")
 
@@ -48,7 +48,7 @@ func GenerateBurndownProjectPython(reader readers.Reader, output string, relativ
 
 	if !quiet {
 		fmt.Printf("Processing %s with %d age bands and %d time points\n", name, len(matrix), len(matrix[0]))
-		fmt.Printf("Header: start=%d, last=%d, sampling=%d, granularity=%d, tick_size=%.3f\n", 
+		fmt.Printf("Header: start=%d, last=%d, sampling=%d, granularity=%d, tick_size=%.3f\n",
 			header.Start, header.Last, header.Sampling, header.Granularity, header.TickSize)
 	}
 
@@ -91,7 +91,7 @@ func GenerateBurndownProjectPython(reader readers.Reader, output string, relativ
 // GenerateBurndownFilePython creates Python-compatible file-level burndown charts
 func GenerateBurndownFilePython(reader readers.Reader, output string, relative bool, resample string) error {
 	fmt.Println("Running: burndown-file (Python-compatible)")
-	
+
 	// Get files burndown data
 	files, err := reader.GetFilesBurndown()
 	if err != nil {
@@ -152,6 +152,147 @@ func GenerateBurndownFilePython(reader readers.Reader, output string, relative b
 	}
 
 	return nil
+}
+
+// GenerateBurndownRepositoryPython creates Python-compatible repository-level burndown charts.
+func GenerateBurndownRepositoryPython(reader readers.Reader, output string, relative bool, resample string) error {
+	fmt.Println("Running: burndown-repository (Python-compatible)")
+
+	repoReader, ok := reader.(readers.RepositoryBurndownReader)
+	if !ok {
+		return fmt.Errorf("reader does not expose repository burndown data")
+	}
+
+	repositories, err := repoReader.GetRepositoriesBurndown()
+	if err != nil {
+		return fmt.Errorf("failed to get repositories burndown data: %v", err)
+	}
+	if len(repositories) == 0 {
+		return fmt.Errorf("no repository burndown data found")
+	}
+
+	header, _, _, err := reader.GetProjectBurndownWithHeader()
+	if err != nil {
+		return fmt.Errorf("failed to get burndown header: %v", err)
+	}
+
+	if output == "" {
+		output = "."
+	}
+	if err := os.MkdirAll(output, os.ModePerm); err != nil {
+		return fmt.Errorf("failed to create output directory %s: %v", output, err)
+	}
+	if resample == "" {
+		resample = "year"
+	}
+
+	quiet := viper.GetBool("quiet")
+	for i, repository := range repositories {
+		if !quiet {
+			fmt.Printf("Processing repository %d/%d: %s\n", i+1, len(repositories), repository.Repository)
+		}
+
+		processedData, err := burndown.LoadBurndown(header, repository.Repository, repository.Matrix, resample, false, false)
+		if err != nil {
+			if !quiet {
+				fmt.Printf("Warning: failed to process repository %s: %v\n", repository.Repository, err)
+			}
+			continue
+		}
+
+		repoOutput := filepath.Join(output, fmt.Sprintf("burndown-repository_%s.png", sanitizeFilename(repository.Repository)))
+		if err := graphics.PlotBurndownPythonStyle(processedData, repoOutput, relative); err != nil {
+			if !quiet {
+				fmt.Printf("Warning: failed to create plot for repository %s: %v\n", repository.Repository, err)
+			}
+			continue
+		}
+		if !quiet {
+			fmt.Printf("Chart saved: %s\n", repoOutput)
+		}
+	}
+
+	return nil
+}
+
+// GenerateBurndownReposCombinedPython creates one burndown chart from all repository matrices combined.
+func GenerateBurndownReposCombinedPython(reader readers.Reader, output string, relative bool, resample string) error {
+	fmt.Println("Running: burndown-repos-combined (Python-compatible)")
+
+	repoReader, ok := reader.(readers.RepositoryBurndownReader)
+	if !ok {
+		return fmt.Errorf("reader does not expose repository burndown data")
+	}
+
+	repositories, err := repoReader.GetRepositoriesBurndown()
+	if err != nil {
+		return fmt.Errorf("failed to get repositories burndown data: %v", err)
+	}
+	if len(repositories) == 0 {
+		return fmt.Errorf("no repository burndown data found")
+	}
+
+	header, _, _, err := reader.GetProjectBurndownWithHeader()
+	if err != nil {
+		return fmt.Errorf("failed to get burndown header: %v", err)
+	}
+
+	matrix := combineRepositoryBurndowns(repositories)
+	if len(matrix) == 0 || len(matrix[0]) == 0 {
+		return fmt.Errorf("empty combined repository burndown matrix")
+	}
+	if resample == "" {
+		resample = "year"
+	}
+	if output == "" {
+		output = "burndown-repos-combined.png"
+	}
+	if err := os.MkdirAll(filepath.Dir(output), os.ModePerm); err != nil {
+		return fmt.Errorf("failed to create output directory %s: %v", filepath.Dir(output), err)
+	}
+
+	processedData, err := burndown.LoadBurndown(header, "repositories", matrix, resample, true, false)
+	if err != nil {
+		return fmt.Errorf("failed to process combined repository burndown data: %v", err)
+	}
+	if err := graphics.PlotBurndownPythonStyle(processedData, output, relative); err != nil {
+		return fmt.Errorf("error creating combined repository burndown plot: %v", err)
+	}
+
+	if !viper.GetBool("quiet") {
+		fmt.Printf("Combined repository burndown chart saved to %s\n", output)
+	}
+	return nil
+}
+
+func combineRepositoryBurndowns(repositories []readers.RepositoryBurndown) [][]int {
+	rows, cols := 0, 0
+	for _, repository := range repositories {
+		if len(repository.Matrix) > rows {
+			rows = len(repository.Matrix)
+		}
+		for _, row := range repository.Matrix {
+			if len(row) > cols {
+				cols = len(row)
+			}
+		}
+	}
+	if rows == 0 || cols == 0 {
+		return nil
+	}
+
+	combined := make([][]int, rows)
+	for i := range combined {
+		combined[i] = make([]int, cols)
+	}
+	for _, repository := range repositories {
+		for i, row := range repository.Matrix {
+			for j, value := range row {
+				combined[i][j] += value
+			}
+		}
+	}
+	return combined
 }
 
 // sanitizeFilename removes problematic characters from filenames
