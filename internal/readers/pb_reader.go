@@ -535,6 +535,68 @@ func (r *ProtobufReader) GetRefactoringProxy() (*RefactoringProxyData, error) {
 	}, nil
 }
 
+// GetCommits retrieves commit statistics when Hercules was run with --commits-stat.
+func (r *ProtobufReader) GetCommits() (*CommitsData, error) {
+	commitsData, err := r.parseCommitsAnalysisResults()
+	if err != nil {
+		return nil, err
+	}
+
+	commits := make([]Commit, 0, len(commitsData.Commits))
+	for _, commit := range commitsData.Commits {
+		if commit == nil {
+			continue
+		}
+		files := make([]CommitFile, 0, len(commit.Files))
+		for _, file := range commit.Files {
+			if file == nil {
+				continue
+			}
+			files = append(files, CommitFile{
+				Name:     file.Name,
+				Language: file.Language,
+				Stats:    convertLineStats(file.Stats),
+			})
+		}
+		commits = append(commits, Commit{
+			Hash:         commit.Hash,
+			WhenUnixTime: commit.WhenUnixTime,
+			Author:       int(commit.Author),
+			Files:        files,
+		})
+	}
+
+	return &CommitsData{
+		Commits:     commits,
+		AuthorIndex: append([]string(nil), commitsData.AuthorIndex...),
+	}, nil
+}
+
+// GetFileHistory retrieves file history data when Hercules was run with --file-history.
+func (r *ProtobufReader) GetFileHistory() (*FileHistoryData, error) {
+	historyData, err := r.parseFileHistoryResults()
+	if err != nil {
+		return nil, err
+	}
+
+	files := make(map[string]FileHistory, len(historyData.Files))
+	for path, history := range historyData.Files {
+		if history == nil {
+			continue
+		}
+		changes := make(map[int]LineStats, len(history.ChangesByDeveloper))
+		for developer, stats := range history.ChangesByDeveloper {
+			changes[int(developer)] = convertLineStats(stats)
+		}
+		files[path] = FileHistory{
+			Commits:            append([]string(nil), history.Commits...),
+			ChangesByDeveloper: changes,
+		}
+	}
+
+	return &FileHistoryData{Files: files}, nil
+}
+
 // GetDeveloperTimeSeriesData returns Python-compatible time series data for protobuf files
 // This now parses real temporal data from DevsAnalysisResults.Ticks (matches Python's approach)
 func (r *ProtobufReader) GetDeveloperTimeSeriesData() (*DeveloperTimeSeriesData, error) {
@@ -903,6 +965,28 @@ func (r *ProtobufReader) parseRefactoringProxyResults() (*pb.RefactoringProxyRes
 	return &proxyData, nil
 }
 
+func (r *ProtobufReader) parseCommitsAnalysisResults() (*pb.CommitsAnalysisResults, error) {
+	if r.data == nil || r.data.Contents == nil {
+		return nil, fmt.Errorf("%w: CommitsStat", ErrAnalysisMissing)
+	}
+	var commitsData pb.CommitsAnalysisResults
+	if err := r.unmarshalContent("CommitsStat", &commitsData); err != nil {
+		return nil, err
+	}
+	return &commitsData, nil
+}
+
+func (r *ProtobufReader) parseFileHistoryResults() (*pb.FileHistoryResultMessage, error) {
+	if r.data == nil || r.data.Contents == nil {
+		return nil, fmt.Errorf("%w: FileHistoryAnalysis", ErrAnalysisMissing)
+	}
+	var historyData pb.FileHistoryResultMessage
+	if err := r.unmarshalContent("FileHistoryAnalysis", &historyData); err != nil {
+		return nil, err
+	}
+	return &historyData, nil
+}
+
 func (r *ProtobufReader) unmarshalContent(key string, message proto.Message) error {
 	contentBytes, exists := r.data.Contents[key]
 	if !exists {
@@ -962,4 +1046,15 @@ func copyStringFloat64Map(values map[string]float64) map[string]float64 {
 		result[key] = value
 	}
 	return result
+}
+
+func convertLineStats(stats *pb.LineStats) LineStats {
+	if stats == nil {
+		return LineStats{}
+	}
+	return LineStats{
+		Added:   int(stats.Added),
+		Removed: int(stats.Removed),
+		Changed: int(stats.Changed),
+	}
 }

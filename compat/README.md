@@ -25,6 +25,11 @@ The current provenance of these files is not fully documented. Before using any 
 
 Future current-Hercules fixtures should be generated from `../hercules` and kept small enough for normal test runs.
 
+Current checked-in current-Hercules fixtures live in `test/testdata/hercules/`:
+
+- `report_default.pb`: default `hercules report` analysis flag set.
+- `shotness.pb`: `--shotness` payload used by report-all modes.
+
 Suggested fixture commands:
 
 ```bash

@@ -3,6 +3,7 @@ package readers
 import (
 	"bytes"
 	"errors"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -118,6 +119,29 @@ func TestProtobufReader_CurrentHerculesReportPayloads(t *testing.T) {
 			Threshold:     0.3,
 			TickSize:      int64(86400 * 1_000_000_000),
 		}),
+		"CommitsStat": marshalProto(t, &pb.CommitsAnalysisResults{
+			Commits: []*pb.Commit{
+				{
+					Hash:         "abc123",
+					WhenUnixTime: 1700000100,
+					Author:       0,
+					Files: []*pb.CommitFile{
+						{Name: "main.go", Language: "Go", Stats: &pb.LineStats{Added: 5, Removed: 1, Changed: 2}},
+					},
+				},
+			},
+			AuthorIndex: []string{"dev-a"},
+		}),
+		"FileHistoryAnalysis": marshalProto(t, &pb.FileHistoryResultMessage{
+			Files: map[string]*pb.FileHistory{
+				"main.go": {
+					Commits: []string{"abc123"},
+					ChangesByDeveloper: map[int32]*pb.LineStats{
+						0: {Added: 5, Removed: 1, Changed: 2},
+					},
+				},
+			},
+		}),
 	}
 
 	payload := &pb.AnalysisResults{
@@ -174,6 +198,15 @@ func TestProtobufReader_CurrentHerculesReportPayloads(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, float32(0.4), refactoring.Ticks[0].RefactoringRate)
 	require.True(t, refactoring.Ticks[0].IsRefactoring)
+
+	commits, err := reader.GetCommits()
+	require.NoError(t, err)
+	require.Equal(t, "abc123", commits.Commits[0].Hash)
+	require.Equal(t, "Go", commits.Commits[0].Files[0].Language)
+
+	history, err := reader.GetFileHistory()
+	require.NoError(t, err)
+	require.Equal(t, 5, history.Files["main.go"].ChangesByDeveloper[0].Added)
 }
 
 func TestProtobufReader_ReportPayloadErrorsAreTyped(t *testing.T) {
@@ -204,6 +237,103 @@ func TestProtobufReader_ReportPayloadErrorsAreTyped(t *testing.T) {
 		require.Error(t, err)
 		require.True(t, errors.Is(err, ErrAnalysisMalformed))
 	})
+}
+
+func TestProtobufReader_CurrentHerculesReportDefaultFixture(t *testing.T) {
+	data, err := os.ReadFile("../../test/testdata/hercules/report_default.pb")
+	require.NoError(t, err)
+
+	var payload pb.AnalysisResults
+	require.NoError(t, proto.Unmarshal(data, &payload))
+
+	requiredContents := []string{
+		"Burndown",
+		"Couples",
+		"Devs",
+		"TemporalActivity",
+		"BusFactor",
+		"OwnershipConcentration",
+		"KnowledgeDiffusion",
+		"HotspotRisk",
+	}
+	for _, key := range requiredContents {
+		require.Contains(t, payload.Contents, key)
+	}
+
+	reader := &ProtobufReader{}
+	require.NoError(t, reader.Read(bytes.NewReader(data)))
+
+	_, _, projectBurndown, err := reader.GetProjectBurndownWithHeader()
+	require.NoError(t, err)
+	require.NotEmpty(t, projectBurndown)
+
+	files, err := reader.GetFilesBurndown()
+	require.NoError(t, err)
+	require.NotEmpty(t, files)
+
+	people, err := reader.GetPeopleBurndown()
+	require.NoError(t, err)
+	require.NotEmpty(t, people)
+
+	_, interaction, err := reader.GetPeopleInteraction()
+	require.NoError(t, err)
+	require.NotEmpty(t, interaction)
+
+	fileIndex, fileCooccurrence, err := reader.GetFileCooccurrence()
+	require.NoError(t, err)
+	require.NotEmpty(t, fileIndex)
+	require.NotEmpty(t, fileCooccurrence)
+
+	peopleIndex, peopleCooccurrence, err := reader.GetPeopleCooccurrence()
+	require.NoError(t, err)
+	require.NotEmpty(t, peopleIndex)
+	require.NotEmpty(t, peopleCooccurrence)
+
+	devs, err := reader.GetDeveloperTimeSeriesData()
+	require.NoError(t, err)
+	require.NotEmpty(t, devs.People)
+	require.NotEmpty(t, devs.Days)
+
+	temporal, err := reader.GetTemporalActivity()
+	require.NoError(t, err)
+	require.NotEmpty(t, temporal.People)
+
+	busFactor, err := reader.GetBusFactor()
+	require.NoError(t, err)
+	require.NotEmpty(t, busFactor.Snapshots)
+
+	ownership, err := reader.GetOwnershipConcentration()
+	require.NoError(t, err)
+	require.NotEmpty(t, ownership.Snapshots)
+
+	diffusion, err := reader.GetKnowledgeDiffusion()
+	require.NoError(t, err)
+	require.NotEmpty(t, diffusion.Files)
+
+	hotspot, err := reader.GetHotspotRisk()
+	require.NoError(t, err)
+	require.NotEmpty(t, hotspot.Files)
+}
+
+func TestProtobufReader_CurrentHerculesShotnessFixture(t *testing.T) {
+	data, err := os.ReadFile("../../test/testdata/hercules/shotness.pb")
+	require.NoError(t, err)
+
+	var payload pb.AnalysisResults
+	require.NoError(t, proto.Unmarshal(data, &payload))
+	require.Contains(t, payload.Contents, "Shotness")
+
+	reader := &ProtobufReader{}
+	require.NoError(t, reader.Read(bytes.NewReader(data)))
+
+	records, err := reader.GetShotnessRecords()
+	require.NoError(t, err)
+	require.NotEmpty(t, records)
+
+	index, cooccurrence, err := reader.GetShotnessCooccurrence()
+	require.NoError(t, err)
+	require.Len(t, index, len(records))
+	require.Len(t, cooccurrence, len(records))
 }
 
 func marshalProto(t *testing.T, message proto.Message) []byte {

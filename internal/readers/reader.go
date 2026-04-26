@@ -63,6 +63,39 @@ type LanguageStat struct {
 	Lines    int
 }
 
+type LineStats struct {
+	Added   int
+	Removed int
+	Changed int
+}
+
+type CommitFile struct {
+	Name     string
+	Language string
+	Stats    LineStats
+}
+
+type Commit struct {
+	Hash         string
+	WhenUnixTime int64
+	Author       int
+	Files        []CommitFile
+}
+
+type CommitsData struct {
+	Commits     []Commit
+	AuthorIndex []string
+}
+
+type FileHistory struct {
+	Commits            []string
+	ChangesByDeveloper map[int]LineStats
+}
+
+type FileHistoryData struct {
+	Files map[string]FileHistory
+}
+
 type ShotnessRecord struct {
 	Type     string          // Type of structural unit (e.g., "function", "class")
 	Name     string          // Name of the structural unit
@@ -227,4 +260,12 @@ type HotspotRiskReader interface {
 
 type RefactoringProxyReader interface {
 	GetRefactoringProxy() (*RefactoringProxyData, error)
+}
+
+type CommitsReader interface {
+	GetCommits() (*CommitsData, error)
+}
+
+type FileHistoryReader interface {
+	GetFileHistory() (*FileHistoryData, error)
 }
