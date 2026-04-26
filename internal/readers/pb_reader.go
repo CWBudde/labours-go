@@ -20,10 +20,10 @@ func (r *ProtobufReader) Read(file io.Reader) error {
 	// Initialize progress tracking for file reading
 	quiet := viper.GetBool("quiet")
 	progEstimator := progress.NewProgressEstimator(!quiet)
-	
+
 	// Start reading operation
 	progEstimator.StartOperation("Reading protobuf data", 2) // read + parse phases
-	
+
 	progEstimator.UpdateProgress(1)
 	allBytes, err := io.ReadAll(file)
 	if err != nil {
@@ -111,6 +111,34 @@ func (r *ProtobufReader) GetPeopleBurndown() ([]PeopleBurndown, error) {
 	return peopleBurndowns, nil
 }
 
+// GetRepositoriesBurndown retrieves per-repository burndown data from combined Hercules output.
+func (r *ProtobufReader) GetRepositoriesBurndown() ([]RepositoryBurndown, error) {
+	burndownData := r.parseBurndownAnalysisResults()
+	if burndownData == nil || len(burndownData.Repositories) == 0 {
+		return nil, fmt.Errorf("no repository burndown data found")
+	}
+
+	repositories := make([]RepositoryBurndown, 0, len(burndownData.Repositories))
+	for _, repoMatrix := range burndownData.Repositories {
+		matrix := parseBurndownSparseMatrix(repoMatrix)
+		repositories = append(repositories, RepositoryBurndown{
+			Repository: repoMatrix.Name,
+			Matrix:     transposeMatrix(matrix),
+		})
+	}
+	return repositories, nil
+}
+
+// GetRepositoryNames retrieves repository_sequence from combined Hercules output.
+func (r *ProtobufReader) GetRepositoryNames() ([]string, error) {
+	burndownData := r.parseBurndownAnalysisResults()
+	if burndownData == nil {
+		return nil, fmt.Errorf("no burndown data found")
+	}
+	names := append([]string(nil), burndownData.RepositorySequence...)
+	return names, nil
+}
+
 // GetOwnershipBurndown retrieves the ownership matrix and sequence
 func (r *ProtobufReader) GetOwnershipBurndown() ([]string, map[string][][]int, error) {
 	// Get people burndown data (matches Python behavior)
@@ -125,7 +153,7 @@ func (r *ProtobufReader) GetOwnershipBurndown() ([]string, map[string][][]int, e
 
 	for _, peopleBurndown := range peopleBurndowns {
 		peopleSequence = append(peopleSequence, peopleBurndown.Person)
-		
+
 		// Transpose the matrix to match Python's .T behavior
 		transposedMatrix := transposeMatrix(peopleBurndown.Matrix)
 		ownership[peopleBurndown.Person] = transposedMatrix
@@ -142,13 +170,13 @@ func (r *ProtobufReader) GetPeopleInteraction() ([]string, [][]int, error) {
 	}
 
 	matrix := parseCompressedSparseRowMatrix(burndownData.PeopleInteraction)
-	
+
 	// Extract people names from the burndown people data
 	var peopleNames []string
 	for _, person := range burndownData.People {
 		peopleNames = append(peopleNames, person.Name)
 	}
-	
+
 	return peopleNames, matrix, nil
 }
 
@@ -176,8 +204,26 @@ func (r *ProtobufReader) GetPeopleCooccurrence() ([]string, [][]int, error) {
 
 // GetShotnessCooccurrence retrieves shotness coupling data
 func (r *ProtobufReader) GetShotnessCooccurrence() ([]string, [][]int, error) {
-	// This would require additional protobuf structure for shotness data
-	return []string{}, [][]int{}, fmt.Errorf("shotness data not implemented in current protobuf format")
+	shotnessRecords, err := r.GetShotnessRecords()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	index := make([]string, 0, len(shotnessRecords))
+	matrix := make([][]int, len(shotnessRecords))
+	for i := range matrix {
+		matrix[i] = make([]int, len(shotnessRecords))
+	}
+
+	for i, record := range shotnessRecords {
+		index = append(index, fmt.Sprintf("%s:%s", record.File, record.Name))
+		for tick, value := range record.Counters {
+			if tick >= 0 && int(tick) < len(shotnessRecords) {
+				matrix[i][tick] = int(value)
+			}
+		}
+	}
+	return index, matrix, nil
 }
 
 // GetShotnessRecords retrieves shotness records
@@ -248,6 +294,247 @@ func (r *ProtobufReader) GetRuntimeStats() (map[string]float64, error) {
 	return runtimeStats, nil
 }
 
+// GetSentimentByTick retrieves real sentiment data from CommentSentimentResults.
+func (r *ProtobufReader) GetSentimentByTick() (map[int]SentimentTick, error) {
+	sentimentData, err := r.parseSentimentAnalysisResults()
+	if err != nil {
+		return nil, err
+	}
+	if len(sentimentData.SentimentByTick) == 0 {
+		return nil, fmt.Errorf("%w: Sentiment", ErrAnalysisMissing)
+	}
+
+	result := make(map[int]SentimentTick, len(sentimentData.SentimentByTick))
+	for tick, sentiment := range sentimentData.SentimentByTick {
+		if sentiment == nil {
+			continue
+		}
+		result[int(tick)] = SentimentTick{
+			Value:    sentiment.Value,
+			Comments: append([]string(nil), sentiment.Comments...),
+			Commits:  append([]string(nil), sentiment.Commits...),
+		}
+	}
+	return result, nil
+}
+
+// GetTemporalActivity retrieves temporal activity data with aggregate and per-tick views.
+func (r *ProtobufReader) GetTemporalActivity() (*TemporalActivityData, error) {
+	temporalData, err := r.parseTemporalActivityResults()
+	if err != nil {
+		return nil, err
+	}
+
+	activities := make(map[int]TemporalDeveloperActivity, len(temporalData.Activities))
+	for devID, activity := range temporalData.Activities {
+		if activity == nil {
+			continue
+		}
+		activities[int(devID)] = TemporalDeveloperActivity{
+			Weekdays: convertTemporalDimension(activity.Weekdays),
+			Hours:    convertTemporalDimension(activity.Hours),
+			Months:   convertTemporalDimension(activity.Months),
+			Weeks:    convertTemporalDimension(activity.Weeks),
+		}
+	}
+
+	ticks := make(map[int]map[int]TemporalActivityTick, len(temporalData.Ticks))
+	for tickID, tickDevs := range temporalData.Ticks {
+		if tickDevs == nil {
+			continue
+		}
+		devs := make(map[int]TemporalActivityTick, len(tickDevs.Devs))
+		for devID, tick := range tickDevs.Devs {
+			if tick == nil {
+				continue
+			}
+			devs[int(devID)] = TemporalActivityTick{
+				Commits: int(tick.Commits),
+				Lines:   int(tick.Lines),
+				Weekday: int(tick.Weekday),
+				Hour:    int(tick.Hour),
+				Month:   int(tick.Month),
+				Week:    int(tick.Week),
+			}
+		}
+		ticks[int(tickID)] = devs
+	}
+
+	return &TemporalActivityData{
+		Activities: activities,
+		People:     append([]string(nil), temporalData.DevIndex...),
+		Ticks:      ticks,
+		TickSize:   temporalData.TickSize,
+	}, nil
+}
+
+// GetBusFactor retrieves bus factor snapshots and subsystem values.
+func (r *ProtobufReader) GetBusFactor() (*BusFactorData, error) {
+	busFactorData, err := r.parseBusFactorResults()
+	if err != nil {
+		return nil, err
+	}
+
+	snapshots := make(map[int]BusFactorSnapshot, len(busFactorData.Snapshots))
+	for tick, snapshot := range busFactorData.Snapshots {
+		if snapshot == nil {
+			continue
+		}
+		snapshots[int(tick)] = BusFactorSnapshot{
+			BusFactor:   int(snapshot.BusFactor),
+			TotalLines:  snapshot.TotalLines,
+			AuthorLines: convertInt32Int64Map(snapshot.AuthorLines),
+		}
+	}
+
+	return &BusFactorData{
+		Snapshots:          snapshots,
+		People:             append([]string(nil), busFactorData.DevIndex...),
+		SubsystemBusFactor: convertStringInt32Map(busFactorData.SubsystemBusFactor),
+		Threshold:          busFactorData.Threshold,
+		TickSize:           busFactorData.TickSize,
+	}, nil
+}
+
+// GetOwnershipConcentration retrieves ownership concentration snapshots and subsystem metrics.
+func (r *ProtobufReader) GetOwnershipConcentration() (*OwnershipConcentrationData, error) {
+	ownershipData, err := r.parseOwnershipConcentrationResults()
+	if err != nil {
+		return nil, err
+	}
+
+	snapshots := make(map[int]OwnershipConcentrationSnapshot, len(ownershipData.Snapshots))
+	for tick, snapshot := range ownershipData.Snapshots {
+		if snapshot == nil {
+			continue
+		}
+		snapshots[int(tick)] = OwnershipConcentrationSnapshot{
+			Gini:        snapshot.Gini,
+			HHI:         snapshot.Hhi,
+			TotalLines:  snapshot.TotalLines,
+			AuthorLines: convertInt32Int64Map(snapshot.AuthorLines),
+		}
+	}
+
+	return &OwnershipConcentrationData{
+		Snapshots:     snapshots,
+		People:        append([]string(nil), ownershipData.DevIndex...),
+		SubsystemGini: copyStringFloat64Map(ownershipData.SubsystemGini),
+		SubsystemHHI:  copyStringFloat64Map(ownershipData.SubsystemHhi),
+		TickSize:      ownershipData.TickSize,
+	}, nil
+}
+
+// GetKnowledgeDiffusion retrieves per-file knowledge diffusion data.
+func (r *ProtobufReader) GetKnowledgeDiffusion() (*KnowledgeDiffusionData, error) {
+	diffusionData, err := r.parseKnowledgeDiffusionResults()
+	if err != nil {
+		return nil, err
+	}
+
+	files := make(map[string]KnowledgeDiffusionFile, len(diffusionData.Files))
+	for fileName, fileData := range diffusionData.Files {
+		if fileData == nil {
+			continue
+		}
+		files[fileName] = KnowledgeDiffusionFile{
+			UniqueEditors:         int(fileData.UniqueEditorsCount),
+			RecentEditors:         int(fileData.RecentEditorsCount),
+			UniqueEditorsOverTime: convertInt32Int32Map(fileData.UniqueEditorsOverTime),
+			Authors:               convertInt32Slice(fileData.Authors),
+		}
+	}
+
+	return &KnowledgeDiffusionData{
+		Files:        files,
+		Distribution: convertInt32Int32Map(diffusionData.Distribution),
+		People:       append([]string(nil), diffusionData.DevIndex...),
+		WindowMonths: int(diffusionData.WindowMonths),
+		TickSize:     diffusionData.TickSize,
+	}, nil
+}
+
+// GetHotspotRisk retrieves file risk scores.
+func (r *ProtobufReader) GetHotspotRisk() (*HotspotRiskData, error) {
+	hotspotData, err := r.parseHotspotRiskResults()
+	if err != nil {
+		return nil, err
+	}
+
+	files := make([]HotspotRiskFile, 0, len(hotspotData.Files))
+	for _, file := range hotspotData.Files {
+		if file == nil {
+			continue
+		}
+		files = append(files, HotspotRiskFile{
+			Path:                file.Path,
+			RiskScore:           file.RiskScore,
+			Size:                int(file.Size),
+			Churn:               int(file.Churn),
+			CouplingDegree:      int(file.CouplingDegree),
+			OwnershipGini:       file.OwnershipGini,
+			SizeNormalized:      file.SizeNormalized,
+			ChurnNormalized:     file.ChurnNormalized,
+			CouplingNormalized:  file.CouplingNormalized,
+			OwnershipNormalized: file.OwnershipNormalized,
+		})
+	}
+
+	return &HotspotRiskData{
+		Files:      files,
+		WindowDays: int(hotspotData.WindowDays),
+	}, nil
+}
+
+// GetRefactoringProxy retrieves refactoring proxy data from either contents or top-level field.
+func (r *ProtobufReader) GetRefactoringProxy() (*RefactoringProxyData, error) {
+	proxyData, err := r.parseRefactoringProxyResults()
+	if err != nil {
+		return nil, err
+	}
+
+	start, end := r.GetHeader()
+	tickSizeDays := proxyData.TickSize / int64(86400*1_000_000_000)
+	if tickSizeDays == 0 && proxyData.TickSize > 0 {
+		tickSizeDays = 1
+	}
+
+	ticks := make([]RefactoringProxyTick, 0, len(proxyData.Ticks))
+	for i, tickIndex := range proxyData.Ticks {
+		rate := float32(0)
+		if i < len(proxyData.RenameRatios) {
+			rate = proxyData.RenameRatios[i]
+		}
+		isRefactoring := false
+		if i < len(proxyData.IsRefactoring) {
+			isRefactoring = proxyData.IsRefactoring[i]
+		}
+		totalChanges := 0
+		if i < len(proxyData.TotalChanges) {
+			totalChanges = int(proxyData.TotalChanges[i])
+		}
+
+		timestamp := start
+		if tickSizeDays > 0 {
+			timestamp = start + int64(tickIndex)*tickSizeDays*86400
+		}
+		ticks = append(ticks, RefactoringProxyTick{
+			Timestamp:       timestamp,
+			RefactoringRate: rate,
+			IsRefactoring:   isRefactoring,
+			TotalChanges:    totalChanges,
+		})
+	}
+
+	return &RefactoringProxyData{
+		Ticks:        ticks,
+		Threshold:    proxyData.Threshold,
+		TickSizeDays: tickSizeDays,
+		StartDate:    start,
+		EndDate:      end,
+	}, nil
+}
+
 // GetDeveloperTimeSeriesData returns Python-compatible time series data for protobuf files
 // This now parses real temporal data from DevsAnalysisResults.Ticks (matches Python's approach)
 func (r *ProtobufReader) GetDeveloperTimeSeriesData() (*DeveloperTimeSeriesData, error) {
@@ -256,29 +543,29 @@ func (r *ProtobufReader) GetDeveloperTimeSeriesData() (*DeveloperTimeSeriesData,
 	if devsData == nil {
 		return nil, fmt.Errorf("no developer analysis data found")
 	}
-	
+
 	// Extract people list from dev_index (matches Python's people = list(self.contents["Devs"].dev_index))
 	people := make([]string, len(devsData.DevIndex))
 	copy(people, devsData.DevIndex)
-	
+
 	// Parse real time series data from ticks (matches Python's self.contents["Devs"].ticks.items())
 	days := make(map[int]map[int]DevDay)
-	
+
 	// Iterate through all time ticks
 	for tickKey, tickDevs := range devsData.Ticks {
 		if tickDevs == nil {
 			continue
 		}
-		
+
 		// Create developer map for this time tick
 		dayDevs := make(map[int]DevDay)
-		
+
 		// Iterate through all developers in this tick
 		for devIndex, devTick := range tickDevs.Devs {
 			if devTick == nil {
 				continue
 			}
-			
+
 			// Convert languages map from protobuf format to DevDay format
 			languages := make(map[string][]int)
 			if devTick.Languages != nil {
@@ -287,13 +574,13 @@ func (r *ProtobufReader) GetDeveloperTimeSeriesData() (*DeveloperTimeSeriesData,
 						// Python format: {lang: [added, removed, changed]}
 						languages[lang] = []int{
 							int(langStats.Added),
-							int(langStats.Removed), 
+							int(langStats.Removed),
 							int(langStats.Changed),
 						}
 					}
 				}
 			}
-			
+
 			// Convert protobuf DevTick to Go DevDay format (matches Python's DevDay structure)
 			dayDevs[int(devIndex)] = DevDay{
 				Commits:       int(devTick.Commits),
@@ -303,11 +590,11 @@ func (r *ProtobufReader) GetDeveloperTimeSeriesData() (*DeveloperTimeSeriesData,
 				Languages:     languages,
 			}
 		}
-		
+
 		// Store this day's data using the real time tick key
 		days[int(tickKey)] = dayDevs
 	}
-	
+
 	// Return the same format as Python: (people, days)
 	return &DeveloperTimeSeriesData{
 		People: people,
@@ -383,19 +670,19 @@ func (r *ProtobufReader) parseBurndownAnalysisResults() *pb.BurndownAnalysisResu
 	if r.data == nil || r.data.Contents == nil {
 		return nil
 	}
-	
+
 	// Look for burndown data in Contents
 	burndownBytes, exists := r.data.Contents["Burndown"]
 	if !exists {
 		return nil
 	}
-	
+
 	// Parse the burndown data
 	var burndownData pb.BurndownAnalysisResults
 	if err := proto.Unmarshal(burndownBytes, &burndownData); err != nil {
 		return nil
 	}
-	
+
 	return &burndownData
 }
 
@@ -408,18 +695,18 @@ func (r *ProtobufReader) GetBurndownParameters() (burndown.BurndownParameters, e
 
 	// Calculate appropriate tick size based on time span and matrix dimensions
 	tickSize := float64(burndownData.TickSize) / 1e9 // Convert nanoseconds to seconds
-	
+
 	if r.data.Header != nil {
 		// Calculate tick size from actual time span and expected data points
 		timeSpan := float64(r.data.Header.EndUnixTime - r.data.Header.BeginUnixTime)
-		
+
 		// Get matrix dimensions to calculate appropriate tick size
 		if burndownData.Project != nil {
 			matrixCols := burndownData.Project.NumberOfColumns
 			if matrixCols > 1 && timeSpan > 0 {
 				// Calculate tick size as time span divided by number of time points
 				calculatedTick := timeSpan / float64(matrixCols-1)
-				
+
 				// Use calculated tick size if it's reasonable, otherwise use original or fallback
 				if calculatedTick > 0 && calculatedTick < timeSpan {
 					tickSize = calculatedTick
@@ -427,14 +714,14 @@ func (r *ProtobufReader) GetBurndownParameters() (burndown.BurndownParameters, e
 			}
 		}
 	}
-	
+
 	// Fallback if we still don't have a reasonable tick size
 	if tickSize <= 0 || tickSize > 365*24*3600 { // More than a year per tick seems wrong
 		tickSize = 86400 // Default to 1 day in seconds
 	}
 
 	// Debug output removed - tick size calculation working correctly
-	
+
 	return burndown.BurndownParameters{
 		Sampling:    1,        // Daily sampling (1 day)
 		Granularity: 1,        // 1 day granularity
@@ -475,19 +762,19 @@ func (r *ProtobufReader) parseCouplesAnalysisResults() *pb.CouplesAnalysisResult
 	if r.data == nil || r.data.Contents == nil {
 		return nil
 	}
-	
+
 	// Look for couples data in Contents
 	couplesBytes, exists := r.data.Contents["Couples"]
 	if !exists {
 		return nil
 	}
-	
+
 	// Parse the couples data
 	var couplesData pb.CouplesAnalysisResults
 	if err := proto.Unmarshal(couplesBytes, &couplesData); err != nil {
 		return nil
 	}
-	
+
 	return &couplesData
 }
 
@@ -496,19 +783,19 @@ func (r *ProtobufReader) parseShotnessAnalysisResults() *pb.ShotnessAnalysisResu
 	if r.data == nil || r.data.Contents == nil {
 		return nil
 	}
-	
+
 	// Look for shotness data in Contents
 	shotnessBytes, exists := r.data.Contents["Shotness"]
 	if !exists {
 		return nil
 	}
-	
+
 	// Parse the shotness data
 	var shotnessData pb.ShotnessAnalysisResults
 	if err := proto.Unmarshal(shotnessBytes, &shotnessData); err != nil {
 		return nil
 	}
-	
+
 	return &shotnessData
 }
 
@@ -517,18 +804,162 @@ func (r *ProtobufReader) parseDevsAnalysisResults() *pb.DevsAnalysisResults {
 	if r.data == nil || r.data.Contents == nil {
 		return nil
 	}
-	
+
 	// Look for devs data in Contents
 	devsBytes, exists := r.data.Contents["Devs"]
 	if !exists {
 		return nil
 	}
-	
+
 	// Parse the devs data
 	var devsData pb.DevsAnalysisResults
 	if err := proto.Unmarshal(devsBytes, &devsData); err != nil {
 		return nil
 	}
-	
+
 	return &devsData
+}
+
+func (r *ProtobufReader) parseSentimentAnalysisResults() (*pb.CommentSentimentResults, error) {
+	if r.data == nil || r.data.Contents == nil {
+		return nil, fmt.Errorf("%w: Sentiment", ErrAnalysisMissing)
+	}
+	var sentimentData pb.CommentSentimentResults
+	if err := r.unmarshalContent("Sentiment", &sentimentData); err != nil {
+		return nil, err
+	}
+	return &sentimentData, nil
+}
+
+func (r *ProtobufReader) parseTemporalActivityResults() (*pb.TemporalActivityResults, error) {
+	if r.data == nil || r.data.Contents == nil {
+		return nil, fmt.Errorf("%w: TemporalActivity", ErrAnalysisMissing)
+	}
+	var temporalData pb.TemporalActivityResults
+	if err := r.unmarshalContent("TemporalActivity", &temporalData); err != nil {
+		return nil, err
+	}
+	return &temporalData, nil
+}
+
+func (r *ProtobufReader) parseBusFactorResults() (*pb.BusFactorAnalysisResults, error) {
+	if r.data == nil || r.data.Contents == nil {
+		return nil, fmt.Errorf("%w: BusFactor", ErrAnalysisMissing)
+	}
+	var busFactorData pb.BusFactorAnalysisResults
+	if err := r.unmarshalContent("BusFactor", &busFactorData); err != nil {
+		return nil, err
+	}
+	return &busFactorData, nil
+}
+
+func (r *ProtobufReader) parseOwnershipConcentrationResults() (*pb.OwnershipConcentrationResults, error) {
+	if r.data == nil || r.data.Contents == nil {
+		return nil, fmt.Errorf("%w: OwnershipConcentration", ErrAnalysisMissing)
+	}
+	var ownershipData pb.OwnershipConcentrationResults
+	if err := r.unmarshalContent("OwnershipConcentration", &ownershipData); err != nil {
+		return nil, err
+	}
+	return &ownershipData, nil
+}
+
+func (r *ProtobufReader) parseKnowledgeDiffusionResults() (*pb.KnowledgeDiffusionResults, error) {
+	if r.data == nil || r.data.Contents == nil {
+		return nil, fmt.Errorf("%w: KnowledgeDiffusion", ErrAnalysisMissing)
+	}
+	var diffusionData pb.KnowledgeDiffusionResults
+	if err := r.unmarshalContent("KnowledgeDiffusion", &diffusionData); err != nil {
+		return nil, err
+	}
+	return &diffusionData, nil
+}
+
+func (r *ProtobufReader) parseHotspotRiskResults() (*pb.HotspotRiskResults, error) {
+	if r.data == nil || r.data.Contents == nil {
+		return nil, fmt.Errorf("%w: HotspotRisk", ErrAnalysisMissing)
+	}
+	var hotspotData pb.HotspotRiskResults
+	if err := r.unmarshalContent("HotspotRisk", &hotspotData); err != nil {
+		return nil, err
+	}
+	return &hotspotData, nil
+}
+
+func (r *ProtobufReader) parseRefactoringProxyResults() (*pb.RefactoringProxyResults, error) {
+	if r.data == nil {
+		return nil, fmt.Errorf("%w: RefactoringProxy", ErrAnalysisMissing)
+	}
+	if r.data.RefactoringProxy != nil {
+		return r.data.RefactoringProxy, nil
+	}
+	if r.data.Contents == nil {
+		return nil, fmt.Errorf("%w: RefactoringProxy", ErrAnalysisMissing)
+	}
+	var proxyData pb.RefactoringProxyResults
+	if err := r.unmarshalContent("RefactoringProxy", &proxyData); err != nil {
+		return nil, err
+	}
+	return &proxyData, nil
+}
+
+func (r *ProtobufReader) unmarshalContent(key string, message proto.Message) error {
+	contentBytes, exists := r.data.Contents[key]
+	if !exists {
+		return fmt.Errorf("%w: %s", ErrAnalysisMissing, key)
+	}
+	if err := proto.Unmarshal(contentBytes, message); err != nil {
+		return fmt.Errorf("%w: %s: %v", ErrAnalysisMalformed, key, err)
+	}
+	return nil
+}
+
+func convertTemporalDimension(dimension *pb.TemporalDimension) TemporalDimensionData {
+	if dimension == nil {
+		return TemporalDimensionData{}
+	}
+	return TemporalDimensionData{
+		Commits: convertInt32Slice(dimension.Commits),
+		Lines:   convertInt32Slice(dimension.Lines),
+	}
+}
+
+func convertInt32Slice(values []int32) []int {
+	result := make([]int, len(values))
+	for i, value := range values {
+		result[i] = int(value)
+	}
+	return result
+}
+
+func convertInt32Int32Map(values map[int32]int32) map[int]int {
+	result := make(map[int]int, len(values))
+	for key, value := range values {
+		result[int(key)] = int(value)
+	}
+	return result
+}
+
+func convertInt32Int64Map(values map[int32]int64) map[int]int64 {
+	result := make(map[int]int64, len(values))
+	for key, value := range values {
+		result[int(key)] = value
+	}
+	return result
+}
+
+func convertStringInt32Map(values map[string]int32) map[string]int {
+	result := make(map[string]int, len(values))
+	for key, value := range values {
+		result[key] = int(value)
+	}
+	return result
+}
+
+func copyStringFloat64Map(values map[string]float64) map[string]float64 {
+	result := make(map[string]float64, len(values))
+	for key, value := range values {
+		result[key] = value
+	}
+	return result
 }

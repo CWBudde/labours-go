@@ -3,59 +3,6 @@ syntax = "proto3";
 package pb;
 option go_package = "labours-go/internal/pb";
 
-// Sparse matrix row for burndown data
-message BurndownSparseMatrixRow {
-    // the first `len(column)` elements are stored,
-    // the rest `number_of_columns - len(column)` values are zeros
-    repeated uint32 columns = 1;
-}
-
-// Burndown-specific sparse matrix representation
-message BurndownSparseMatrix {
-    string name = 1;
-    int32 number_of_rows = 2;
-    int32 number_of_columns = 3;
-    // `len(row)` matches `number_of_rows`
-    repeated BurndownSparseMatrixRow rows = 4;
-}
-
-// Main analysis result container
-message BurndownAnalysisResults {
-    // how many ticks are in each band [burndown_project, burndown_file, burndown_developer]
-    int32 granularity = 1;
-    // how frequently we measure the state of each band [burndown_project, burndown_file, burndown_developer]
-    int32 sampling = 2;
-    // always exists
-    BurndownSparseMatrix project = 3;
-    // this is included if `--burndown-files` was specified
-    repeated BurndownSparseMatrix files = 4;
-    // these two are included if `--burndown-people` was specified
-    repeated BurndownSparseMatrix people = 5;
-    // rows and cols order correspond to `burndown_developer`
-    CompressedSparseRowMatrix people_interaction = 6;
-    // How many lines belong to relevant developers for each file. The order is the same as in `files`.
-    repeated FilesOwnership files_ownership = 7;
-    // how long each tick is, as an int64 nanosecond count (Go's time.Duration)
-    int64 tick_size = 8;
-}
-
-// Efficient sparse matrix representation using Compressed Sparse Row format
-message CompressedSparseRowMatrix {
-    int32 number_of_rows = 1;
-    int32 number_of_columns = 2;
-    // https://en.wikipedia.org/wiki/Sparse_matrix#Compressed_sparse_row_.28CSR.2C_CRS_or_Yale_format.29
-    repeated int64 data = 3;
-    repeated int32 indices = 4;
-    repeated int64 indptr = 5;
-}
-
-// File ownership data mapping file paths to developer indices
-message FilesOwnership {
-    // The sum always equals to the total number of lines in the file.
-    map<int32, int32> value = 1;
-}
-
-// Repository metadata
 message Metadata {
     // this format is versioned
     int32 version = 1;
@@ -75,7 +22,57 @@ message Metadata {
     map<string, double> run_time_per_item = 8;
 }
 
-// Couples analysis results
+message BurndownSparseMatrixRow {
+    // the first `len(column)` elements are stored,
+    // the rest `number_of_columns - len(column)` values are zeros
+    repeated uint32 columns = 1;
+}
+
+message BurndownSparseMatrix {
+    string name = 1;
+    int32 number_of_rows = 2;
+    int32 number_of_columns = 3;
+    // `len(row)` matches `number_of_rows`
+    repeated BurndownSparseMatrixRow rows = 4;
+}
+
+message FilesOwnership {
+    // The sum always equals to the total number of lines in the file.
+    map<int32, int32> value = 1;
+}
+
+message BurndownAnalysisResults {
+    // how many ticks are in each band [burndown_project, burndown_file, burndown_developer]
+    int32 granularity = 1;
+    // how frequently we measure the state of each band [burndown_project, burndown_file, burndown_developer]
+    int32 sampling = 2;
+    // always exists
+    BurndownSparseMatrix project = 3;
+    // this is included if `--burndown-files` was specified
+    repeated BurndownSparseMatrix files = 4;
+    // these two are included if `--burndown-people` was specified
+    repeated BurndownSparseMatrix people = 5;
+    // rows and cols order correspond to `burndown_developer`
+    CompressedSparseRowMatrix people_interaction = 6;
+    // How many lines belong to relevant developers for each file. The order is the same as in `files`.
+    repeated FilesOwnership files_ownership = 7;
+    // how long each tick is, as an int64 nanosecond count (Go's time.Duration)
+    int64 tick_size = 8;
+    // List of repository names in the same order as `repositories`
+    repeated string repository_sequence = 9;
+    // Per-repository burndown matrices (included when combining multiple repositories)
+    repeated BurndownSparseMatrix repositories = 10;
+}
+
+message CompressedSparseRowMatrix {
+    int32 number_of_rows = 1;
+    int32 number_of_columns = 2;
+    // https://en.wikipedia.org/wiki/Sparse_matrix#Compressed_sparse_row_.28CSR.2C_CRS_or_Yale_format.29
+    repeated int64 data = 3;
+    repeated int32 indices = 4;
+    repeated int64 indptr = 5;
+}
+
 message Couples {
     // name of each `matrix`'s row and column
     repeated string index = 1;
@@ -96,43 +93,42 @@ message CouplesAnalysisResults {
     repeated int32 files_lines = 9;
 }
 
-// Developer statistics (simplified version - full version in hercules has nested structures)
-message DeveloperStat {
-    string name = 1;
-    int32 commits = 2;
-    int64 lines_added = 3;
-    int64 lines_removed = 4;
-    int64 lines_modified = 5;
-    int32 files_touched = 6;
-    map<string, int32> languages = 7;
+message ShotnessRecord {
+    string type = 1;
+    string name = 2;
+    string file = 3;
+    map<int32, int32> counters = 4;
 }
 
-// Language statistics
-message LanguageStat {
-    string language = 1;
-    int64 lines = 2;
+message ShotnessAnalysisResults {
+    repeated ShotnessRecord records = 1;
 }
 
-// Line statistics for commits/developers
+message FileHistory {
+    repeated string commits = 1;
+    map<int32, LineStats> changes_by_developer = 2;
+}
+
+message FileHistoryResultMessage {
+    map<string, FileHistory> files = 1;
+}
+
 message LineStats {
     int32 added = 1;
     int32 removed = 2;
     int32 changed = 3;
 }
 
-// Developer tick data
 message DevTick {
     int32 commits = 1;
     LineStats stats = 2;
     map<string, LineStats> languages = 3;
 }
 
-// All developers for a specific tick
 message TickDevs {
     map<int32, DevTick> devs = 1;
 }
 
-// Developer analysis results
 message DevsAnalysisResults {
     map<int32, TickDevs> ticks = 1;
     // developer identities, the indexes correspond to TickDevs' keys.
@@ -141,22 +137,310 @@ message DevsAnalysisResults {
     int64 tick_size = 8;
 }
 
-// Shotness record for tracking structural unit modifications
-message ShotnessRecord {
-    string type = 1;      // Type of structural unit (e.g., "function", "class")
-    string name = 2;      // Name of the structural unit
-    string file = 3;      // File path containing the unit
-    map<int32, int32> counters = 4;  // Time-based modification counters
+message Sentiment {
+    float value = 1;
+    repeated string comments = 2;
+    repeated string commits = 3;
 }
 
-// Shotness analysis results
-message ShotnessAnalysisResults {
-    repeated ShotnessRecord records = 1;  // Collection of all shotness records
+message CommentSentimentResults {
+    map<int32, Sentiment> sentiment_by_tick = 1;
 }
 
-// Comprehensive analysis results that can contain multiple analysis types
+message CommitFile {
+    string name = 1;
+    string language = 3;
+    LineStats stats = 4;
+}
+
+message Commit {
+    string hash = 1;
+    int64 when_unix_time = 2;
+    int32 author = 3;
+    repeated CommitFile files = 4;
+}
+
+message CommitsAnalysisResults {
+    repeated Commit commits = 1;
+    repeated string author_index = 2;
+}
+
+message Typo {
+    string wrong = 1;
+    string correct = 2;
+    string commit = 3;
+    string file = 4;
+    int32 line = 5;
+}
+
+message TyposDataset {
+    repeated Typo typos = 1;
+}
+
+message ImportsPerTick {
+    map<int32, int64> counts = 1;
+}
+
+message ImportsPerLanguage {
+    map<string, ImportsPerTick> ticks = 1;
+}
+
+message ImportsPerDeveloper {
+    map<string, ImportsPerLanguage> languages = 1;
+}
+
+message ImportsPerDeveloperResults {
+    repeated ImportsPerDeveloper imports = 1;
+    repeated string author_index = 2;
+    // how long each tick is, as an int64 nanosecond count (Go's time.Duration)
+    int64 tick_size = 3;
+}
+
+message TemporalDimension {
+    // Count of commits for this dimension
+    repeated int32 commits = 1;
+    // Count of lines changed (added + removed) for this dimension
+    repeated int32 lines = 2;
+}
+
+message DeveloperTemporalActivity {
+    // Sunday=0 to Saturday=6 (length 7)
+    TemporalDimension weekdays = 1;
+    // 0-23 (length 24)
+    TemporalDimension hours = 2;
+    // January=0 to December=11 (length 12)
+    TemporalDimension months = 3;
+    // ISO week 1-53 stored at indices 0-52 (length 53)
+    TemporalDimension weeks = 4;
+}
+
+// Per-tick temporal activity for a single developer
+message TemporalActivityTick {
+    int32 commits = 1;
+    int32 lines = 2;
+    int32 weekday = 3;  // 0-6 (Sunday=0)
+    int32 hour = 4;     // 0-23
+    int32 month = 5;    // 0-11 (January=0)
+    int32 week = 6;     // 0-52 (ISO week 1-53 stored as 0-52)
+}
+
+// Per-tick data for all developers
+message TemporalActivityTickDevs {
+    map<int32, TemporalActivityTick> devs = 1;
+}
+
+message TemporalActivityResults {
+    // developer index -> temporal activity (aggregated totals, for backward compatibility)
+    map<int32, DeveloperTemporalActivity> activities = 1;
+    // developer identities, the indexes correspond to activities' keys
+    repeated string dev_index = 2;
+    // Per-tick data: tick index -> developer index -> tick data
+    // This allows filtering by date range in post-processing
+    map<int32, TemporalActivityTickDevs> ticks = 3;
+    // how long each tick is, as an int64 nanosecond count (Go's time.Duration)
+    int64 tick_size = 4;
+}
+
+// Per-tick ownership snapshot for bus factor computation
+message BusFactorTickSnapshot {
+    // bus factor value at this tick (smallest k where top-k owners cover >= threshold)
+    int32 bus_factor = 1;
+    // total alive lines at this tick
+    int64 total_lines = 2;
+    // per-author alive line counts at this tick, keyed by author index
+    map<int32, int64> author_lines = 3;
+}
+
+message BusFactorAnalysisResults {
+    // bus factor value per tick (index = tick number)
+    map<int32, BusFactorTickSnapshot> snapshots = 1;
+    // bus factor per directory/subsystem prefix
+    map<string, int32> subsystem_bus_factor = 2;
+    // developer identities
+    repeated string dev_index = 3;
+    // how long each tick is, as an int64 nanosecond count (Go's time.Duration)
+    int64 tick_size = 4;
+    // threshold used (e.g. 0.8 for 80%)
+    float threshold = 5;
+}
+
+// Per-tick ownership concentration snapshot
+message OwnershipConcentrationTickSnapshot {
+    // Gini coefficient (0 = perfectly equal, 1 = one person owns everything)
+    double gini = 1;
+    // Herfindahl-Hirschman Index (1/n = perfectly equal, 1.0 = single author)
+    double hhi = 2;
+    // total alive lines at this tick
+    int64 total_lines = 3;
+    // per-author alive line counts at this tick, keyed by author index
+    map<int32, int64> author_lines = 4;
+}
+
+message OwnershipConcentrationResults {
+    // concentration metrics per tick (index = tick number)
+    map<int32, OwnershipConcentrationTickSnapshot> snapshots = 1;
+    // per-directory/subsystem Gini coefficient at final tick
+    map<string, double> subsystem_gini = 2;
+    // per-directory/subsystem HHI at final tick
+    map<string, double> subsystem_hhi = 5;
+    // developer identities
+    repeated string dev_index = 3;
+    // how long each tick is, as an int64 nanosecond count (Go's time.Duration)
+    int64 tick_size = 4;
+}
+
+// Per-file knowledge diffusion data
+message KnowledgeDiffusionFileData {
+    // total unique editors who ever touched this file
+    int32 unique_editors_count = 1;
+    // tick -> cumulative unique editor count at that tick
+    map<int32, int32> unique_editors_over_time = 2;
+    // editors active within the recent window
+    int32 recent_editors_count = 3;
+    // author indices who touched this file
+    repeated int32 authors = 4;
+}
+
+message KnowledgeDiffusionResults {
+    // per-file diffusion data
+    map<string, KnowledgeDiffusionFileData> files = 1;
+    // histogram: editor_count -> number_of_files
+    map<int32, int32> distribution = 2;
+    // sliding window size in months for "recent" editors
+    int32 window_months = 3;
+    // developer identities
+    repeated string dev_index = 4;
+    // how long each tick is, as an int64 nanosecond count (Go's time.Duration)
+    int64 tick_size = 5;
+}
+
+// Snapshot of onboarding metrics at a specific milestone
+message OnboardingSnapshot {
+    int32 days_since_join = 1;
+
+    // All commits
+    int32 total_commits = 2;
+    int32 total_files = 3;
+    int32 total_lines = 4;
+
+    // Meaningful commits only (>= threshold)
+    int32 meaningful_commits = 5;
+    int32 meaningful_files = 6;
+    int32 meaningful_lines = 7;
+}
+
+// Average snapshot of onboarding metrics (for cohort aggregates)
+message OnboardingAverageSnapshot {
+    int32 days_since_join = 1;
+    double avg_total_commits = 2;
+    double avg_total_files = 3;
+    double avg_total_lines = 4;
+    double avg_meaningful_commits = 5;
+    double avg_meaningful_files = 6;
+    double avg_meaningful_lines = 7;
+}
+
+// Per-author onboarding progression data
+message AuthorOnboardingData {
+    int32 first_commit_tick = 1;
+    string join_cohort = 2;  // "YYYY-MM" format
+
+    // Snapshots at configured window milestones (keyed by days)
+    map<int32, OnboardingSnapshot> snapshots = 3;
+}
+
+// Aggregated cohort statistics
+message CohortStats {
+    string cohort = 1;  // "YYYY-MM"
+    int32 author_count = 2;
+
+    // Average snapshots across cohort (keyed by days)
+    map<int32, OnboardingAverageSnapshot> average_snapshots = 3;
+}
+
+// Top-level onboarding analysis results
+message OnboardingResults {
+    // Per-author detailed data (keyed by author index)
+    map<int32, AuthorOnboardingData> authors = 1;
+
+    // Cohort aggregates (keyed by "YYYY-MM")
+    map<string, CohortStats> cohorts = 2;
+
+    // Configuration used
+    repeated int32 window_days = 3;
+    int32 meaningful_threshold = 4;
+
+    // Developer identities
+    repeated string dev_index = 5;
+
+    // Tick size as nanosecond count
+    int64 tick_size = 6;
+}
+
+// Per-file risk assessment
+message FileRisk {
+    string path = 1;
+    double risk_score = 2;
+    int32 size = 3;
+    int32 churn = 4;
+    int32 coupling_degree = 5;
+    double ownership_gini = 6;
+    double size_normalized = 7;
+    double churn_normalized = 8;
+    double coupling_normalized = 9;
+    double ownership_normalized = 10;
+}
+
+// Hotspot risk analysis results
+message HotspotRiskResults {
+    int32 window_days = 1;
+    repeated FileRisk files = 2;
+}
+
+message RefactoringProxyResults {
+    repeated int32 ticks = 1;
+    repeated float rename_ratios = 2;
+    repeated bool is_refactoring = 3;
+    repeated int32 total_changes = 4;
+    float threshold = 5;
+    int64 tick_size = 6;
+}
+
+message CodeChurnSparseHistoryEntry {
+    int32 previous_tick = 1;
+    int64 delta = 2;
+}
+
+message CodeChurnDeleteHistory {
+    int32 author = 1;
+    int32 current_tick = 2;
+    repeated CodeChurnSparseHistoryEntry entries = 3;
+}
+
+message CodeChurnFileStat {
+    string file = 1;
+    int32 inserted_lines = 2;
+    int32 owned_lines = 3;
+    float memorability = 4;
+    float awareness = 5;
+    repeated CodeChurnDeleteHistory delete_history = 6;
+}
+
+message CodeChurnAuthorStat {
+    repeated CodeChurnFileStat files = 1;
+}
+
+message CodeChurnAnalysisResults {
+    int32 granularity = 1;
+    int32 sampling = 2;
+    int64 tick_size = 3;
+    repeated string people = 4;
+    repeated CodeChurnAuthorStat authors = 5;
+}
+
 message AnalysisResults {
     Metadata header = 1;
     // the mapped values are dynamic messages which require the second parsing pass.
     map<string, bytes> contents = 2;
+    RefactoringProxyResults refactoring_proxy = 3;
 }

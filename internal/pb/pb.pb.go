@@ -21,357 +21,6 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// Sparse matrix row for burndown data
-type BurndownSparseMatrixRow struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// the first `len(column)` elements are stored,
-	// the rest `number_of_columns - len(column)` values are zeros
-	Columns       []uint32 `protobuf:"varint,1,rep,packed,name=columns,proto3" json:"columns,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *BurndownSparseMatrixRow) Reset() {
-	*x = BurndownSparseMatrixRow{}
-	mi := &file_pb_proto_msgTypes[0]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *BurndownSparseMatrixRow) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*BurndownSparseMatrixRow) ProtoMessage() {}
-
-func (x *BurndownSparseMatrixRow) ProtoReflect() protoreflect.Message {
-	mi := &file_pb_proto_msgTypes[0]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use BurndownSparseMatrixRow.ProtoReflect.Descriptor instead.
-func (*BurndownSparseMatrixRow) Descriptor() ([]byte, []int) {
-	return file_pb_proto_rawDescGZIP(), []int{0}
-}
-
-func (x *BurndownSparseMatrixRow) GetColumns() []uint32 {
-	if x != nil {
-		return x.Columns
-	}
-	return nil
-}
-
-// Burndown-specific sparse matrix representation
-type BurndownSparseMatrix struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	Name            string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	NumberOfRows    int32                  `protobuf:"varint,2,opt,name=number_of_rows,json=numberOfRows,proto3" json:"number_of_rows,omitempty"`
-	NumberOfColumns int32                  `protobuf:"varint,3,opt,name=number_of_columns,json=numberOfColumns,proto3" json:"number_of_columns,omitempty"`
-	// `len(row)` matches `number_of_rows`
-	Rows          []*BurndownSparseMatrixRow `protobuf:"bytes,4,rep,name=rows,proto3" json:"rows,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *BurndownSparseMatrix) Reset() {
-	*x = BurndownSparseMatrix{}
-	mi := &file_pb_proto_msgTypes[1]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *BurndownSparseMatrix) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*BurndownSparseMatrix) ProtoMessage() {}
-
-func (x *BurndownSparseMatrix) ProtoReflect() protoreflect.Message {
-	mi := &file_pb_proto_msgTypes[1]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use BurndownSparseMatrix.ProtoReflect.Descriptor instead.
-func (*BurndownSparseMatrix) Descriptor() ([]byte, []int) {
-	return file_pb_proto_rawDescGZIP(), []int{1}
-}
-
-func (x *BurndownSparseMatrix) GetName() string {
-	if x != nil {
-		return x.Name
-	}
-	return ""
-}
-
-func (x *BurndownSparseMatrix) GetNumberOfRows() int32 {
-	if x != nil {
-		return x.NumberOfRows
-	}
-	return 0
-}
-
-func (x *BurndownSparseMatrix) GetNumberOfColumns() int32 {
-	if x != nil {
-		return x.NumberOfColumns
-	}
-	return 0
-}
-
-func (x *BurndownSparseMatrix) GetRows() []*BurndownSparseMatrixRow {
-	if x != nil {
-		return x.Rows
-	}
-	return nil
-}
-
-// Main analysis result container
-type BurndownAnalysisResults struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// how many ticks are in each band [burndown_project, burndown_file, burndown_developer]
-	Granularity int32 `protobuf:"varint,1,opt,name=granularity,proto3" json:"granularity,omitempty"`
-	// how frequently we measure the state of each band [burndown_project, burndown_file, burndown_developer]
-	Sampling int32 `protobuf:"varint,2,opt,name=sampling,proto3" json:"sampling,omitempty"`
-	// always exists
-	Project *BurndownSparseMatrix `protobuf:"bytes,3,opt,name=project,proto3" json:"project,omitempty"`
-	// this is included if `--burndown-files` was specified
-	Files []*BurndownSparseMatrix `protobuf:"bytes,4,rep,name=files,proto3" json:"files,omitempty"`
-	// these two are included if `--burndown-people` was specified
-	People []*BurndownSparseMatrix `protobuf:"bytes,5,rep,name=people,proto3" json:"people,omitempty"`
-	// rows and cols order correspond to `burndown_developer`
-	PeopleInteraction *CompressedSparseRowMatrix `protobuf:"bytes,6,opt,name=people_interaction,json=peopleInteraction,proto3" json:"people_interaction,omitempty"`
-	// How many lines belong to relevant developers for each file. The order is the same as in `files`.
-	FilesOwnership []*FilesOwnership `protobuf:"bytes,7,rep,name=files_ownership,json=filesOwnership,proto3" json:"files_ownership,omitempty"`
-	// how long each tick is, as an int64 nanosecond count (Go's time.Duration)
-	TickSize      int64 `protobuf:"varint,8,opt,name=tick_size,json=tickSize,proto3" json:"tick_size,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *BurndownAnalysisResults) Reset() {
-	*x = BurndownAnalysisResults{}
-	mi := &file_pb_proto_msgTypes[2]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *BurndownAnalysisResults) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*BurndownAnalysisResults) ProtoMessage() {}
-
-func (x *BurndownAnalysisResults) ProtoReflect() protoreflect.Message {
-	mi := &file_pb_proto_msgTypes[2]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use BurndownAnalysisResults.ProtoReflect.Descriptor instead.
-func (*BurndownAnalysisResults) Descriptor() ([]byte, []int) {
-	return file_pb_proto_rawDescGZIP(), []int{2}
-}
-
-func (x *BurndownAnalysisResults) GetGranularity() int32 {
-	if x != nil {
-		return x.Granularity
-	}
-	return 0
-}
-
-func (x *BurndownAnalysisResults) GetSampling() int32 {
-	if x != nil {
-		return x.Sampling
-	}
-	return 0
-}
-
-func (x *BurndownAnalysisResults) GetProject() *BurndownSparseMatrix {
-	if x != nil {
-		return x.Project
-	}
-	return nil
-}
-
-func (x *BurndownAnalysisResults) GetFiles() []*BurndownSparseMatrix {
-	if x != nil {
-		return x.Files
-	}
-	return nil
-}
-
-func (x *BurndownAnalysisResults) GetPeople() []*BurndownSparseMatrix {
-	if x != nil {
-		return x.People
-	}
-	return nil
-}
-
-func (x *BurndownAnalysisResults) GetPeopleInteraction() *CompressedSparseRowMatrix {
-	if x != nil {
-		return x.PeopleInteraction
-	}
-	return nil
-}
-
-func (x *BurndownAnalysisResults) GetFilesOwnership() []*FilesOwnership {
-	if x != nil {
-		return x.FilesOwnership
-	}
-	return nil
-}
-
-func (x *BurndownAnalysisResults) GetTickSize() int64 {
-	if x != nil {
-		return x.TickSize
-	}
-	return 0
-}
-
-// Efficient sparse matrix representation using Compressed Sparse Row format
-type CompressedSparseRowMatrix struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	NumberOfRows    int32                  `protobuf:"varint,1,opt,name=number_of_rows,json=numberOfRows,proto3" json:"number_of_rows,omitempty"`
-	NumberOfColumns int32                  `protobuf:"varint,2,opt,name=number_of_columns,json=numberOfColumns,proto3" json:"number_of_columns,omitempty"`
-	// https://en.wikipedia.org/wiki/Sparse_matrix#Compressed_sparse_row_.28CSR.2C_CRS_or_Yale_format.29
-	Data          []int64 `protobuf:"varint,3,rep,packed,name=data,proto3" json:"data,omitempty"`
-	Indices       []int32 `protobuf:"varint,4,rep,packed,name=indices,proto3" json:"indices,omitempty"`
-	Indptr        []int64 `protobuf:"varint,5,rep,packed,name=indptr,proto3" json:"indptr,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *CompressedSparseRowMatrix) Reset() {
-	*x = CompressedSparseRowMatrix{}
-	mi := &file_pb_proto_msgTypes[3]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *CompressedSparseRowMatrix) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*CompressedSparseRowMatrix) ProtoMessage() {}
-
-func (x *CompressedSparseRowMatrix) ProtoReflect() protoreflect.Message {
-	mi := &file_pb_proto_msgTypes[3]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use CompressedSparseRowMatrix.ProtoReflect.Descriptor instead.
-func (*CompressedSparseRowMatrix) Descriptor() ([]byte, []int) {
-	return file_pb_proto_rawDescGZIP(), []int{3}
-}
-
-func (x *CompressedSparseRowMatrix) GetNumberOfRows() int32 {
-	if x != nil {
-		return x.NumberOfRows
-	}
-	return 0
-}
-
-func (x *CompressedSparseRowMatrix) GetNumberOfColumns() int32 {
-	if x != nil {
-		return x.NumberOfColumns
-	}
-	return 0
-}
-
-func (x *CompressedSparseRowMatrix) GetData() []int64 {
-	if x != nil {
-		return x.Data
-	}
-	return nil
-}
-
-func (x *CompressedSparseRowMatrix) GetIndices() []int32 {
-	if x != nil {
-		return x.Indices
-	}
-	return nil
-}
-
-func (x *CompressedSparseRowMatrix) GetIndptr() []int64 {
-	if x != nil {
-		return x.Indptr
-	}
-	return nil
-}
-
-// File ownership data mapping file paths to developer indices
-type FilesOwnership struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// The sum always equals to the total number of lines in the file.
-	Value         map[int32]int32 `protobuf:"bytes,1,rep,name=value,proto3" json:"value,omitempty" protobuf_key:"varint,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *FilesOwnership) Reset() {
-	*x = FilesOwnership{}
-	mi := &file_pb_proto_msgTypes[4]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *FilesOwnership) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*FilesOwnership) ProtoMessage() {}
-
-func (x *FilesOwnership) ProtoReflect() protoreflect.Message {
-	mi := &file_pb_proto_msgTypes[4]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use FilesOwnership.ProtoReflect.Descriptor instead.
-func (*FilesOwnership) Descriptor() ([]byte, []int) {
-	return file_pb_proto_rawDescGZIP(), []int{4}
-}
-
-func (x *FilesOwnership) GetValue() map[int32]int32 {
-	if x != nil {
-		return x.Value
-	}
-	return nil
-}
-
-// Repository metadata
 type Metadata struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// this format is versioned
@@ -396,7 +45,7 @@ type Metadata struct {
 
 func (x *Metadata) Reset() {
 	*x = Metadata{}
-	mi := &file_pb_proto_msgTypes[5]
+	mi := &file_pb_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -408,7 +57,7 @@ func (x *Metadata) String() string {
 func (*Metadata) ProtoMessage() {}
 
 func (x *Metadata) ProtoReflect() protoreflect.Message {
-	mi := &file_pb_proto_msgTypes[5]
+	mi := &file_pb_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -421,7 +70,7 @@ func (x *Metadata) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Metadata.ProtoReflect.Descriptor instead.
 func (*Metadata) Descriptor() ([]byte, []int) {
-	return file_pb_proto_rawDescGZIP(), []int{5}
+	return file_pb_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *Metadata) GetVersion() int32 {
@@ -480,7 +129,369 @@ func (x *Metadata) GetRunTimePerItem() map[string]float64 {
 	return nil
 }
 
-// Couples analysis results
+type BurndownSparseMatrixRow struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// the first `len(column)` elements are stored,
+	// the rest `number_of_columns - len(column)` values are zeros
+	Columns       []uint32 `protobuf:"varint,1,rep,packed,name=columns,proto3" json:"columns,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BurndownSparseMatrixRow) Reset() {
+	*x = BurndownSparseMatrixRow{}
+	mi := &file_pb_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BurndownSparseMatrixRow) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BurndownSparseMatrixRow) ProtoMessage() {}
+
+func (x *BurndownSparseMatrixRow) ProtoReflect() protoreflect.Message {
+	mi := &file_pb_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BurndownSparseMatrixRow.ProtoReflect.Descriptor instead.
+func (*BurndownSparseMatrixRow) Descriptor() ([]byte, []int) {
+	return file_pb_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *BurndownSparseMatrixRow) GetColumns() []uint32 {
+	if x != nil {
+		return x.Columns
+	}
+	return nil
+}
+
+type BurndownSparseMatrix struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Name            string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	NumberOfRows    int32                  `protobuf:"varint,2,opt,name=number_of_rows,json=numberOfRows,proto3" json:"number_of_rows,omitempty"`
+	NumberOfColumns int32                  `protobuf:"varint,3,opt,name=number_of_columns,json=numberOfColumns,proto3" json:"number_of_columns,omitempty"`
+	// `len(row)` matches `number_of_rows`
+	Rows          []*BurndownSparseMatrixRow `protobuf:"bytes,4,rep,name=rows,proto3" json:"rows,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BurndownSparseMatrix) Reset() {
+	*x = BurndownSparseMatrix{}
+	mi := &file_pb_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BurndownSparseMatrix) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BurndownSparseMatrix) ProtoMessage() {}
+
+func (x *BurndownSparseMatrix) ProtoReflect() protoreflect.Message {
+	mi := &file_pb_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BurndownSparseMatrix.ProtoReflect.Descriptor instead.
+func (*BurndownSparseMatrix) Descriptor() ([]byte, []int) {
+	return file_pb_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *BurndownSparseMatrix) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *BurndownSparseMatrix) GetNumberOfRows() int32 {
+	if x != nil {
+		return x.NumberOfRows
+	}
+	return 0
+}
+
+func (x *BurndownSparseMatrix) GetNumberOfColumns() int32 {
+	if x != nil {
+		return x.NumberOfColumns
+	}
+	return 0
+}
+
+func (x *BurndownSparseMatrix) GetRows() []*BurndownSparseMatrixRow {
+	if x != nil {
+		return x.Rows
+	}
+	return nil
+}
+
+type FilesOwnership struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The sum always equals to the total number of lines in the file.
+	Value         map[int32]int32 `protobuf:"bytes,1,rep,name=value,proto3" json:"value,omitempty" protobuf_key:"varint,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FilesOwnership) Reset() {
+	*x = FilesOwnership{}
+	mi := &file_pb_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FilesOwnership) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FilesOwnership) ProtoMessage() {}
+
+func (x *FilesOwnership) ProtoReflect() protoreflect.Message {
+	mi := &file_pb_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FilesOwnership.ProtoReflect.Descriptor instead.
+func (*FilesOwnership) Descriptor() ([]byte, []int) {
+	return file_pb_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *FilesOwnership) GetValue() map[int32]int32 {
+	if x != nil {
+		return x.Value
+	}
+	return nil
+}
+
+type BurndownAnalysisResults struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// how many ticks are in each band [burndown_project, burndown_file, burndown_developer]
+	Granularity int32 `protobuf:"varint,1,opt,name=granularity,proto3" json:"granularity,omitempty"`
+	// how frequently we measure the state of each band [burndown_project, burndown_file, burndown_developer]
+	Sampling int32 `protobuf:"varint,2,opt,name=sampling,proto3" json:"sampling,omitempty"`
+	// always exists
+	Project *BurndownSparseMatrix `protobuf:"bytes,3,opt,name=project,proto3" json:"project,omitempty"`
+	// this is included if `--burndown-files` was specified
+	Files []*BurndownSparseMatrix `protobuf:"bytes,4,rep,name=files,proto3" json:"files,omitempty"`
+	// these two are included if `--burndown-people` was specified
+	People []*BurndownSparseMatrix `protobuf:"bytes,5,rep,name=people,proto3" json:"people,omitempty"`
+	// rows and cols order correspond to `burndown_developer`
+	PeopleInteraction *CompressedSparseRowMatrix `protobuf:"bytes,6,opt,name=people_interaction,json=peopleInteraction,proto3" json:"people_interaction,omitempty"`
+	// How many lines belong to relevant developers for each file. The order is the same as in `files`.
+	FilesOwnership []*FilesOwnership `protobuf:"bytes,7,rep,name=files_ownership,json=filesOwnership,proto3" json:"files_ownership,omitempty"`
+	// how long each tick is, as an int64 nanosecond count (Go's time.Duration)
+	TickSize int64 `protobuf:"varint,8,opt,name=tick_size,json=tickSize,proto3" json:"tick_size,omitempty"`
+	// List of repository names in the same order as `repositories`
+	RepositorySequence []string `protobuf:"bytes,9,rep,name=repository_sequence,json=repositorySequence,proto3" json:"repository_sequence,omitempty"`
+	// Per-repository burndown matrices (included when combining multiple repositories)
+	Repositories  []*BurndownSparseMatrix `protobuf:"bytes,10,rep,name=repositories,proto3" json:"repositories,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BurndownAnalysisResults) Reset() {
+	*x = BurndownAnalysisResults{}
+	mi := &file_pb_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BurndownAnalysisResults) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BurndownAnalysisResults) ProtoMessage() {}
+
+func (x *BurndownAnalysisResults) ProtoReflect() protoreflect.Message {
+	mi := &file_pb_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BurndownAnalysisResults.ProtoReflect.Descriptor instead.
+func (*BurndownAnalysisResults) Descriptor() ([]byte, []int) {
+	return file_pb_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *BurndownAnalysisResults) GetGranularity() int32 {
+	if x != nil {
+		return x.Granularity
+	}
+	return 0
+}
+
+func (x *BurndownAnalysisResults) GetSampling() int32 {
+	if x != nil {
+		return x.Sampling
+	}
+	return 0
+}
+
+func (x *BurndownAnalysisResults) GetProject() *BurndownSparseMatrix {
+	if x != nil {
+		return x.Project
+	}
+	return nil
+}
+
+func (x *BurndownAnalysisResults) GetFiles() []*BurndownSparseMatrix {
+	if x != nil {
+		return x.Files
+	}
+	return nil
+}
+
+func (x *BurndownAnalysisResults) GetPeople() []*BurndownSparseMatrix {
+	if x != nil {
+		return x.People
+	}
+	return nil
+}
+
+func (x *BurndownAnalysisResults) GetPeopleInteraction() *CompressedSparseRowMatrix {
+	if x != nil {
+		return x.PeopleInteraction
+	}
+	return nil
+}
+
+func (x *BurndownAnalysisResults) GetFilesOwnership() []*FilesOwnership {
+	if x != nil {
+		return x.FilesOwnership
+	}
+	return nil
+}
+
+func (x *BurndownAnalysisResults) GetTickSize() int64 {
+	if x != nil {
+		return x.TickSize
+	}
+	return 0
+}
+
+func (x *BurndownAnalysisResults) GetRepositorySequence() []string {
+	if x != nil {
+		return x.RepositorySequence
+	}
+	return nil
+}
+
+func (x *BurndownAnalysisResults) GetRepositories() []*BurndownSparseMatrix {
+	if x != nil {
+		return x.Repositories
+	}
+	return nil
+}
+
+type CompressedSparseRowMatrix struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	NumberOfRows    int32                  `protobuf:"varint,1,opt,name=number_of_rows,json=numberOfRows,proto3" json:"number_of_rows,omitempty"`
+	NumberOfColumns int32                  `protobuf:"varint,2,opt,name=number_of_columns,json=numberOfColumns,proto3" json:"number_of_columns,omitempty"`
+	// https://en.wikipedia.org/wiki/Sparse_matrix#Compressed_sparse_row_.28CSR.2C_CRS_or_Yale_format.29
+	Data          []int64 `protobuf:"varint,3,rep,packed,name=data,proto3" json:"data,omitempty"`
+	Indices       []int32 `protobuf:"varint,4,rep,packed,name=indices,proto3" json:"indices,omitempty"`
+	Indptr        []int64 `protobuf:"varint,5,rep,packed,name=indptr,proto3" json:"indptr,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CompressedSparseRowMatrix) Reset() {
+	*x = CompressedSparseRowMatrix{}
+	mi := &file_pb_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CompressedSparseRowMatrix) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CompressedSparseRowMatrix) ProtoMessage() {}
+
+func (x *CompressedSparseRowMatrix) ProtoReflect() protoreflect.Message {
+	mi := &file_pb_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CompressedSparseRowMatrix.ProtoReflect.Descriptor instead.
+func (*CompressedSparseRowMatrix) Descriptor() ([]byte, []int) {
+	return file_pb_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *CompressedSparseRowMatrix) GetNumberOfRows() int32 {
+	if x != nil {
+		return x.NumberOfRows
+	}
+	return 0
+}
+
+func (x *CompressedSparseRowMatrix) GetNumberOfColumns() int32 {
+	if x != nil {
+		return x.NumberOfColumns
+	}
+	return 0
+}
+
+func (x *CompressedSparseRowMatrix) GetData() []int64 {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+func (x *CompressedSparseRowMatrix) GetIndices() []int32 {
+	if x != nil {
+		return x.Indices
+	}
+	return nil
+}
+
+func (x *CompressedSparseRowMatrix) GetIndptr() []int64 {
+	if x != nil {
+		return x.Indptr
+	}
+	return nil
+}
+
 type Couples struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// name of each `matrix`'s row and column
@@ -649,396 +660,19 @@ func (x *CouplesAnalysisResults) GetFilesLines() []int32 {
 	return nil
 }
 
-// Developer statistics (simplified version - full version in hercules has nested structures)
-type DeveloperStat struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Commits       int32                  `protobuf:"varint,2,opt,name=commits,proto3" json:"commits,omitempty"`
-	LinesAdded    int64                  `protobuf:"varint,3,opt,name=lines_added,json=linesAdded,proto3" json:"lines_added,omitempty"`
-	LinesRemoved  int64                  `protobuf:"varint,4,opt,name=lines_removed,json=linesRemoved,proto3" json:"lines_removed,omitempty"`
-	LinesModified int64                  `protobuf:"varint,5,opt,name=lines_modified,json=linesModified,proto3" json:"lines_modified,omitempty"`
-	FilesTouched  int32                  `protobuf:"varint,6,opt,name=files_touched,json=filesTouched,proto3" json:"files_touched,omitempty"`
-	Languages     map[string]int32       `protobuf:"bytes,7,rep,name=languages,proto3" json:"languages,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *DeveloperStat) Reset() {
-	*x = DeveloperStat{}
-	mi := &file_pb_proto_msgTypes[9]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *DeveloperStat) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*DeveloperStat) ProtoMessage() {}
-
-func (x *DeveloperStat) ProtoReflect() protoreflect.Message {
-	mi := &file_pb_proto_msgTypes[9]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use DeveloperStat.ProtoReflect.Descriptor instead.
-func (*DeveloperStat) Descriptor() ([]byte, []int) {
-	return file_pb_proto_rawDescGZIP(), []int{9}
-}
-
-func (x *DeveloperStat) GetName() string {
-	if x != nil {
-		return x.Name
-	}
-	return ""
-}
-
-func (x *DeveloperStat) GetCommits() int32 {
-	if x != nil {
-		return x.Commits
-	}
-	return 0
-}
-
-func (x *DeveloperStat) GetLinesAdded() int64 {
-	if x != nil {
-		return x.LinesAdded
-	}
-	return 0
-}
-
-func (x *DeveloperStat) GetLinesRemoved() int64 {
-	if x != nil {
-		return x.LinesRemoved
-	}
-	return 0
-}
-
-func (x *DeveloperStat) GetLinesModified() int64 {
-	if x != nil {
-		return x.LinesModified
-	}
-	return 0
-}
-
-func (x *DeveloperStat) GetFilesTouched() int32 {
-	if x != nil {
-		return x.FilesTouched
-	}
-	return 0
-}
-
-func (x *DeveloperStat) GetLanguages() map[string]int32 {
-	if x != nil {
-		return x.Languages
-	}
-	return nil
-}
-
-// Language statistics
-type LanguageStat struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Language      string                 `protobuf:"bytes,1,opt,name=language,proto3" json:"language,omitempty"`
-	Lines         int64                  `protobuf:"varint,2,opt,name=lines,proto3" json:"lines,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *LanguageStat) Reset() {
-	*x = LanguageStat{}
-	mi := &file_pb_proto_msgTypes[10]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *LanguageStat) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*LanguageStat) ProtoMessage() {}
-
-func (x *LanguageStat) ProtoReflect() protoreflect.Message {
-	mi := &file_pb_proto_msgTypes[10]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use LanguageStat.ProtoReflect.Descriptor instead.
-func (*LanguageStat) Descriptor() ([]byte, []int) {
-	return file_pb_proto_rawDescGZIP(), []int{10}
-}
-
-func (x *LanguageStat) GetLanguage() string {
-	if x != nil {
-		return x.Language
-	}
-	return ""
-}
-
-func (x *LanguageStat) GetLines() int64 {
-	if x != nil {
-		return x.Lines
-	}
-	return 0
-}
-
-// Line statistics for commits/developers
-type LineStats struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Added         int32                  `protobuf:"varint,1,opt,name=added,proto3" json:"added,omitempty"`
-	Removed       int32                  `protobuf:"varint,2,opt,name=removed,proto3" json:"removed,omitempty"`
-	Changed       int32                  `protobuf:"varint,3,opt,name=changed,proto3" json:"changed,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *LineStats) Reset() {
-	*x = LineStats{}
-	mi := &file_pb_proto_msgTypes[11]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *LineStats) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*LineStats) ProtoMessage() {}
-
-func (x *LineStats) ProtoReflect() protoreflect.Message {
-	mi := &file_pb_proto_msgTypes[11]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use LineStats.ProtoReflect.Descriptor instead.
-func (*LineStats) Descriptor() ([]byte, []int) {
-	return file_pb_proto_rawDescGZIP(), []int{11}
-}
-
-func (x *LineStats) GetAdded() int32 {
-	if x != nil {
-		return x.Added
-	}
-	return 0
-}
-
-func (x *LineStats) GetRemoved() int32 {
-	if x != nil {
-		return x.Removed
-	}
-	return 0
-}
-
-func (x *LineStats) GetChanged() int32 {
-	if x != nil {
-		return x.Changed
-	}
-	return 0
-}
-
-// Developer tick data
-type DevTick struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Commits       int32                  `protobuf:"varint,1,opt,name=commits,proto3" json:"commits,omitempty"`
-	Stats         *LineStats             `protobuf:"bytes,2,opt,name=stats,proto3" json:"stats,omitempty"`
-	Languages     map[string]*LineStats  `protobuf:"bytes,3,rep,name=languages,proto3" json:"languages,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *DevTick) Reset() {
-	*x = DevTick{}
-	mi := &file_pb_proto_msgTypes[12]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *DevTick) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*DevTick) ProtoMessage() {}
-
-func (x *DevTick) ProtoReflect() protoreflect.Message {
-	mi := &file_pb_proto_msgTypes[12]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use DevTick.ProtoReflect.Descriptor instead.
-func (*DevTick) Descriptor() ([]byte, []int) {
-	return file_pb_proto_rawDescGZIP(), []int{12}
-}
-
-func (x *DevTick) GetCommits() int32 {
-	if x != nil {
-		return x.Commits
-	}
-	return 0
-}
-
-func (x *DevTick) GetStats() *LineStats {
-	if x != nil {
-		return x.Stats
-	}
-	return nil
-}
-
-func (x *DevTick) GetLanguages() map[string]*LineStats {
-	if x != nil {
-		return x.Languages
-	}
-	return nil
-}
-
-// All developers for a specific tick
-type TickDevs struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Devs          map[int32]*DevTick     `protobuf:"bytes,1,rep,name=devs,proto3" json:"devs,omitempty" protobuf_key:"varint,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *TickDevs) Reset() {
-	*x = TickDevs{}
-	mi := &file_pb_proto_msgTypes[13]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *TickDevs) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*TickDevs) ProtoMessage() {}
-
-func (x *TickDevs) ProtoReflect() protoreflect.Message {
-	mi := &file_pb_proto_msgTypes[13]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use TickDevs.ProtoReflect.Descriptor instead.
-func (*TickDevs) Descriptor() ([]byte, []int) {
-	return file_pb_proto_rawDescGZIP(), []int{13}
-}
-
-func (x *TickDevs) GetDevs() map[int32]*DevTick {
-	if x != nil {
-		return x.Devs
-	}
-	return nil
-}
-
-// Developer analysis results
-type DevsAnalysisResults struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	Ticks map[int32]*TickDevs    `protobuf:"bytes,1,rep,name=ticks,proto3" json:"ticks,omitempty" protobuf_key:"varint,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	// developer identities, the indexes correspond to TickDevs' keys.
-	DevIndex []string `protobuf:"bytes,2,rep,name=dev_index,json=devIndex,proto3" json:"dev_index,omitempty"`
-	// how long each tick is, as an int64 nanosecond count (Go's time.Duration)
-	TickSize      int64 `protobuf:"varint,8,opt,name=tick_size,json=tickSize,proto3" json:"tick_size,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *DevsAnalysisResults) Reset() {
-	*x = DevsAnalysisResults{}
-	mi := &file_pb_proto_msgTypes[14]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *DevsAnalysisResults) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*DevsAnalysisResults) ProtoMessage() {}
-
-func (x *DevsAnalysisResults) ProtoReflect() protoreflect.Message {
-	mi := &file_pb_proto_msgTypes[14]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use DevsAnalysisResults.ProtoReflect.Descriptor instead.
-func (*DevsAnalysisResults) Descriptor() ([]byte, []int) {
-	return file_pb_proto_rawDescGZIP(), []int{14}
-}
-
-func (x *DevsAnalysisResults) GetTicks() map[int32]*TickDevs {
-	if x != nil {
-		return x.Ticks
-	}
-	return nil
-}
-
-func (x *DevsAnalysisResults) GetDevIndex() []string {
-	if x != nil {
-		return x.DevIndex
-	}
-	return nil
-}
-
-func (x *DevsAnalysisResults) GetTickSize() int64 {
-	if x != nil {
-		return x.TickSize
-	}
-	return 0
-}
-
-// Shotness record for tracking structural unit modifications
 type ShotnessRecord struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Type          string                 `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`                                                                                     // Type of structural unit (e.g., "function", "class")
-	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`                                                                                     // Name of the structural unit
-	File          string                 `protobuf:"bytes,3,opt,name=file,proto3" json:"file,omitempty"`                                                                                     // File path containing the unit
-	Counters      map[int32]int32        `protobuf:"bytes,4,rep,name=counters,proto3" json:"counters,omitempty" protobuf_key:"varint,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"` // Time-based modification counters
+	Type          string                 `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	File          string                 `protobuf:"bytes,3,opt,name=file,proto3" json:"file,omitempty"`
+	Counters      map[int32]int32        `protobuf:"bytes,4,rep,name=counters,proto3" json:"counters,omitempty" protobuf_key:"varint,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ShotnessRecord) Reset() {
 	*x = ShotnessRecord{}
-	mi := &file_pb_proto_msgTypes[15]
+	mi := &file_pb_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1050,7 +684,7 @@ func (x *ShotnessRecord) String() string {
 func (*ShotnessRecord) ProtoMessage() {}
 
 func (x *ShotnessRecord) ProtoReflect() protoreflect.Message {
-	mi := &file_pb_proto_msgTypes[15]
+	mi := &file_pb_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1063,7 +697,7 @@ func (x *ShotnessRecord) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ShotnessRecord.ProtoReflect.Descriptor instead.
 func (*ShotnessRecord) Descriptor() ([]byte, []int) {
-	return file_pb_proto_rawDescGZIP(), []int{15}
+	return file_pb_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ShotnessRecord) GetType() string {
@@ -1094,17 +728,16 @@ func (x *ShotnessRecord) GetCounters() map[int32]int32 {
 	return nil
 }
 
-// Shotness analysis results
 type ShotnessAnalysisResults struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Records       []*ShotnessRecord      `protobuf:"bytes,1,rep,name=records,proto3" json:"records,omitempty"` // Collection of all shotness records
+	Records       []*ShotnessRecord      `protobuf:"bytes,1,rep,name=records,proto3" json:"records,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ShotnessAnalysisResults) Reset() {
 	*x = ShotnessAnalysisResults{}
-	mi := &file_pb_proto_msgTypes[16]
+	mi := &file_pb_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1116,7 +749,7 @@ func (x *ShotnessAnalysisResults) String() string {
 func (*ShotnessAnalysisResults) ProtoMessage() {}
 
 func (x *ShotnessAnalysisResults) ProtoReflect() protoreflect.Message {
-	mi := &file_pb_proto_msgTypes[16]
+	mi := &file_pb_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1129,7 +762,7 @@ func (x *ShotnessAnalysisResults) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ShotnessAnalysisResults.ProtoReflect.Descriptor instead.
 func (*ShotnessAnalysisResults) Descriptor() ([]byte, []int) {
-	return file_pb_proto_rawDescGZIP(), []int{16}
+	return file_pb_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *ShotnessAnalysisResults) GetRecords() []*ShotnessRecord {
@@ -1139,19 +772,2692 @@ func (x *ShotnessAnalysisResults) GetRecords() []*ShotnessRecord {
 	return nil
 }
 
-// Comprehensive analysis results that can contain multiple analysis types
-type AnalysisResults struct {
-	state  protoimpl.MessageState `protogen:"open.v1"`
-	Header *Metadata              `protobuf:"bytes,1,opt,name=header,proto3" json:"header,omitempty"`
-	// the mapped values are dynamic messages which require the second parsing pass.
-	Contents      map[string][]byte `protobuf:"bytes,2,rep,name=contents,proto3" json:"contents,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+type FileHistory struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	Commits            []string               `protobuf:"bytes,1,rep,name=commits,proto3" json:"commits,omitempty"`
+	ChangesByDeveloper map[int32]*LineStats   `protobuf:"bytes,2,rep,name=changes_by_developer,json=changesByDeveloper,proto3" json:"changes_by_developer,omitempty" protobuf_key:"varint,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *FileHistory) Reset() {
+	*x = FileHistory{}
+	mi := &file_pb_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FileHistory) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FileHistory) ProtoMessage() {}
+
+func (x *FileHistory) ProtoReflect() protoreflect.Message {
+	mi := &file_pb_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FileHistory.ProtoReflect.Descriptor instead.
+func (*FileHistory) Descriptor() ([]byte, []int) {
+	return file_pb_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *FileHistory) GetCommits() []string {
+	if x != nil {
+		return x.Commits
+	}
+	return nil
+}
+
+func (x *FileHistory) GetChangesByDeveloper() map[int32]*LineStats {
+	if x != nil {
+		return x.ChangesByDeveloper
+	}
+	return nil
+}
+
+type FileHistoryResultMessage struct {
+	state         protoimpl.MessageState  `protogen:"open.v1"`
+	Files         map[string]*FileHistory `protobuf:"bytes,1,rep,name=files,proto3" json:"files,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
+func (x *FileHistoryResultMessage) Reset() {
+	*x = FileHistoryResultMessage{}
+	mi := &file_pb_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FileHistoryResultMessage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FileHistoryResultMessage) ProtoMessage() {}
+
+func (x *FileHistoryResultMessage) ProtoReflect() protoreflect.Message {
+	mi := &file_pb_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FileHistoryResultMessage.ProtoReflect.Descriptor instead.
+func (*FileHistoryResultMessage) Descriptor() ([]byte, []int) {
+	return file_pb_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *FileHistoryResultMessage) GetFiles() map[string]*FileHistory {
+	if x != nil {
+		return x.Files
+	}
+	return nil
+}
+
+type LineStats struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Added         int32                  `protobuf:"varint,1,opt,name=added,proto3" json:"added,omitempty"`
+	Removed       int32                  `protobuf:"varint,2,opt,name=removed,proto3" json:"removed,omitempty"`
+	Changed       int32                  `protobuf:"varint,3,opt,name=changed,proto3" json:"changed,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LineStats) Reset() {
+	*x = LineStats{}
+	mi := &file_pb_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LineStats) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LineStats) ProtoMessage() {}
+
+func (x *LineStats) ProtoReflect() protoreflect.Message {
+	mi := &file_pb_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LineStats.ProtoReflect.Descriptor instead.
+func (*LineStats) Descriptor() ([]byte, []int) {
+	return file_pb_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *LineStats) GetAdded() int32 {
+	if x != nil {
+		return x.Added
+	}
+	return 0
+}
+
+func (x *LineStats) GetRemoved() int32 {
+	if x != nil {
+		return x.Removed
+	}
+	return 0
+}
+
+func (x *LineStats) GetChanged() int32 {
+	if x != nil {
+		return x.Changed
+	}
+	return 0
+}
+
+type DevTick struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Commits       int32                  `protobuf:"varint,1,opt,name=commits,proto3" json:"commits,omitempty"`
+	Stats         *LineStats             `protobuf:"bytes,2,opt,name=stats,proto3" json:"stats,omitempty"`
+	Languages     map[string]*LineStats  `protobuf:"bytes,3,rep,name=languages,proto3" json:"languages,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DevTick) Reset() {
+	*x = DevTick{}
+	mi := &file_pb_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DevTick) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DevTick) ProtoMessage() {}
+
+func (x *DevTick) ProtoReflect() protoreflect.Message {
+	mi := &file_pb_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DevTick.ProtoReflect.Descriptor instead.
+func (*DevTick) Descriptor() ([]byte, []int) {
+	return file_pb_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *DevTick) GetCommits() int32 {
+	if x != nil {
+		return x.Commits
+	}
+	return 0
+}
+
+func (x *DevTick) GetStats() *LineStats {
+	if x != nil {
+		return x.Stats
+	}
+	return nil
+}
+
+func (x *DevTick) GetLanguages() map[string]*LineStats {
+	if x != nil {
+		return x.Languages
+	}
+	return nil
+}
+
+type TickDevs struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Devs          map[int32]*DevTick     `protobuf:"bytes,1,rep,name=devs,proto3" json:"devs,omitempty" protobuf_key:"varint,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TickDevs) Reset() {
+	*x = TickDevs{}
+	mi := &file_pb_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TickDevs) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TickDevs) ProtoMessage() {}
+
+func (x *TickDevs) ProtoReflect() protoreflect.Message {
+	mi := &file_pb_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TickDevs.ProtoReflect.Descriptor instead.
+func (*TickDevs) Descriptor() ([]byte, []int) {
+	return file_pb_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *TickDevs) GetDevs() map[int32]*DevTick {
+	if x != nil {
+		return x.Devs
+	}
+	return nil
+}
+
+type DevsAnalysisResults struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Ticks map[int32]*TickDevs    `protobuf:"bytes,1,rep,name=ticks,proto3" json:"ticks,omitempty" protobuf_key:"varint,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	// developer identities, the indexes correspond to TickDevs' keys.
+	DevIndex []string `protobuf:"bytes,2,rep,name=dev_index,json=devIndex,proto3" json:"dev_index,omitempty"`
+	// how long each tick is, as an int64 nanosecond count (Go's time.Duration)
+	TickSize      int64 `protobuf:"varint,8,opt,name=tick_size,json=tickSize,proto3" json:"tick_size,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DevsAnalysisResults) Reset() {
+	*x = DevsAnalysisResults{}
+	mi := &file_pb_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DevsAnalysisResults) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DevsAnalysisResults) ProtoMessage() {}
+
+func (x *DevsAnalysisResults) ProtoReflect() protoreflect.Message {
+	mi := &file_pb_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DevsAnalysisResults.ProtoReflect.Descriptor instead.
+func (*DevsAnalysisResults) Descriptor() ([]byte, []int) {
+	return file_pb_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *DevsAnalysisResults) GetTicks() map[int32]*TickDevs {
+	if x != nil {
+		return x.Ticks
+	}
+	return nil
+}
+
+func (x *DevsAnalysisResults) GetDevIndex() []string {
+	if x != nil {
+		return x.DevIndex
+	}
+	return nil
+}
+
+func (x *DevsAnalysisResults) GetTickSize() int64 {
+	if x != nil {
+		return x.TickSize
+	}
+	return 0
+}
+
+type Sentiment struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Value         float32                `protobuf:"fixed32,1,opt,name=value,proto3" json:"value,omitempty"`
+	Comments      []string               `protobuf:"bytes,2,rep,name=comments,proto3" json:"comments,omitempty"`
+	Commits       []string               `protobuf:"bytes,3,rep,name=commits,proto3" json:"commits,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Sentiment) Reset() {
+	*x = Sentiment{}
+	mi := &file_pb_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Sentiment) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Sentiment) ProtoMessage() {}
+
+func (x *Sentiment) ProtoReflect() protoreflect.Message {
+	mi := &file_pb_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Sentiment.ProtoReflect.Descriptor instead.
+func (*Sentiment) Descriptor() ([]byte, []int) {
+	return file_pb_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *Sentiment) GetValue() float32 {
+	if x != nil {
+		return x.Value
+	}
+	return 0
+}
+
+func (x *Sentiment) GetComments() []string {
+	if x != nil {
+		return x.Comments
+	}
+	return nil
+}
+
+func (x *Sentiment) GetCommits() []string {
+	if x != nil {
+		return x.Commits
+	}
+	return nil
+}
+
+type CommentSentimentResults struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	SentimentByTick map[int32]*Sentiment   `protobuf:"bytes,1,rep,name=sentiment_by_tick,json=sentimentByTick,proto3" json:"sentiment_by_tick,omitempty" protobuf_key:"varint,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *CommentSentimentResults) Reset() {
+	*x = CommentSentimentResults{}
+	mi := &file_pb_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CommentSentimentResults) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CommentSentimentResults) ProtoMessage() {}
+
+func (x *CommentSentimentResults) ProtoReflect() protoreflect.Message {
+	mi := &file_pb_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CommentSentimentResults.ProtoReflect.Descriptor instead.
+func (*CommentSentimentResults) Descriptor() ([]byte, []int) {
+	return file_pb_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *CommentSentimentResults) GetSentimentByTick() map[int32]*Sentiment {
+	if x != nil {
+		return x.SentimentByTick
+	}
+	return nil
+}
+
+type CommitFile struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Language      string                 `protobuf:"bytes,3,opt,name=language,proto3" json:"language,omitempty"`
+	Stats         *LineStats             `protobuf:"bytes,4,opt,name=stats,proto3" json:"stats,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CommitFile) Reset() {
+	*x = CommitFile{}
+	mi := &file_pb_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CommitFile) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CommitFile) ProtoMessage() {}
+
+func (x *CommitFile) ProtoReflect() protoreflect.Message {
+	mi := &file_pb_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CommitFile.ProtoReflect.Descriptor instead.
+func (*CommitFile) Descriptor() ([]byte, []int) {
+	return file_pb_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *CommitFile) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *CommitFile) GetLanguage() string {
+	if x != nil {
+		return x.Language
+	}
+	return ""
+}
+
+func (x *CommitFile) GetStats() *LineStats {
+	if x != nil {
+		return x.Stats
+	}
+	return nil
+}
+
+type Commit struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Hash          string                 `protobuf:"bytes,1,opt,name=hash,proto3" json:"hash,omitempty"`
+	WhenUnixTime  int64                  `protobuf:"varint,2,opt,name=when_unix_time,json=whenUnixTime,proto3" json:"when_unix_time,omitempty"`
+	Author        int32                  `protobuf:"varint,3,opt,name=author,proto3" json:"author,omitempty"`
+	Files         []*CommitFile          `protobuf:"bytes,4,rep,name=files,proto3" json:"files,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Commit) Reset() {
+	*x = Commit{}
+	mi := &file_pb_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Commit) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Commit) ProtoMessage() {}
+
+func (x *Commit) ProtoReflect() protoreflect.Message {
+	mi := &file_pb_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Commit.ProtoReflect.Descriptor instead.
+func (*Commit) Descriptor() ([]byte, []int) {
+	return file_pb_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *Commit) GetHash() string {
+	if x != nil {
+		return x.Hash
+	}
+	return ""
+}
+
+func (x *Commit) GetWhenUnixTime() int64 {
+	if x != nil {
+		return x.WhenUnixTime
+	}
+	return 0
+}
+
+func (x *Commit) GetAuthor() int32 {
+	if x != nil {
+		return x.Author
+	}
+	return 0
+}
+
+func (x *Commit) GetFiles() []*CommitFile {
+	if x != nil {
+		return x.Files
+	}
+	return nil
+}
+
+type CommitsAnalysisResults struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Commits       []*Commit              `protobuf:"bytes,1,rep,name=commits,proto3" json:"commits,omitempty"`
+	AuthorIndex   []string               `protobuf:"bytes,2,rep,name=author_index,json=authorIndex,proto3" json:"author_index,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CommitsAnalysisResults) Reset() {
+	*x = CommitsAnalysisResults{}
+	mi := &file_pb_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CommitsAnalysisResults) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CommitsAnalysisResults) ProtoMessage() {}
+
+func (x *CommitsAnalysisResults) ProtoReflect() protoreflect.Message {
+	mi := &file_pb_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CommitsAnalysisResults.ProtoReflect.Descriptor instead.
+func (*CommitsAnalysisResults) Descriptor() ([]byte, []int) {
+	return file_pb_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *CommitsAnalysisResults) GetCommits() []*Commit {
+	if x != nil {
+		return x.Commits
+	}
+	return nil
+}
+
+func (x *CommitsAnalysisResults) GetAuthorIndex() []string {
+	if x != nil {
+		return x.AuthorIndex
+	}
+	return nil
+}
+
+type Typo struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Wrong         string                 `protobuf:"bytes,1,opt,name=wrong,proto3" json:"wrong,omitempty"`
+	Correct       string                 `protobuf:"bytes,2,opt,name=correct,proto3" json:"correct,omitempty"`
+	Commit        string                 `protobuf:"bytes,3,opt,name=commit,proto3" json:"commit,omitempty"`
+	File          string                 `protobuf:"bytes,4,opt,name=file,proto3" json:"file,omitempty"`
+	Line          int32                  `protobuf:"varint,5,opt,name=line,proto3" json:"line,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Typo) Reset() {
+	*x = Typo{}
+	mi := &file_pb_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Typo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Typo) ProtoMessage() {}
+
+func (x *Typo) ProtoReflect() protoreflect.Message {
+	mi := &file_pb_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Typo.ProtoReflect.Descriptor instead.
+func (*Typo) Descriptor() ([]byte, []int) {
+	return file_pb_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *Typo) GetWrong() string {
+	if x != nil {
+		return x.Wrong
+	}
+	return ""
+}
+
+func (x *Typo) GetCorrect() string {
+	if x != nil {
+		return x.Correct
+	}
+	return ""
+}
+
+func (x *Typo) GetCommit() string {
+	if x != nil {
+		return x.Commit
+	}
+	return ""
+}
+
+func (x *Typo) GetFile() string {
+	if x != nil {
+		return x.File
+	}
+	return ""
+}
+
+func (x *Typo) GetLine() int32 {
+	if x != nil {
+		return x.Line
+	}
+	return 0
+}
+
+type TyposDataset struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Typos         []*Typo                `protobuf:"bytes,1,rep,name=typos,proto3" json:"typos,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TyposDataset) Reset() {
+	*x = TyposDataset{}
+	mi := &file_pb_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TyposDataset) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TyposDataset) ProtoMessage() {}
+
+func (x *TyposDataset) ProtoReflect() protoreflect.Message {
+	mi := &file_pb_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TyposDataset.ProtoReflect.Descriptor instead.
+func (*TyposDataset) Descriptor() ([]byte, []int) {
+	return file_pb_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *TyposDataset) GetTypos() []*Typo {
+	if x != nil {
+		return x.Typos
+	}
+	return nil
+}
+
+type ImportsPerTick struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Counts        map[int32]int64        `protobuf:"bytes,1,rep,name=counts,proto3" json:"counts,omitempty" protobuf_key:"varint,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ImportsPerTick) Reset() {
+	*x = ImportsPerTick{}
+	mi := &file_pb_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ImportsPerTick) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ImportsPerTick) ProtoMessage() {}
+
+func (x *ImportsPerTick) ProtoReflect() protoreflect.Message {
+	mi := &file_pb_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ImportsPerTick.ProtoReflect.Descriptor instead.
+func (*ImportsPerTick) Descriptor() ([]byte, []int) {
+	return file_pb_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *ImportsPerTick) GetCounts() map[int32]int64 {
+	if x != nil {
+		return x.Counts
+	}
+	return nil
+}
+
+type ImportsPerLanguage struct {
+	state         protoimpl.MessageState     `protogen:"open.v1"`
+	Ticks         map[string]*ImportsPerTick `protobuf:"bytes,1,rep,name=ticks,proto3" json:"ticks,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ImportsPerLanguage) Reset() {
+	*x = ImportsPerLanguage{}
+	mi := &file_pb_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ImportsPerLanguage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ImportsPerLanguage) ProtoMessage() {}
+
+func (x *ImportsPerLanguage) ProtoReflect() protoreflect.Message {
+	mi := &file_pb_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ImportsPerLanguage.ProtoReflect.Descriptor instead.
+func (*ImportsPerLanguage) Descriptor() ([]byte, []int) {
+	return file_pb_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *ImportsPerLanguage) GetTicks() map[string]*ImportsPerTick {
+	if x != nil {
+		return x.Ticks
+	}
+	return nil
+}
+
+type ImportsPerDeveloper struct {
+	state         protoimpl.MessageState         `protogen:"open.v1"`
+	Languages     map[string]*ImportsPerLanguage `protobuf:"bytes,1,rep,name=languages,proto3" json:"languages,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ImportsPerDeveloper) Reset() {
+	*x = ImportsPerDeveloper{}
+	mi := &file_pb_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ImportsPerDeveloper) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ImportsPerDeveloper) ProtoMessage() {}
+
+func (x *ImportsPerDeveloper) ProtoReflect() protoreflect.Message {
+	mi := &file_pb_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ImportsPerDeveloper.ProtoReflect.Descriptor instead.
+func (*ImportsPerDeveloper) Descriptor() ([]byte, []int) {
+	return file_pb_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *ImportsPerDeveloper) GetLanguages() map[string]*ImportsPerLanguage {
+	if x != nil {
+		return x.Languages
+	}
+	return nil
+}
+
+type ImportsPerDeveloperResults struct {
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Imports     []*ImportsPerDeveloper `protobuf:"bytes,1,rep,name=imports,proto3" json:"imports,omitempty"`
+	AuthorIndex []string               `protobuf:"bytes,2,rep,name=author_index,json=authorIndex,proto3" json:"author_index,omitempty"`
+	// how long each tick is, as an int64 nanosecond count (Go's time.Duration)
+	TickSize      int64 `protobuf:"varint,3,opt,name=tick_size,json=tickSize,proto3" json:"tick_size,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ImportsPerDeveloperResults) Reset() {
+	*x = ImportsPerDeveloperResults{}
+	mi := &file_pb_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ImportsPerDeveloperResults) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ImportsPerDeveloperResults) ProtoMessage() {}
+
+func (x *ImportsPerDeveloperResults) ProtoReflect() protoreflect.Message {
+	mi := &file_pb_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ImportsPerDeveloperResults.ProtoReflect.Descriptor instead.
+func (*ImportsPerDeveloperResults) Descriptor() ([]byte, []int) {
+	return file_pb_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *ImportsPerDeveloperResults) GetImports() []*ImportsPerDeveloper {
+	if x != nil {
+		return x.Imports
+	}
+	return nil
+}
+
+func (x *ImportsPerDeveloperResults) GetAuthorIndex() []string {
+	if x != nil {
+		return x.AuthorIndex
+	}
+	return nil
+}
+
+func (x *ImportsPerDeveloperResults) GetTickSize() int64 {
+	if x != nil {
+		return x.TickSize
+	}
+	return 0
+}
+
+type TemporalDimension struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Count of commits for this dimension
+	Commits []int32 `protobuf:"varint,1,rep,packed,name=commits,proto3" json:"commits,omitempty"`
+	// Count of lines changed (added + removed) for this dimension
+	Lines         []int32 `protobuf:"varint,2,rep,packed,name=lines,proto3" json:"lines,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TemporalDimension) Reset() {
+	*x = TemporalDimension{}
+	mi := &file_pb_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TemporalDimension) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TemporalDimension) ProtoMessage() {}
+
+func (x *TemporalDimension) ProtoReflect() protoreflect.Message {
+	mi := &file_pb_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TemporalDimension.ProtoReflect.Descriptor instead.
+func (*TemporalDimension) Descriptor() ([]byte, []int) {
+	return file_pb_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *TemporalDimension) GetCommits() []int32 {
+	if x != nil {
+		return x.Commits
+	}
+	return nil
+}
+
+func (x *TemporalDimension) GetLines() []int32 {
+	if x != nil {
+		return x.Lines
+	}
+	return nil
+}
+
+type DeveloperTemporalActivity struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Sunday=0 to Saturday=6 (length 7)
+	Weekdays *TemporalDimension `protobuf:"bytes,1,opt,name=weekdays,proto3" json:"weekdays,omitempty"`
+	// 0-23 (length 24)
+	Hours *TemporalDimension `protobuf:"bytes,2,opt,name=hours,proto3" json:"hours,omitempty"`
+	// January=0 to December=11 (length 12)
+	Months *TemporalDimension `protobuf:"bytes,3,opt,name=months,proto3" json:"months,omitempty"`
+	// ISO week 1-53 stored at indices 0-52 (length 53)
+	Weeks         *TemporalDimension `protobuf:"bytes,4,opt,name=weeks,proto3" json:"weeks,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeveloperTemporalActivity) Reset() {
+	*x = DeveloperTemporalActivity{}
+	mi := &file_pb_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeveloperTemporalActivity) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeveloperTemporalActivity) ProtoMessage() {}
+
+func (x *DeveloperTemporalActivity) ProtoReflect() protoreflect.Message {
+	mi := &file_pb_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeveloperTemporalActivity.ProtoReflect.Descriptor instead.
+func (*DeveloperTemporalActivity) Descriptor() ([]byte, []int) {
+	return file_pb_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *DeveloperTemporalActivity) GetWeekdays() *TemporalDimension {
+	if x != nil {
+		return x.Weekdays
+	}
+	return nil
+}
+
+func (x *DeveloperTemporalActivity) GetHours() *TemporalDimension {
+	if x != nil {
+		return x.Hours
+	}
+	return nil
+}
+
+func (x *DeveloperTemporalActivity) GetMonths() *TemporalDimension {
+	if x != nil {
+		return x.Months
+	}
+	return nil
+}
+
+func (x *DeveloperTemporalActivity) GetWeeks() *TemporalDimension {
+	if x != nil {
+		return x.Weeks
+	}
+	return nil
+}
+
+// Per-tick temporal activity for a single developer
+type TemporalActivityTick struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Commits       int32                  `protobuf:"varint,1,opt,name=commits,proto3" json:"commits,omitempty"`
+	Lines         int32                  `protobuf:"varint,2,opt,name=lines,proto3" json:"lines,omitempty"`
+	Weekday       int32                  `protobuf:"varint,3,opt,name=weekday,proto3" json:"weekday,omitempty"` // 0-6 (Sunday=0)
+	Hour          int32                  `protobuf:"varint,4,opt,name=hour,proto3" json:"hour,omitempty"`       // 0-23
+	Month         int32                  `protobuf:"varint,5,opt,name=month,proto3" json:"month,omitempty"`     // 0-11 (January=0)
+	Week          int32                  `protobuf:"varint,6,opt,name=week,proto3" json:"week,omitempty"`       // 0-52 (ISO week 1-53 stored as 0-52)
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TemporalActivityTick) Reset() {
+	*x = TemporalActivityTick{}
+	mi := &file_pb_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TemporalActivityTick) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TemporalActivityTick) ProtoMessage() {}
+
+func (x *TemporalActivityTick) ProtoReflect() protoreflect.Message {
+	mi := &file_pb_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TemporalActivityTick.ProtoReflect.Descriptor instead.
+func (*TemporalActivityTick) Descriptor() ([]byte, []int) {
+	return file_pb_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *TemporalActivityTick) GetCommits() int32 {
+	if x != nil {
+		return x.Commits
+	}
+	return 0
+}
+
+func (x *TemporalActivityTick) GetLines() int32 {
+	if x != nil {
+		return x.Lines
+	}
+	return 0
+}
+
+func (x *TemporalActivityTick) GetWeekday() int32 {
+	if x != nil {
+		return x.Weekday
+	}
+	return 0
+}
+
+func (x *TemporalActivityTick) GetHour() int32 {
+	if x != nil {
+		return x.Hour
+	}
+	return 0
+}
+
+func (x *TemporalActivityTick) GetMonth() int32 {
+	if x != nil {
+		return x.Month
+	}
+	return 0
+}
+
+func (x *TemporalActivityTick) GetWeek() int32 {
+	if x != nil {
+		return x.Week
+	}
+	return 0
+}
+
+// Per-tick data for all developers
+type TemporalActivityTickDevs struct {
+	state         protoimpl.MessageState          `protogen:"open.v1"`
+	Devs          map[int32]*TemporalActivityTick `protobuf:"bytes,1,rep,name=devs,proto3" json:"devs,omitempty" protobuf_key:"varint,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TemporalActivityTickDevs) Reset() {
+	*x = TemporalActivityTickDevs{}
+	mi := &file_pb_proto_msgTypes[31]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TemporalActivityTickDevs) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TemporalActivityTickDevs) ProtoMessage() {}
+
+func (x *TemporalActivityTickDevs) ProtoReflect() protoreflect.Message {
+	mi := &file_pb_proto_msgTypes[31]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TemporalActivityTickDevs.ProtoReflect.Descriptor instead.
+func (*TemporalActivityTickDevs) Descriptor() ([]byte, []int) {
+	return file_pb_proto_rawDescGZIP(), []int{31}
+}
+
+func (x *TemporalActivityTickDevs) GetDevs() map[int32]*TemporalActivityTick {
+	if x != nil {
+		return x.Devs
+	}
+	return nil
+}
+
+type TemporalActivityResults struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// developer index -> temporal activity (aggregated totals, for backward compatibility)
+	Activities map[int32]*DeveloperTemporalActivity `protobuf:"bytes,1,rep,name=activities,proto3" json:"activities,omitempty" protobuf_key:"varint,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	// developer identities, the indexes correspond to activities' keys
+	DevIndex []string `protobuf:"bytes,2,rep,name=dev_index,json=devIndex,proto3" json:"dev_index,omitempty"`
+	// Per-tick data: tick index -> developer index -> tick data
+	// This allows filtering by date range in post-processing
+	Ticks map[int32]*TemporalActivityTickDevs `protobuf:"bytes,3,rep,name=ticks,proto3" json:"ticks,omitempty" protobuf_key:"varint,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	// how long each tick is, as an int64 nanosecond count (Go's time.Duration)
+	TickSize      int64 `protobuf:"varint,4,opt,name=tick_size,json=tickSize,proto3" json:"tick_size,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TemporalActivityResults) Reset() {
+	*x = TemporalActivityResults{}
+	mi := &file_pb_proto_msgTypes[32]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TemporalActivityResults) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TemporalActivityResults) ProtoMessage() {}
+
+func (x *TemporalActivityResults) ProtoReflect() protoreflect.Message {
+	mi := &file_pb_proto_msgTypes[32]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TemporalActivityResults.ProtoReflect.Descriptor instead.
+func (*TemporalActivityResults) Descriptor() ([]byte, []int) {
+	return file_pb_proto_rawDescGZIP(), []int{32}
+}
+
+func (x *TemporalActivityResults) GetActivities() map[int32]*DeveloperTemporalActivity {
+	if x != nil {
+		return x.Activities
+	}
+	return nil
+}
+
+func (x *TemporalActivityResults) GetDevIndex() []string {
+	if x != nil {
+		return x.DevIndex
+	}
+	return nil
+}
+
+func (x *TemporalActivityResults) GetTicks() map[int32]*TemporalActivityTickDevs {
+	if x != nil {
+		return x.Ticks
+	}
+	return nil
+}
+
+func (x *TemporalActivityResults) GetTickSize() int64 {
+	if x != nil {
+		return x.TickSize
+	}
+	return 0
+}
+
+// Per-tick ownership snapshot for bus factor computation
+type BusFactorTickSnapshot struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// bus factor value at this tick (smallest k where top-k owners cover >= threshold)
+	BusFactor int32 `protobuf:"varint,1,opt,name=bus_factor,json=busFactor,proto3" json:"bus_factor,omitempty"`
+	// total alive lines at this tick
+	TotalLines int64 `protobuf:"varint,2,opt,name=total_lines,json=totalLines,proto3" json:"total_lines,omitempty"`
+	// per-author alive line counts at this tick, keyed by author index
+	AuthorLines   map[int32]int64 `protobuf:"bytes,3,rep,name=author_lines,json=authorLines,proto3" json:"author_lines,omitempty" protobuf_key:"varint,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BusFactorTickSnapshot) Reset() {
+	*x = BusFactorTickSnapshot{}
+	mi := &file_pb_proto_msgTypes[33]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BusFactorTickSnapshot) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BusFactorTickSnapshot) ProtoMessage() {}
+
+func (x *BusFactorTickSnapshot) ProtoReflect() protoreflect.Message {
+	mi := &file_pb_proto_msgTypes[33]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BusFactorTickSnapshot.ProtoReflect.Descriptor instead.
+func (*BusFactorTickSnapshot) Descriptor() ([]byte, []int) {
+	return file_pb_proto_rawDescGZIP(), []int{33}
+}
+
+func (x *BusFactorTickSnapshot) GetBusFactor() int32 {
+	if x != nil {
+		return x.BusFactor
+	}
+	return 0
+}
+
+func (x *BusFactorTickSnapshot) GetTotalLines() int64 {
+	if x != nil {
+		return x.TotalLines
+	}
+	return 0
+}
+
+func (x *BusFactorTickSnapshot) GetAuthorLines() map[int32]int64 {
+	if x != nil {
+		return x.AuthorLines
+	}
+	return nil
+}
+
+type BusFactorAnalysisResults struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// bus factor value per tick (index = tick number)
+	Snapshots map[int32]*BusFactorTickSnapshot `protobuf:"bytes,1,rep,name=snapshots,proto3" json:"snapshots,omitempty" protobuf_key:"varint,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	// bus factor per directory/subsystem prefix
+	SubsystemBusFactor map[string]int32 `protobuf:"bytes,2,rep,name=subsystem_bus_factor,json=subsystemBusFactor,proto3" json:"subsystem_bus_factor,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
+	// developer identities
+	DevIndex []string `protobuf:"bytes,3,rep,name=dev_index,json=devIndex,proto3" json:"dev_index,omitempty"`
+	// how long each tick is, as an int64 nanosecond count (Go's time.Duration)
+	TickSize int64 `protobuf:"varint,4,opt,name=tick_size,json=tickSize,proto3" json:"tick_size,omitempty"`
+	// threshold used (e.g. 0.8 for 80%)
+	Threshold     float32 `protobuf:"fixed32,5,opt,name=threshold,proto3" json:"threshold,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BusFactorAnalysisResults) Reset() {
+	*x = BusFactorAnalysisResults{}
+	mi := &file_pb_proto_msgTypes[34]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BusFactorAnalysisResults) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BusFactorAnalysisResults) ProtoMessage() {}
+
+func (x *BusFactorAnalysisResults) ProtoReflect() protoreflect.Message {
+	mi := &file_pb_proto_msgTypes[34]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BusFactorAnalysisResults.ProtoReflect.Descriptor instead.
+func (*BusFactorAnalysisResults) Descriptor() ([]byte, []int) {
+	return file_pb_proto_rawDescGZIP(), []int{34}
+}
+
+func (x *BusFactorAnalysisResults) GetSnapshots() map[int32]*BusFactorTickSnapshot {
+	if x != nil {
+		return x.Snapshots
+	}
+	return nil
+}
+
+func (x *BusFactorAnalysisResults) GetSubsystemBusFactor() map[string]int32 {
+	if x != nil {
+		return x.SubsystemBusFactor
+	}
+	return nil
+}
+
+func (x *BusFactorAnalysisResults) GetDevIndex() []string {
+	if x != nil {
+		return x.DevIndex
+	}
+	return nil
+}
+
+func (x *BusFactorAnalysisResults) GetTickSize() int64 {
+	if x != nil {
+		return x.TickSize
+	}
+	return 0
+}
+
+func (x *BusFactorAnalysisResults) GetThreshold() float32 {
+	if x != nil {
+		return x.Threshold
+	}
+	return 0
+}
+
+// Per-tick ownership concentration snapshot
+type OwnershipConcentrationTickSnapshot struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Gini coefficient (0 = perfectly equal, 1 = one person owns everything)
+	Gini float64 `protobuf:"fixed64,1,opt,name=gini,proto3" json:"gini,omitempty"`
+	// Herfindahl-Hirschman Index (1/n = perfectly equal, 1.0 = single author)
+	Hhi float64 `protobuf:"fixed64,2,opt,name=hhi,proto3" json:"hhi,omitempty"`
+	// total alive lines at this tick
+	TotalLines int64 `protobuf:"varint,3,opt,name=total_lines,json=totalLines,proto3" json:"total_lines,omitempty"`
+	// per-author alive line counts at this tick, keyed by author index
+	AuthorLines   map[int32]int64 `protobuf:"bytes,4,rep,name=author_lines,json=authorLines,proto3" json:"author_lines,omitempty" protobuf_key:"varint,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *OwnershipConcentrationTickSnapshot) Reset() {
+	*x = OwnershipConcentrationTickSnapshot{}
+	mi := &file_pb_proto_msgTypes[35]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *OwnershipConcentrationTickSnapshot) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OwnershipConcentrationTickSnapshot) ProtoMessage() {}
+
+func (x *OwnershipConcentrationTickSnapshot) ProtoReflect() protoreflect.Message {
+	mi := &file_pb_proto_msgTypes[35]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OwnershipConcentrationTickSnapshot.ProtoReflect.Descriptor instead.
+func (*OwnershipConcentrationTickSnapshot) Descriptor() ([]byte, []int) {
+	return file_pb_proto_rawDescGZIP(), []int{35}
+}
+
+func (x *OwnershipConcentrationTickSnapshot) GetGini() float64 {
+	if x != nil {
+		return x.Gini
+	}
+	return 0
+}
+
+func (x *OwnershipConcentrationTickSnapshot) GetHhi() float64 {
+	if x != nil {
+		return x.Hhi
+	}
+	return 0
+}
+
+func (x *OwnershipConcentrationTickSnapshot) GetTotalLines() int64 {
+	if x != nil {
+		return x.TotalLines
+	}
+	return 0
+}
+
+func (x *OwnershipConcentrationTickSnapshot) GetAuthorLines() map[int32]int64 {
+	if x != nil {
+		return x.AuthorLines
+	}
+	return nil
+}
+
+type OwnershipConcentrationResults struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// concentration metrics per tick (index = tick number)
+	Snapshots map[int32]*OwnershipConcentrationTickSnapshot `protobuf:"bytes,1,rep,name=snapshots,proto3" json:"snapshots,omitempty" protobuf_key:"varint,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	// per-directory/subsystem Gini coefficient at final tick
+	SubsystemGini map[string]float64 `protobuf:"bytes,2,rep,name=subsystem_gini,json=subsystemGini,proto3" json:"subsystem_gini,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"fixed64,2,opt,name=value"`
+	// per-directory/subsystem HHI at final tick
+	SubsystemHhi map[string]float64 `protobuf:"bytes,5,rep,name=subsystem_hhi,json=subsystemHhi,proto3" json:"subsystem_hhi,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"fixed64,2,opt,name=value"`
+	// developer identities
+	DevIndex []string `protobuf:"bytes,3,rep,name=dev_index,json=devIndex,proto3" json:"dev_index,omitempty"`
+	// how long each tick is, as an int64 nanosecond count (Go's time.Duration)
+	TickSize      int64 `protobuf:"varint,4,opt,name=tick_size,json=tickSize,proto3" json:"tick_size,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *OwnershipConcentrationResults) Reset() {
+	*x = OwnershipConcentrationResults{}
+	mi := &file_pb_proto_msgTypes[36]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *OwnershipConcentrationResults) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OwnershipConcentrationResults) ProtoMessage() {}
+
+func (x *OwnershipConcentrationResults) ProtoReflect() protoreflect.Message {
+	mi := &file_pb_proto_msgTypes[36]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OwnershipConcentrationResults.ProtoReflect.Descriptor instead.
+func (*OwnershipConcentrationResults) Descriptor() ([]byte, []int) {
+	return file_pb_proto_rawDescGZIP(), []int{36}
+}
+
+func (x *OwnershipConcentrationResults) GetSnapshots() map[int32]*OwnershipConcentrationTickSnapshot {
+	if x != nil {
+		return x.Snapshots
+	}
+	return nil
+}
+
+func (x *OwnershipConcentrationResults) GetSubsystemGini() map[string]float64 {
+	if x != nil {
+		return x.SubsystemGini
+	}
+	return nil
+}
+
+func (x *OwnershipConcentrationResults) GetSubsystemHhi() map[string]float64 {
+	if x != nil {
+		return x.SubsystemHhi
+	}
+	return nil
+}
+
+func (x *OwnershipConcentrationResults) GetDevIndex() []string {
+	if x != nil {
+		return x.DevIndex
+	}
+	return nil
+}
+
+func (x *OwnershipConcentrationResults) GetTickSize() int64 {
+	if x != nil {
+		return x.TickSize
+	}
+	return 0
+}
+
+// Per-file knowledge diffusion data
+type KnowledgeDiffusionFileData struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// total unique editors who ever touched this file
+	UniqueEditorsCount int32 `protobuf:"varint,1,opt,name=unique_editors_count,json=uniqueEditorsCount,proto3" json:"unique_editors_count,omitempty"`
+	// tick -> cumulative unique editor count at that tick
+	UniqueEditorsOverTime map[int32]int32 `protobuf:"bytes,2,rep,name=unique_editors_over_time,json=uniqueEditorsOverTime,proto3" json:"unique_editors_over_time,omitempty" protobuf_key:"varint,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
+	// editors active within the recent window
+	RecentEditorsCount int32 `protobuf:"varint,3,opt,name=recent_editors_count,json=recentEditorsCount,proto3" json:"recent_editors_count,omitempty"`
+	// author indices who touched this file
+	Authors       []int32 `protobuf:"varint,4,rep,packed,name=authors,proto3" json:"authors,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *KnowledgeDiffusionFileData) Reset() {
+	*x = KnowledgeDiffusionFileData{}
+	mi := &file_pb_proto_msgTypes[37]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *KnowledgeDiffusionFileData) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*KnowledgeDiffusionFileData) ProtoMessage() {}
+
+func (x *KnowledgeDiffusionFileData) ProtoReflect() protoreflect.Message {
+	mi := &file_pb_proto_msgTypes[37]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use KnowledgeDiffusionFileData.ProtoReflect.Descriptor instead.
+func (*KnowledgeDiffusionFileData) Descriptor() ([]byte, []int) {
+	return file_pb_proto_rawDescGZIP(), []int{37}
+}
+
+func (x *KnowledgeDiffusionFileData) GetUniqueEditorsCount() int32 {
+	if x != nil {
+		return x.UniqueEditorsCount
+	}
+	return 0
+}
+
+func (x *KnowledgeDiffusionFileData) GetUniqueEditorsOverTime() map[int32]int32 {
+	if x != nil {
+		return x.UniqueEditorsOverTime
+	}
+	return nil
+}
+
+func (x *KnowledgeDiffusionFileData) GetRecentEditorsCount() int32 {
+	if x != nil {
+		return x.RecentEditorsCount
+	}
+	return 0
+}
+
+func (x *KnowledgeDiffusionFileData) GetAuthors() []int32 {
+	if x != nil {
+		return x.Authors
+	}
+	return nil
+}
+
+type KnowledgeDiffusionResults struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// per-file diffusion data
+	Files map[string]*KnowledgeDiffusionFileData `protobuf:"bytes,1,rep,name=files,proto3" json:"files,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	// histogram: editor_count -> number_of_files
+	Distribution map[int32]int32 `protobuf:"bytes,2,rep,name=distribution,proto3" json:"distribution,omitempty" protobuf_key:"varint,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
+	// sliding window size in months for "recent" editors
+	WindowMonths int32 `protobuf:"varint,3,opt,name=window_months,json=windowMonths,proto3" json:"window_months,omitempty"`
+	// developer identities
+	DevIndex []string `protobuf:"bytes,4,rep,name=dev_index,json=devIndex,proto3" json:"dev_index,omitempty"`
+	// how long each tick is, as an int64 nanosecond count (Go's time.Duration)
+	TickSize      int64 `protobuf:"varint,5,opt,name=tick_size,json=tickSize,proto3" json:"tick_size,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *KnowledgeDiffusionResults) Reset() {
+	*x = KnowledgeDiffusionResults{}
+	mi := &file_pb_proto_msgTypes[38]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *KnowledgeDiffusionResults) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*KnowledgeDiffusionResults) ProtoMessage() {}
+
+func (x *KnowledgeDiffusionResults) ProtoReflect() protoreflect.Message {
+	mi := &file_pb_proto_msgTypes[38]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use KnowledgeDiffusionResults.ProtoReflect.Descriptor instead.
+func (*KnowledgeDiffusionResults) Descriptor() ([]byte, []int) {
+	return file_pb_proto_rawDescGZIP(), []int{38}
+}
+
+func (x *KnowledgeDiffusionResults) GetFiles() map[string]*KnowledgeDiffusionFileData {
+	if x != nil {
+		return x.Files
+	}
+	return nil
+}
+
+func (x *KnowledgeDiffusionResults) GetDistribution() map[int32]int32 {
+	if x != nil {
+		return x.Distribution
+	}
+	return nil
+}
+
+func (x *KnowledgeDiffusionResults) GetWindowMonths() int32 {
+	if x != nil {
+		return x.WindowMonths
+	}
+	return 0
+}
+
+func (x *KnowledgeDiffusionResults) GetDevIndex() []string {
+	if x != nil {
+		return x.DevIndex
+	}
+	return nil
+}
+
+func (x *KnowledgeDiffusionResults) GetTickSize() int64 {
+	if x != nil {
+		return x.TickSize
+	}
+	return 0
+}
+
+// Snapshot of onboarding metrics at a specific milestone
+type OnboardingSnapshot struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	DaysSinceJoin int32                  `protobuf:"varint,1,opt,name=days_since_join,json=daysSinceJoin,proto3" json:"days_since_join,omitempty"`
+	// All commits
+	TotalCommits int32 `protobuf:"varint,2,opt,name=total_commits,json=totalCommits,proto3" json:"total_commits,omitempty"`
+	TotalFiles   int32 `protobuf:"varint,3,opt,name=total_files,json=totalFiles,proto3" json:"total_files,omitempty"`
+	TotalLines   int32 `protobuf:"varint,4,opt,name=total_lines,json=totalLines,proto3" json:"total_lines,omitempty"`
+	// Meaningful commits only (>= threshold)
+	MeaningfulCommits int32 `protobuf:"varint,5,opt,name=meaningful_commits,json=meaningfulCommits,proto3" json:"meaningful_commits,omitempty"`
+	MeaningfulFiles   int32 `protobuf:"varint,6,opt,name=meaningful_files,json=meaningfulFiles,proto3" json:"meaningful_files,omitempty"`
+	MeaningfulLines   int32 `protobuf:"varint,7,opt,name=meaningful_lines,json=meaningfulLines,proto3" json:"meaningful_lines,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *OnboardingSnapshot) Reset() {
+	*x = OnboardingSnapshot{}
+	mi := &file_pb_proto_msgTypes[39]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *OnboardingSnapshot) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OnboardingSnapshot) ProtoMessage() {}
+
+func (x *OnboardingSnapshot) ProtoReflect() protoreflect.Message {
+	mi := &file_pb_proto_msgTypes[39]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OnboardingSnapshot.ProtoReflect.Descriptor instead.
+func (*OnboardingSnapshot) Descriptor() ([]byte, []int) {
+	return file_pb_proto_rawDescGZIP(), []int{39}
+}
+
+func (x *OnboardingSnapshot) GetDaysSinceJoin() int32 {
+	if x != nil {
+		return x.DaysSinceJoin
+	}
+	return 0
+}
+
+func (x *OnboardingSnapshot) GetTotalCommits() int32 {
+	if x != nil {
+		return x.TotalCommits
+	}
+	return 0
+}
+
+func (x *OnboardingSnapshot) GetTotalFiles() int32 {
+	if x != nil {
+		return x.TotalFiles
+	}
+	return 0
+}
+
+func (x *OnboardingSnapshot) GetTotalLines() int32 {
+	if x != nil {
+		return x.TotalLines
+	}
+	return 0
+}
+
+func (x *OnboardingSnapshot) GetMeaningfulCommits() int32 {
+	if x != nil {
+		return x.MeaningfulCommits
+	}
+	return 0
+}
+
+func (x *OnboardingSnapshot) GetMeaningfulFiles() int32 {
+	if x != nil {
+		return x.MeaningfulFiles
+	}
+	return 0
+}
+
+func (x *OnboardingSnapshot) GetMeaningfulLines() int32 {
+	if x != nil {
+		return x.MeaningfulLines
+	}
+	return 0
+}
+
+// Average snapshot of onboarding metrics (for cohort aggregates)
+type OnboardingAverageSnapshot struct {
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	DaysSinceJoin        int32                  `protobuf:"varint,1,opt,name=days_since_join,json=daysSinceJoin,proto3" json:"days_since_join,omitempty"`
+	AvgTotalCommits      float64                `protobuf:"fixed64,2,opt,name=avg_total_commits,json=avgTotalCommits,proto3" json:"avg_total_commits,omitempty"`
+	AvgTotalFiles        float64                `protobuf:"fixed64,3,opt,name=avg_total_files,json=avgTotalFiles,proto3" json:"avg_total_files,omitempty"`
+	AvgTotalLines        float64                `protobuf:"fixed64,4,opt,name=avg_total_lines,json=avgTotalLines,proto3" json:"avg_total_lines,omitempty"`
+	AvgMeaningfulCommits float64                `protobuf:"fixed64,5,opt,name=avg_meaningful_commits,json=avgMeaningfulCommits,proto3" json:"avg_meaningful_commits,omitempty"`
+	AvgMeaningfulFiles   float64                `protobuf:"fixed64,6,opt,name=avg_meaningful_files,json=avgMeaningfulFiles,proto3" json:"avg_meaningful_files,omitempty"`
+	AvgMeaningfulLines   float64                `protobuf:"fixed64,7,opt,name=avg_meaningful_lines,json=avgMeaningfulLines,proto3" json:"avg_meaningful_lines,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
+}
+
+func (x *OnboardingAverageSnapshot) Reset() {
+	*x = OnboardingAverageSnapshot{}
+	mi := &file_pb_proto_msgTypes[40]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *OnboardingAverageSnapshot) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OnboardingAverageSnapshot) ProtoMessage() {}
+
+func (x *OnboardingAverageSnapshot) ProtoReflect() protoreflect.Message {
+	mi := &file_pb_proto_msgTypes[40]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OnboardingAverageSnapshot.ProtoReflect.Descriptor instead.
+func (*OnboardingAverageSnapshot) Descriptor() ([]byte, []int) {
+	return file_pb_proto_rawDescGZIP(), []int{40}
+}
+
+func (x *OnboardingAverageSnapshot) GetDaysSinceJoin() int32 {
+	if x != nil {
+		return x.DaysSinceJoin
+	}
+	return 0
+}
+
+func (x *OnboardingAverageSnapshot) GetAvgTotalCommits() float64 {
+	if x != nil {
+		return x.AvgTotalCommits
+	}
+	return 0
+}
+
+func (x *OnboardingAverageSnapshot) GetAvgTotalFiles() float64 {
+	if x != nil {
+		return x.AvgTotalFiles
+	}
+	return 0
+}
+
+func (x *OnboardingAverageSnapshot) GetAvgTotalLines() float64 {
+	if x != nil {
+		return x.AvgTotalLines
+	}
+	return 0
+}
+
+func (x *OnboardingAverageSnapshot) GetAvgMeaningfulCommits() float64 {
+	if x != nil {
+		return x.AvgMeaningfulCommits
+	}
+	return 0
+}
+
+func (x *OnboardingAverageSnapshot) GetAvgMeaningfulFiles() float64 {
+	if x != nil {
+		return x.AvgMeaningfulFiles
+	}
+	return 0
+}
+
+func (x *OnboardingAverageSnapshot) GetAvgMeaningfulLines() float64 {
+	if x != nil {
+		return x.AvgMeaningfulLines
+	}
+	return 0
+}
+
+// Per-author onboarding progression data
+type AuthorOnboardingData struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	FirstCommitTick int32                  `protobuf:"varint,1,opt,name=first_commit_tick,json=firstCommitTick,proto3" json:"first_commit_tick,omitempty"`
+	JoinCohort      string                 `protobuf:"bytes,2,opt,name=join_cohort,json=joinCohort,proto3" json:"join_cohort,omitempty"` // "YYYY-MM" format
+	// Snapshots at configured window milestones (keyed by days)
+	Snapshots     map[int32]*OnboardingSnapshot `protobuf:"bytes,3,rep,name=snapshots,proto3" json:"snapshots,omitempty" protobuf_key:"varint,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AuthorOnboardingData) Reset() {
+	*x = AuthorOnboardingData{}
+	mi := &file_pb_proto_msgTypes[41]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AuthorOnboardingData) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AuthorOnboardingData) ProtoMessage() {}
+
+func (x *AuthorOnboardingData) ProtoReflect() protoreflect.Message {
+	mi := &file_pb_proto_msgTypes[41]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AuthorOnboardingData.ProtoReflect.Descriptor instead.
+func (*AuthorOnboardingData) Descriptor() ([]byte, []int) {
+	return file_pb_proto_rawDescGZIP(), []int{41}
+}
+
+func (x *AuthorOnboardingData) GetFirstCommitTick() int32 {
+	if x != nil {
+		return x.FirstCommitTick
+	}
+	return 0
+}
+
+func (x *AuthorOnboardingData) GetJoinCohort() string {
+	if x != nil {
+		return x.JoinCohort
+	}
+	return ""
+}
+
+func (x *AuthorOnboardingData) GetSnapshots() map[int32]*OnboardingSnapshot {
+	if x != nil {
+		return x.Snapshots
+	}
+	return nil
+}
+
+// Aggregated cohort statistics
+type CohortStats struct {
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Cohort      string                 `protobuf:"bytes,1,opt,name=cohort,proto3" json:"cohort,omitempty"` // "YYYY-MM"
+	AuthorCount int32                  `protobuf:"varint,2,opt,name=author_count,json=authorCount,proto3" json:"author_count,omitempty"`
+	// Average snapshots across cohort (keyed by days)
+	AverageSnapshots map[int32]*OnboardingAverageSnapshot `protobuf:"bytes,3,rep,name=average_snapshots,json=averageSnapshots,proto3" json:"average_snapshots,omitempty" protobuf_key:"varint,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *CohortStats) Reset() {
+	*x = CohortStats{}
+	mi := &file_pb_proto_msgTypes[42]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CohortStats) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CohortStats) ProtoMessage() {}
+
+func (x *CohortStats) ProtoReflect() protoreflect.Message {
+	mi := &file_pb_proto_msgTypes[42]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CohortStats.ProtoReflect.Descriptor instead.
+func (*CohortStats) Descriptor() ([]byte, []int) {
+	return file_pb_proto_rawDescGZIP(), []int{42}
+}
+
+func (x *CohortStats) GetCohort() string {
+	if x != nil {
+		return x.Cohort
+	}
+	return ""
+}
+
+func (x *CohortStats) GetAuthorCount() int32 {
+	if x != nil {
+		return x.AuthorCount
+	}
+	return 0
+}
+
+func (x *CohortStats) GetAverageSnapshots() map[int32]*OnboardingAverageSnapshot {
+	if x != nil {
+		return x.AverageSnapshots
+	}
+	return nil
+}
+
+// Top-level onboarding analysis results
+type OnboardingResults struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Per-author detailed data (keyed by author index)
+	Authors map[int32]*AuthorOnboardingData `protobuf:"bytes,1,rep,name=authors,proto3" json:"authors,omitempty" protobuf_key:"varint,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	// Cohort aggregates (keyed by "YYYY-MM")
+	Cohorts map[string]*CohortStats `protobuf:"bytes,2,rep,name=cohorts,proto3" json:"cohorts,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	// Configuration used
+	WindowDays          []int32 `protobuf:"varint,3,rep,packed,name=window_days,json=windowDays,proto3" json:"window_days,omitempty"`
+	MeaningfulThreshold int32   `protobuf:"varint,4,opt,name=meaningful_threshold,json=meaningfulThreshold,proto3" json:"meaningful_threshold,omitempty"`
+	// Developer identities
+	DevIndex []string `protobuf:"bytes,5,rep,name=dev_index,json=devIndex,proto3" json:"dev_index,omitempty"`
+	// Tick size as nanosecond count
+	TickSize      int64 `protobuf:"varint,6,opt,name=tick_size,json=tickSize,proto3" json:"tick_size,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *OnboardingResults) Reset() {
+	*x = OnboardingResults{}
+	mi := &file_pb_proto_msgTypes[43]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *OnboardingResults) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OnboardingResults) ProtoMessage() {}
+
+func (x *OnboardingResults) ProtoReflect() protoreflect.Message {
+	mi := &file_pb_proto_msgTypes[43]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OnboardingResults.ProtoReflect.Descriptor instead.
+func (*OnboardingResults) Descriptor() ([]byte, []int) {
+	return file_pb_proto_rawDescGZIP(), []int{43}
+}
+
+func (x *OnboardingResults) GetAuthors() map[int32]*AuthorOnboardingData {
+	if x != nil {
+		return x.Authors
+	}
+	return nil
+}
+
+func (x *OnboardingResults) GetCohorts() map[string]*CohortStats {
+	if x != nil {
+		return x.Cohorts
+	}
+	return nil
+}
+
+func (x *OnboardingResults) GetWindowDays() []int32 {
+	if x != nil {
+		return x.WindowDays
+	}
+	return nil
+}
+
+func (x *OnboardingResults) GetMeaningfulThreshold() int32 {
+	if x != nil {
+		return x.MeaningfulThreshold
+	}
+	return 0
+}
+
+func (x *OnboardingResults) GetDevIndex() []string {
+	if x != nil {
+		return x.DevIndex
+	}
+	return nil
+}
+
+func (x *OnboardingResults) GetTickSize() int64 {
+	if x != nil {
+		return x.TickSize
+	}
+	return 0
+}
+
+// Per-file risk assessment
+type FileRisk struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	Path                string                 `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
+	RiskScore           float64                `protobuf:"fixed64,2,opt,name=risk_score,json=riskScore,proto3" json:"risk_score,omitempty"`
+	Size                int32                  `protobuf:"varint,3,opt,name=size,proto3" json:"size,omitempty"`
+	Churn               int32                  `protobuf:"varint,4,opt,name=churn,proto3" json:"churn,omitempty"`
+	CouplingDegree      int32                  `protobuf:"varint,5,opt,name=coupling_degree,json=couplingDegree,proto3" json:"coupling_degree,omitempty"`
+	OwnershipGini       float64                `protobuf:"fixed64,6,opt,name=ownership_gini,json=ownershipGini,proto3" json:"ownership_gini,omitempty"`
+	SizeNormalized      float64                `protobuf:"fixed64,7,opt,name=size_normalized,json=sizeNormalized,proto3" json:"size_normalized,omitempty"`
+	ChurnNormalized     float64                `protobuf:"fixed64,8,opt,name=churn_normalized,json=churnNormalized,proto3" json:"churn_normalized,omitempty"`
+	CouplingNormalized  float64                `protobuf:"fixed64,9,opt,name=coupling_normalized,json=couplingNormalized,proto3" json:"coupling_normalized,omitempty"`
+	OwnershipNormalized float64                `protobuf:"fixed64,10,opt,name=ownership_normalized,json=ownershipNormalized,proto3" json:"ownership_normalized,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+func (x *FileRisk) Reset() {
+	*x = FileRisk{}
+	mi := &file_pb_proto_msgTypes[44]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FileRisk) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FileRisk) ProtoMessage() {}
+
+func (x *FileRisk) ProtoReflect() protoreflect.Message {
+	mi := &file_pb_proto_msgTypes[44]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FileRisk.ProtoReflect.Descriptor instead.
+func (*FileRisk) Descriptor() ([]byte, []int) {
+	return file_pb_proto_rawDescGZIP(), []int{44}
+}
+
+func (x *FileRisk) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *FileRisk) GetRiskScore() float64 {
+	if x != nil {
+		return x.RiskScore
+	}
+	return 0
+}
+
+func (x *FileRisk) GetSize() int32 {
+	if x != nil {
+		return x.Size
+	}
+	return 0
+}
+
+func (x *FileRisk) GetChurn() int32 {
+	if x != nil {
+		return x.Churn
+	}
+	return 0
+}
+
+func (x *FileRisk) GetCouplingDegree() int32 {
+	if x != nil {
+		return x.CouplingDegree
+	}
+	return 0
+}
+
+func (x *FileRisk) GetOwnershipGini() float64 {
+	if x != nil {
+		return x.OwnershipGini
+	}
+	return 0
+}
+
+func (x *FileRisk) GetSizeNormalized() float64 {
+	if x != nil {
+		return x.SizeNormalized
+	}
+	return 0
+}
+
+func (x *FileRisk) GetChurnNormalized() float64 {
+	if x != nil {
+		return x.ChurnNormalized
+	}
+	return 0
+}
+
+func (x *FileRisk) GetCouplingNormalized() float64 {
+	if x != nil {
+		return x.CouplingNormalized
+	}
+	return 0
+}
+
+func (x *FileRisk) GetOwnershipNormalized() float64 {
+	if x != nil {
+		return x.OwnershipNormalized
+	}
+	return 0
+}
+
+// Hotspot risk analysis results
+type HotspotRiskResults struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WindowDays    int32                  `protobuf:"varint,1,opt,name=window_days,json=windowDays,proto3" json:"window_days,omitempty"`
+	Files         []*FileRisk            `protobuf:"bytes,2,rep,name=files,proto3" json:"files,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HotspotRiskResults) Reset() {
+	*x = HotspotRiskResults{}
+	mi := &file_pb_proto_msgTypes[45]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HotspotRiskResults) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HotspotRiskResults) ProtoMessage() {}
+
+func (x *HotspotRiskResults) ProtoReflect() protoreflect.Message {
+	mi := &file_pb_proto_msgTypes[45]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HotspotRiskResults.ProtoReflect.Descriptor instead.
+func (*HotspotRiskResults) Descriptor() ([]byte, []int) {
+	return file_pb_proto_rawDescGZIP(), []int{45}
+}
+
+func (x *HotspotRiskResults) GetWindowDays() int32 {
+	if x != nil {
+		return x.WindowDays
+	}
+	return 0
+}
+
+func (x *HotspotRiskResults) GetFiles() []*FileRisk {
+	if x != nil {
+		return x.Files
+	}
+	return nil
+}
+
+type RefactoringProxyResults struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Ticks         []int32                `protobuf:"varint,1,rep,packed,name=ticks,proto3" json:"ticks,omitempty"`
+	RenameRatios  []float32              `protobuf:"fixed32,2,rep,packed,name=rename_ratios,json=renameRatios,proto3" json:"rename_ratios,omitempty"`
+	IsRefactoring []bool                 `protobuf:"varint,3,rep,packed,name=is_refactoring,json=isRefactoring,proto3" json:"is_refactoring,omitempty"`
+	TotalChanges  []int32                `protobuf:"varint,4,rep,packed,name=total_changes,json=totalChanges,proto3" json:"total_changes,omitempty"`
+	Threshold     float32                `protobuf:"fixed32,5,opt,name=threshold,proto3" json:"threshold,omitempty"`
+	TickSize      int64                  `protobuf:"varint,6,opt,name=tick_size,json=tickSize,proto3" json:"tick_size,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RefactoringProxyResults) Reset() {
+	*x = RefactoringProxyResults{}
+	mi := &file_pb_proto_msgTypes[46]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RefactoringProxyResults) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RefactoringProxyResults) ProtoMessage() {}
+
+func (x *RefactoringProxyResults) ProtoReflect() protoreflect.Message {
+	mi := &file_pb_proto_msgTypes[46]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RefactoringProxyResults.ProtoReflect.Descriptor instead.
+func (*RefactoringProxyResults) Descriptor() ([]byte, []int) {
+	return file_pb_proto_rawDescGZIP(), []int{46}
+}
+
+func (x *RefactoringProxyResults) GetTicks() []int32 {
+	if x != nil {
+		return x.Ticks
+	}
+	return nil
+}
+
+func (x *RefactoringProxyResults) GetRenameRatios() []float32 {
+	if x != nil {
+		return x.RenameRatios
+	}
+	return nil
+}
+
+func (x *RefactoringProxyResults) GetIsRefactoring() []bool {
+	if x != nil {
+		return x.IsRefactoring
+	}
+	return nil
+}
+
+func (x *RefactoringProxyResults) GetTotalChanges() []int32 {
+	if x != nil {
+		return x.TotalChanges
+	}
+	return nil
+}
+
+func (x *RefactoringProxyResults) GetThreshold() float32 {
+	if x != nil {
+		return x.Threshold
+	}
+	return 0
+}
+
+func (x *RefactoringProxyResults) GetTickSize() int64 {
+	if x != nil {
+		return x.TickSize
+	}
+	return 0
+}
+
+type CodeChurnSparseHistoryEntry struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	PreviousTick  int32                  `protobuf:"varint,1,opt,name=previous_tick,json=previousTick,proto3" json:"previous_tick,omitempty"`
+	Delta         int64                  `protobuf:"varint,2,opt,name=delta,proto3" json:"delta,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CodeChurnSparseHistoryEntry) Reset() {
+	*x = CodeChurnSparseHistoryEntry{}
+	mi := &file_pb_proto_msgTypes[47]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CodeChurnSparseHistoryEntry) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CodeChurnSparseHistoryEntry) ProtoMessage() {}
+
+func (x *CodeChurnSparseHistoryEntry) ProtoReflect() protoreflect.Message {
+	mi := &file_pb_proto_msgTypes[47]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CodeChurnSparseHistoryEntry.ProtoReflect.Descriptor instead.
+func (*CodeChurnSparseHistoryEntry) Descriptor() ([]byte, []int) {
+	return file_pb_proto_rawDescGZIP(), []int{47}
+}
+
+func (x *CodeChurnSparseHistoryEntry) GetPreviousTick() int32 {
+	if x != nil {
+		return x.PreviousTick
+	}
+	return 0
+}
+
+func (x *CodeChurnSparseHistoryEntry) GetDelta() int64 {
+	if x != nil {
+		return x.Delta
+	}
+	return 0
+}
+
+type CodeChurnDeleteHistory struct {
+	state         protoimpl.MessageState         `protogen:"open.v1"`
+	Author        int32                          `protobuf:"varint,1,opt,name=author,proto3" json:"author,omitempty"`
+	CurrentTick   int32                          `protobuf:"varint,2,opt,name=current_tick,json=currentTick,proto3" json:"current_tick,omitempty"`
+	Entries       []*CodeChurnSparseHistoryEntry `protobuf:"bytes,3,rep,name=entries,proto3" json:"entries,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CodeChurnDeleteHistory) Reset() {
+	*x = CodeChurnDeleteHistory{}
+	mi := &file_pb_proto_msgTypes[48]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CodeChurnDeleteHistory) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CodeChurnDeleteHistory) ProtoMessage() {}
+
+func (x *CodeChurnDeleteHistory) ProtoReflect() protoreflect.Message {
+	mi := &file_pb_proto_msgTypes[48]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CodeChurnDeleteHistory.ProtoReflect.Descriptor instead.
+func (*CodeChurnDeleteHistory) Descriptor() ([]byte, []int) {
+	return file_pb_proto_rawDescGZIP(), []int{48}
+}
+
+func (x *CodeChurnDeleteHistory) GetAuthor() int32 {
+	if x != nil {
+		return x.Author
+	}
+	return 0
+}
+
+func (x *CodeChurnDeleteHistory) GetCurrentTick() int32 {
+	if x != nil {
+		return x.CurrentTick
+	}
+	return 0
+}
+
+func (x *CodeChurnDeleteHistory) GetEntries() []*CodeChurnSparseHistoryEntry {
+	if x != nil {
+		return x.Entries
+	}
+	return nil
+}
+
+type CodeChurnFileStat struct {
+	state         protoimpl.MessageState    `protogen:"open.v1"`
+	File          string                    `protobuf:"bytes,1,opt,name=file,proto3" json:"file,omitempty"`
+	InsertedLines int32                     `protobuf:"varint,2,opt,name=inserted_lines,json=insertedLines,proto3" json:"inserted_lines,omitempty"`
+	OwnedLines    int32                     `protobuf:"varint,3,opt,name=owned_lines,json=ownedLines,proto3" json:"owned_lines,omitempty"`
+	Memorability  float32                   `protobuf:"fixed32,4,opt,name=memorability,proto3" json:"memorability,omitempty"`
+	Awareness     float32                   `protobuf:"fixed32,5,opt,name=awareness,proto3" json:"awareness,omitempty"`
+	DeleteHistory []*CodeChurnDeleteHistory `protobuf:"bytes,6,rep,name=delete_history,json=deleteHistory,proto3" json:"delete_history,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CodeChurnFileStat) Reset() {
+	*x = CodeChurnFileStat{}
+	mi := &file_pb_proto_msgTypes[49]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CodeChurnFileStat) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CodeChurnFileStat) ProtoMessage() {}
+
+func (x *CodeChurnFileStat) ProtoReflect() protoreflect.Message {
+	mi := &file_pb_proto_msgTypes[49]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CodeChurnFileStat.ProtoReflect.Descriptor instead.
+func (*CodeChurnFileStat) Descriptor() ([]byte, []int) {
+	return file_pb_proto_rawDescGZIP(), []int{49}
+}
+
+func (x *CodeChurnFileStat) GetFile() string {
+	if x != nil {
+		return x.File
+	}
+	return ""
+}
+
+func (x *CodeChurnFileStat) GetInsertedLines() int32 {
+	if x != nil {
+		return x.InsertedLines
+	}
+	return 0
+}
+
+func (x *CodeChurnFileStat) GetOwnedLines() int32 {
+	if x != nil {
+		return x.OwnedLines
+	}
+	return 0
+}
+
+func (x *CodeChurnFileStat) GetMemorability() float32 {
+	if x != nil {
+		return x.Memorability
+	}
+	return 0
+}
+
+func (x *CodeChurnFileStat) GetAwareness() float32 {
+	if x != nil {
+		return x.Awareness
+	}
+	return 0
+}
+
+func (x *CodeChurnFileStat) GetDeleteHistory() []*CodeChurnDeleteHistory {
+	if x != nil {
+		return x.DeleteHistory
+	}
+	return nil
+}
+
+type CodeChurnAuthorStat struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Files         []*CodeChurnFileStat   `protobuf:"bytes,1,rep,name=files,proto3" json:"files,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CodeChurnAuthorStat) Reset() {
+	*x = CodeChurnAuthorStat{}
+	mi := &file_pb_proto_msgTypes[50]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CodeChurnAuthorStat) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CodeChurnAuthorStat) ProtoMessage() {}
+
+func (x *CodeChurnAuthorStat) ProtoReflect() protoreflect.Message {
+	mi := &file_pb_proto_msgTypes[50]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CodeChurnAuthorStat.ProtoReflect.Descriptor instead.
+func (*CodeChurnAuthorStat) Descriptor() ([]byte, []int) {
+	return file_pb_proto_rawDescGZIP(), []int{50}
+}
+
+func (x *CodeChurnAuthorStat) GetFiles() []*CodeChurnFileStat {
+	if x != nil {
+		return x.Files
+	}
+	return nil
+}
+
+type CodeChurnAnalysisResults struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Granularity   int32                  `protobuf:"varint,1,opt,name=granularity,proto3" json:"granularity,omitempty"`
+	Sampling      int32                  `protobuf:"varint,2,opt,name=sampling,proto3" json:"sampling,omitempty"`
+	TickSize      int64                  `protobuf:"varint,3,opt,name=tick_size,json=tickSize,proto3" json:"tick_size,omitempty"`
+	People        []string               `protobuf:"bytes,4,rep,name=people,proto3" json:"people,omitempty"`
+	Authors       []*CodeChurnAuthorStat `protobuf:"bytes,5,rep,name=authors,proto3" json:"authors,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CodeChurnAnalysisResults) Reset() {
+	*x = CodeChurnAnalysisResults{}
+	mi := &file_pb_proto_msgTypes[51]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CodeChurnAnalysisResults) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CodeChurnAnalysisResults) ProtoMessage() {}
+
+func (x *CodeChurnAnalysisResults) ProtoReflect() protoreflect.Message {
+	mi := &file_pb_proto_msgTypes[51]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CodeChurnAnalysisResults.ProtoReflect.Descriptor instead.
+func (*CodeChurnAnalysisResults) Descriptor() ([]byte, []int) {
+	return file_pb_proto_rawDescGZIP(), []int{51}
+}
+
+func (x *CodeChurnAnalysisResults) GetGranularity() int32 {
+	if x != nil {
+		return x.Granularity
+	}
+	return 0
+}
+
+func (x *CodeChurnAnalysisResults) GetSampling() int32 {
+	if x != nil {
+		return x.Sampling
+	}
+	return 0
+}
+
+func (x *CodeChurnAnalysisResults) GetTickSize() int64 {
+	if x != nil {
+		return x.TickSize
+	}
+	return 0
+}
+
+func (x *CodeChurnAnalysisResults) GetPeople() []string {
+	if x != nil {
+		return x.People
+	}
+	return nil
+}
+
+func (x *CodeChurnAnalysisResults) GetAuthors() []*CodeChurnAuthorStat {
+	if x != nil {
+		return x.Authors
+	}
+	return nil
+}
+
+type AnalysisResults struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	Header *Metadata              `protobuf:"bytes,1,opt,name=header,proto3" json:"header,omitempty"`
+	// the mapped values are dynamic messages which require the second parsing pass.
+	Contents         map[string][]byte        `protobuf:"bytes,2,rep,name=contents,proto3" json:"contents,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	RefactoringProxy *RefactoringProxyResults `protobuf:"bytes,3,opt,name=refactoring_proxy,json=refactoringProxy,proto3" json:"refactoring_proxy,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
 func (x *AnalysisResults) Reset() {
 	*x = AnalysisResults{}
-	mi := &file_pb_proto_msgTypes[17]
+	mi := &file_pb_proto_msgTypes[52]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1163,7 +3469,7 @@ func (x *AnalysisResults) String() string {
 func (*AnalysisResults) ProtoMessage() {}
 
 func (x *AnalysisResults) ProtoReflect() protoreflect.Message {
-	mi := &file_pb_proto_msgTypes[17]
+	mi := &file_pb_proto_msgTypes[52]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1176,7 +3482,7 @@ func (x *AnalysisResults) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AnalysisResults.ProtoReflect.Descriptor instead.
 func (*AnalysisResults) Descriptor() ([]byte, []int) {
-	return file_pb_proto_rawDescGZIP(), []int{17}
+	return file_pb_proto_rawDescGZIP(), []int{52}
 }
 
 func (x *AnalysisResults) GetHeader() *Metadata {
@@ -1193,39 +3499,18 @@ func (x *AnalysisResults) GetContents() map[string][]byte {
 	return nil
 }
 
+func (x *AnalysisResults) GetRefactoringProxy() *RefactoringProxyResults {
+	if x != nil {
+		return x.RefactoringProxy
+	}
+	return nil
+}
+
 var File_pb_proto protoreflect.FileDescriptor
 
 const file_pb_proto_rawDesc = "" +
 	"\n" +
-	"\bpb.proto\x12\x02pb\"3\n" +
-	"\x17BurndownSparseMatrixRow\x12\x18\n" +
-	"\acolumns\x18\x01 \x03(\rR\acolumns\"\xad\x01\n" +
-	"\x14BurndownSparseMatrix\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\x12$\n" +
-	"\x0enumber_of_rows\x18\x02 \x01(\x05R\fnumberOfRows\x12*\n" +
-	"\x11number_of_columns\x18\x03 \x01(\x05R\x0fnumberOfColumns\x12/\n" +
-	"\x04rows\x18\x04 \x03(\v2\x1b.pb.BurndownSparseMatrixRowR\x04rows\"\x95\x03\n" +
-	"\x17BurndownAnalysisResults\x12 \n" +
-	"\vgranularity\x18\x01 \x01(\x05R\vgranularity\x12\x1a\n" +
-	"\bsampling\x18\x02 \x01(\x05R\bsampling\x122\n" +
-	"\aproject\x18\x03 \x01(\v2\x18.pb.BurndownSparseMatrixR\aproject\x12.\n" +
-	"\x05files\x18\x04 \x03(\v2\x18.pb.BurndownSparseMatrixR\x05files\x120\n" +
-	"\x06people\x18\x05 \x03(\v2\x18.pb.BurndownSparseMatrixR\x06people\x12L\n" +
-	"\x12people_interaction\x18\x06 \x01(\v2\x1d.pb.CompressedSparseRowMatrixR\x11peopleInteraction\x12;\n" +
-	"\x0ffiles_ownership\x18\a \x03(\v2\x12.pb.FilesOwnershipR\x0efilesOwnership\x12\x1b\n" +
-	"\ttick_size\x18\b \x01(\x03R\btickSize\"\xb3\x01\n" +
-	"\x19CompressedSparseRowMatrix\x12$\n" +
-	"\x0enumber_of_rows\x18\x01 \x01(\x05R\fnumberOfRows\x12*\n" +
-	"\x11number_of_columns\x18\x02 \x01(\x05R\x0fnumberOfColumns\x12\x12\n" +
-	"\x04data\x18\x03 \x03(\x03R\x04data\x12\x18\n" +
-	"\aindices\x18\x04 \x03(\x05R\aindices\x12\x16\n" +
-	"\x06indptr\x18\x05 \x03(\x03R\x06indptr\"\x7f\n" +
-	"\x0eFilesOwnership\x123\n" +
-	"\x05value\x18\x01 \x03(\v2\x1d.pb.FilesOwnership.ValueEntryR\x05value\x1a8\n" +
-	"\n" +
-	"ValueEntry\x12\x10\n" +
-	"\x03key\x18\x01 \x01(\x05R\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\"\xe9\x02\n" +
+	"\bpb.proto\x12\x02pb\"\xe9\x02\n" +
 	"\bMetadata\x12\x18\n" +
 	"\aversion\x18\x01 \x01(\x05R\aversion\x12\x12\n" +
 	"\x04hash\x18\x02 \x01(\tR\x04hash\x12\x1e\n" +
@@ -1239,7 +3524,38 @@ const file_pb_proto_rawDesc = "" +
 	"\x11run_time_per_item\x18\b \x03(\v2 .pb.Metadata.RunTimePerItemEntryR\x0erunTimePerItem\x1aA\n" +
 	"\x13RunTimePerItemEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\x01R\x05value:\x028\x01\"V\n" +
+	"\x05value\x18\x02 \x01(\x01R\x05value:\x028\x01\"3\n" +
+	"\x17BurndownSparseMatrixRow\x12\x18\n" +
+	"\acolumns\x18\x01 \x03(\rR\acolumns\"\xad\x01\n" +
+	"\x14BurndownSparseMatrix\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12$\n" +
+	"\x0enumber_of_rows\x18\x02 \x01(\x05R\fnumberOfRows\x12*\n" +
+	"\x11number_of_columns\x18\x03 \x01(\x05R\x0fnumberOfColumns\x12/\n" +
+	"\x04rows\x18\x04 \x03(\v2\x1b.pb.BurndownSparseMatrixRowR\x04rows\"\x7f\n" +
+	"\x0eFilesOwnership\x123\n" +
+	"\x05value\x18\x01 \x03(\v2\x1d.pb.FilesOwnership.ValueEntryR\x05value\x1a8\n" +
+	"\n" +
+	"ValueEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\x05R\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\"\x84\x04\n" +
+	"\x17BurndownAnalysisResults\x12 \n" +
+	"\vgranularity\x18\x01 \x01(\x05R\vgranularity\x12\x1a\n" +
+	"\bsampling\x18\x02 \x01(\x05R\bsampling\x122\n" +
+	"\aproject\x18\x03 \x01(\v2\x18.pb.BurndownSparseMatrixR\aproject\x12.\n" +
+	"\x05files\x18\x04 \x03(\v2\x18.pb.BurndownSparseMatrixR\x05files\x120\n" +
+	"\x06people\x18\x05 \x03(\v2\x18.pb.BurndownSparseMatrixR\x06people\x12L\n" +
+	"\x12people_interaction\x18\x06 \x01(\v2\x1d.pb.CompressedSparseRowMatrixR\x11peopleInteraction\x12;\n" +
+	"\x0ffiles_ownership\x18\a \x03(\v2\x12.pb.FilesOwnershipR\x0efilesOwnership\x12\x1b\n" +
+	"\ttick_size\x18\b \x01(\x03R\btickSize\x12/\n" +
+	"\x13repository_sequence\x18\t \x03(\tR\x12repositorySequence\x12<\n" +
+	"\frepositories\x18\n" +
+	" \x03(\v2\x18.pb.BurndownSparseMatrixR\frepositories\"\xb3\x01\n" +
+	"\x19CompressedSparseRowMatrix\x12$\n" +
+	"\x0enumber_of_rows\x18\x01 \x01(\x05R\fnumberOfRows\x12*\n" +
+	"\x11number_of_columns\x18\x02 \x01(\x05R\x0fnumberOfColumns\x12\x12\n" +
+	"\x04data\x18\x03 \x03(\x03R\x04data\x12\x18\n" +
+	"\aindices\x18\x04 \x03(\x05R\aindices\x12\x16\n" +
+	"\x06indptr\x18\x05 \x03(\x03R\x06indptr\"V\n" +
 	"\aCouples\x12\x14\n" +
 	"\x05index\x18\x01 \x03(\tR\x05index\x125\n" +
 	"\x06matrix\x18\x02 \x01(\v2\x1d.pb.CompressedSparseRowMatrixR\x06matrix\"$\n" +
@@ -1250,22 +3566,29 @@ const file_pb_proto_rawDesc = "" +
 	"\x0epeople_couples\x18\a \x01(\v2\v.pb.CouplesR\rpeopleCouples\x123\n" +
 	"\fpeople_files\x18\b \x03(\v2\x10.pb.TouchedFilesR\vpeopleFiles\x12\x1f\n" +
 	"\vfiles_lines\x18\t \x03(\x05R\n" +
-	"filesLines\"\xcd\x02\n" +
-	"\rDeveloperStat\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\x12\x18\n" +
-	"\acommits\x18\x02 \x01(\x05R\acommits\x12\x1f\n" +
-	"\vlines_added\x18\x03 \x01(\x03R\n" +
-	"linesAdded\x12#\n" +
-	"\rlines_removed\x18\x04 \x01(\x03R\flinesRemoved\x12%\n" +
-	"\x0elines_modified\x18\x05 \x01(\x03R\rlinesModified\x12#\n" +
-	"\rfiles_touched\x18\x06 \x01(\x05R\ffilesTouched\x12>\n" +
-	"\tlanguages\x18\a \x03(\v2 .pb.DeveloperStat.LanguagesEntryR\tlanguages\x1a<\n" +
-	"\x0eLanguagesEntry\x12\x10\n" +
-	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\"@\n" +
-	"\fLanguageStat\x12\x1a\n" +
-	"\blanguage\x18\x01 \x01(\tR\blanguage\x12\x14\n" +
-	"\x05lines\x18\x02 \x01(\x03R\x05lines\"U\n" +
+	"filesLines\"\xc7\x01\n" +
+	"\x0eShotnessRecord\x12\x12\n" +
+	"\x04type\x18\x01 \x01(\tR\x04type\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x12\n" +
+	"\x04file\x18\x03 \x01(\tR\x04file\x12<\n" +
+	"\bcounters\x18\x04 \x03(\v2 .pb.ShotnessRecord.CountersEntryR\bcounters\x1a;\n" +
+	"\rCountersEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\x05R\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\"G\n" +
+	"\x17ShotnessAnalysisResults\x12,\n" +
+	"\arecords\x18\x01 \x03(\v2\x12.pb.ShotnessRecordR\arecords\"\xd8\x01\n" +
+	"\vFileHistory\x12\x18\n" +
+	"\acommits\x18\x01 \x03(\tR\acommits\x12Y\n" +
+	"\x14changes_by_developer\x18\x02 \x03(\v2'.pb.FileHistory.ChangesByDeveloperEntryR\x12changesByDeveloper\x1aT\n" +
+	"\x17ChangesByDeveloperEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\x05R\x03key\x12#\n" +
+	"\x05value\x18\x02 \x01(\v2\r.pb.LineStatsR\x05value:\x028\x01\"\xa4\x01\n" +
+	"\x18FileHistoryResultMessage\x12=\n" +
+	"\x05files\x18\x01 \x03(\v2'.pb.FileHistoryResultMessage.FilesEntryR\x05files\x1aI\n" +
+	"\n" +
+	"FilesEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12%\n" +
+	"\x05value\x18\x02 \x01(\v2\x0f.pb.FileHistoryR\x05value:\x028\x01\"U\n" +
 	"\tLineStats\x12\x14\n" +
 	"\x05added\x18\x01 \x01(\x05R\x05added\x12\x18\n" +
 	"\aremoved\x18\x02 \x01(\x05R\aremoved\x12\x18\n" +
@@ -1289,20 +3612,256 @@ const file_pb_proto_rawDesc = "" +
 	"\n" +
 	"TicksEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\x05R\x03key\x12\"\n" +
-	"\x05value\x18\x02 \x01(\v2\f.pb.TickDevsR\x05value:\x028\x01\"\xc7\x01\n" +
-	"\x0eShotnessRecord\x12\x12\n" +
-	"\x04type\x18\x01 \x01(\tR\x04type\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\x12\x12\n" +
-	"\x04file\x18\x03 \x01(\tR\x04file\x12<\n" +
-	"\bcounters\x18\x04 \x03(\v2 .pb.ShotnessRecord.CountersEntryR\bcounters\x1a;\n" +
-	"\rCountersEntry\x12\x10\n" +
+	"\x05value\x18\x02 \x01(\v2\f.pb.TickDevsR\x05value:\x028\x01\"W\n" +
+	"\tSentiment\x12\x14\n" +
+	"\x05value\x18\x01 \x01(\x02R\x05value\x12\x1a\n" +
+	"\bcomments\x18\x02 \x03(\tR\bcomments\x12\x18\n" +
+	"\acommits\x18\x03 \x03(\tR\acommits\"\xca\x01\n" +
+	"\x17CommentSentimentResults\x12\\\n" +
+	"\x11sentiment_by_tick\x18\x01 \x03(\v20.pb.CommentSentimentResults.SentimentByTickEntryR\x0fsentimentByTick\x1aQ\n" +
+	"\x14SentimentByTickEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\x05R\x03key\x12#\n" +
+	"\x05value\x18\x02 \x01(\v2\r.pb.SentimentR\x05value:\x028\x01\"a\n" +
+	"\n" +
+	"CommitFile\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1a\n" +
+	"\blanguage\x18\x03 \x01(\tR\blanguage\x12#\n" +
+	"\x05stats\x18\x04 \x01(\v2\r.pb.LineStatsR\x05stats\"\x80\x01\n" +
+	"\x06Commit\x12\x12\n" +
+	"\x04hash\x18\x01 \x01(\tR\x04hash\x12$\n" +
+	"\x0ewhen_unix_time\x18\x02 \x01(\x03R\fwhenUnixTime\x12\x16\n" +
+	"\x06author\x18\x03 \x01(\x05R\x06author\x12$\n" +
+	"\x05files\x18\x04 \x03(\v2\x0e.pb.CommitFileR\x05files\"a\n" +
+	"\x16CommitsAnalysisResults\x12$\n" +
+	"\acommits\x18\x01 \x03(\v2\n" +
+	".pb.CommitR\acommits\x12!\n" +
+	"\fauthor_index\x18\x02 \x03(\tR\vauthorIndex\"v\n" +
+	"\x04Typo\x12\x14\n" +
+	"\x05wrong\x18\x01 \x01(\tR\x05wrong\x12\x18\n" +
+	"\acorrect\x18\x02 \x01(\tR\acorrect\x12\x16\n" +
+	"\x06commit\x18\x03 \x01(\tR\x06commit\x12\x12\n" +
+	"\x04file\x18\x04 \x01(\tR\x04file\x12\x12\n" +
+	"\x04line\x18\x05 \x01(\x05R\x04line\".\n" +
+	"\fTyposDataset\x12\x1e\n" +
+	"\x05typos\x18\x01 \x03(\v2\b.pb.TypoR\x05typos\"\x83\x01\n" +
+	"\x0eImportsPerTick\x126\n" +
+	"\x06counts\x18\x01 \x03(\v2\x1e.pb.ImportsPerTick.CountsEntryR\x06counts\x1a9\n" +
+	"\vCountsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\x05R\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\"G\n" +
-	"\x17ShotnessAnalysisResults\x12,\n" +
-	"\arecords\x18\x01 \x03(\v2\x12.pb.ShotnessRecordR\arecords\"\xb3\x01\n" +
+	"\x05value\x18\x02 \x01(\x03R\x05value:\x028\x01\"\x9b\x01\n" +
+	"\x12ImportsPerLanguage\x127\n" +
+	"\x05ticks\x18\x01 \x03(\v2!.pb.ImportsPerLanguage.TicksEntryR\x05ticks\x1aL\n" +
+	"\n" +
+	"TicksEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12(\n" +
+	"\x05value\x18\x02 \x01(\v2\x12.pb.ImportsPerTickR\x05value:\x028\x01\"\xb1\x01\n" +
+	"\x13ImportsPerDeveloper\x12D\n" +
+	"\tlanguages\x18\x01 \x03(\v2&.pb.ImportsPerDeveloper.LanguagesEntryR\tlanguages\x1aT\n" +
+	"\x0eLanguagesEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12,\n" +
+	"\x05value\x18\x02 \x01(\v2\x16.pb.ImportsPerLanguageR\x05value:\x028\x01\"\x8f\x01\n" +
+	"\x1aImportsPerDeveloperResults\x121\n" +
+	"\aimports\x18\x01 \x03(\v2\x17.pb.ImportsPerDeveloperR\aimports\x12!\n" +
+	"\fauthor_index\x18\x02 \x03(\tR\vauthorIndex\x12\x1b\n" +
+	"\ttick_size\x18\x03 \x01(\x03R\btickSize\"C\n" +
+	"\x11TemporalDimension\x12\x18\n" +
+	"\acommits\x18\x01 \x03(\x05R\acommits\x12\x14\n" +
+	"\x05lines\x18\x02 \x03(\x05R\x05lines\"\xd7\x01\n" +
+	"\x19DeveloperTemporalActivity\x121\n" +
+	"\bweekdays\x18\x01 \x01(\v2\x15.pb.TemporalDimensionR\bweekdays\x12+\n" +
+	"\x05hours\x18\x02 \x01(\v2\x15.pb.TemporalDimensionR\x05hours\x12-\n" +
+	"\x06months\x18\x03 \x01(\v2\x15.pb.TemporalDimensionR\x06months\x12+\n" +
+	"\x05weeks\x18\x04 \x01(\v2\x15.pb.TemporalDimensionR\x05weeks\"\x9e\x01\n" +
+	"\x14TemporalActivityTick\x12\x18\n" +
+	"\acommits\x18\x01 \x01(\x05R\acommits\x12\x14\n" +
+	"\x05lines\x18\x02 \x01(\x05R\x05lines\x12\x18\n" +
+	"\aweekday\x18\x03 \x01(\x05R\aweekday\x12\x12\n" +
+	"\x04hour\x18\x04 \x01(\x05R\x04hour\x12\x14\n" +
+	"\x05month\x18\x05 \x01(\x05R\x05month\x12\x12\n" +
+	"\x04week\x18\x06 \x01(\x05R\x04week\"\xa9\x01\n" +
+	"\x18TemporalActivityTickDevs\x12:\n" +
+	"\x04devs\x18\x01 \x03(\v2&.pb.TemporalActivityTickDevs.DevsEntryR\x04devs\x1aQ\n" +
+	"\tDevsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\x05R\x03key\x12.\n" +
+	"\x05value\x18\x02 \x01(\v2\x18.pb.TemporalActivityTickR\x05value:\x028\x01\"\x94\x03\n" +
+	"\x17TemporalActivityResults\x12K\n" +
+	"\n" +
+	"activities\x18\x01 \x03(\v2+.pb.TemporalActivityResults.ActivitiesEntryR\n" +
+	"activities\x12\x1b\n" +
+	"\tdev_index\x18\x02 \x03(\tR\bdevIndex\x12<\n" +
+	"\x05ticks\x18\x03 \x03(\v2&.pb.TemporalActivityResults.TicksEntryR\x05ticks\x12\x1b\n" +
+	"\ttick_size\x18\x04 \x01(\x03R\btickSize\x1a\\\n" +
+	"\x0fActivitiesEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\x05R\x03key\x123\n" +
+	"\x05value\x18\x02 \x01(\v2\x1d.pb.DeveloperTemporalActivityR\x05value:\x028\x01\x1aV\n" +
+	"\n" +
+	"TicksEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\x05R\x03key\x122\n" +
+	"\x05value\x18\x02 \x01(\v2\x1c.pb.TemporalActivityTickDevsR\x05value:\x028\x01\"\xe6\x01\n" +
+	"\x15BusFactorTickSnapshot\x12\x1d\n" +
+	"\n" +
+	"bus_factor\x18\x01 \x01(\x05R\tbusFactor\x12\x1f\n" +
+	"\vtotal_lines\x18\x02 \x01(\x03R\n" +
+	"totalLines\x12M\n" +
+	"\fauthor_lines\x18\x03 \x03(\v2*.pb.BusFactorTickSnapshot.AuthorLinesEntryR\vauthorLines\x1a>\n" +
+	"\x10AuthorLinesEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\x05R\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\x03R\x05value:\x028\x01\"\xc5\x03\n" +
+	"\x18BusFactorAnalysisResults\x12I\n" +
+	"\tsnapshots\x18\x01 \x03(\v2+.pb.BusFactorAnalysisResults.SnapshotsEntryR\tsnapshots\x12f\n" +
+	"\x14subsystem_bus_factor\x18\x02 \x03(\v24.pb.BusFactorAnalysisResults.SubsystemBusFactorEntryR\x12subsystemBusFactor\x12\x1b\n" +
+	"\tdev_index\x18\x03 \x03(\tR\bdevIndex\x12\x1b\n" +
+	"\ttick_size\x18\x04 \x01(\x03R\btickSize\x12\x1c\n" +
+	"\tthreshold\x18\x05 \x01(\x02R\tthreshold\x1aW\n" +
+	"\x0eSnapshotsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\x05R\x03key\x12/\n" +
+	"\x05value\x18\x02 \x01(\v2\x19.pb.BusFactorTickSnapshotR\x05value:\x028\x01\x1aE\n" +
+	"\x17SubsystemBusFactorEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\"\x87\x02\n" +
+	"\"OwnershipConcentrationTickSnapshot\x12\x12\n" +
+	"\x04gini\x18\x01 \x01(\x01R\x04gini\x12\x10\n" +
+	"\x03hhi\x18\x02 \x01(\x01R\x03hhi\x12\x1f\n" +
+	"\vtotal_lines\x18\x03 \x01(\x03R\n" +
+	"totalLines\x12Z\n" +
+	"\fauthor_lines\x18\x04 \x03(\v27.pb.OwnershipConcentrationTickSnapshot.AuthorLinesEntryR\vauthorLines\x1a>\n" +
+	"\x10AuthorLinesEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\x05R\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\x03R\x05value:\x028\x01\"\xc9\x04\n" +
+	"\x1dOwnershipConcentrationResults\x12N\n" +
+	"\tsnapshots\x18\x01 \x03(\v20.pb.OwnershipConcentrationResults.SnapshotsEntryR\tsnapshots\x12[\n" +
+	"\x0esubsystem_gini\x18\x02 \x03(\v24.pb.OwnershipConcentrationResults.SubsystemGiniEntryR\rsubsystemGini\x12X\n" +
+	"\rsubsystem_hhi\x18\x05 \x03(\v23.pb.OwnershipConcentrationResults.SubsystemHhiEntryR\fsubsystemHhi\x12\x1b\n" +
+	"\tdev_index\x18\x03 \x03(\tR\bdevIndex\x12\x1b\n" +
+	"\ttick_size\x18\x04 \x01(\x03R\btickSize\x1ad\n" +
+	"\x0eSnapshotsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\x05R\x03key\x12<\n" +
+	"\x05value\x18\x02 \x01(\v2&.pb.OwnershipConcentrationTickSnapshotR\x05value:\x028\x01\x1a@\n" +
+	"\x12SubsystemGiniEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\x01R\x05value:\x028\x01\x1a?\n" +
+	"\x11SubsystemHhiEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\x01R\x05value:\x028\x01\"\xd8\x02\n" +
+	"\x1aKnowledgeDiffusionFileData\x120\n" +
+	"\x14unique_editors_count\x18\x01 \x01(\x05R\x12uniqueEditorsCount\x12r\n" +
+	"\x18unique_editors_over_time\x18\x02 \x03(\v29.pb.KnowledgeDiffusionFileData.UniqueEditorsOverTimeEntryR\x15uniqueEditorsOverTime\x120\n" +
+	"\x14recent_editors_count\x18\x03 \x01(\x05R\x12recentEditorsCount\x12\x18\n" +
+	"\aauthors\x18\x04 \x03(\x05R\aauthors\x1aH\n" +
+	"\x1aUniqueEditorsOverTimeEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\x05R\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\"\xaa\x03\n" +
+	"\x19KnowledgeDiffusionResults\x12>\n" +
+	"\x05files\x18\x01 \x03(\v2(.pb.KnowledgeDiffusionResults.FilesEntryR\x05files\x12S\n" +
+	"\fdistribution\x18\x02 \x03(\v2/.pb.KnowledgeDiffusionResults.DistributionEntryR\fdistribution\x12#\n" +
+	"\rwindow_months\x18\x03 \x01(\x05R\fwindowMonths\x12\x1b\n" +
+	"\tdev_index\x18\x04 \x03(\tR\bdevIndex\x12\x1b\n" +
+	"\ttick_size\x18\x05 \x01(\x03R\btickSize\x1aX\n" +
+	"\n" +
+	"FilesEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x124\n" +
+	"\x05value\x18\x02 \x01(\v2\x1e.pb.KnowledgeDiffusionFileDataR\x05value:\x028\x01\x1a?\n" +
+	"\x11DistributionEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\x05R\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\"\xa8\x02\n" +
+	"\x12OnboardingSnapshot\x12&\n" +
+	"\x0fdays_since_join\x18\x01 \x01(\x05R\rdaysSinceJoin\x12#\n" +
+	"\rtotal_commits\x18\x02 \x01(\x05R\ftotalCommits\x12\x1f\n" +
+	"\vtotal_files\x18\x03 \x01(\x05R\n" +
+	"totalFiles\x12\x1f\n" +
+	"\vtotal_lines\x18\x04 \x01(\x05R\n" +
+	"totalLines\x12-\n" +
+	"\x12meaningful_commits\x18\x05 \x01(\x05R\x11meaningfulCommits\x12)\n" +
+	"\x10meaningful_files\x18\x06 \x01(\x05R\x0fmeaningfulFiles\x12)\n" +
+	"\x10meaningful_lines\x18\a \x01(\x05R\x0fmeaningfulLines\"\xd9\x02\n" +
+	"\x19OnboardingAverageSnapshot\x12&\n" +
+	"\x0fdays_since_join\x18\x01 \x01(\x05R\rdaysSinceJoin\x12*\n" +
+	"\x11avg_total_commits\x18\x02 \x01(\x01R\x0favgTotalCommits\x12&\n" +
+	"\x0favg_total_files\x18\x03 \x01(\x01R\ravgTotalFiles\x12&\n" +
+	"\x0favg_total_lines\x18\x04 \x01(\x01R\ravgTotalLines\x124\n" +
+	"\x16avg_meaningful_commits\x18\x05 \x01(\x01R\x14avgMeaningfulCommits\x120\n" +
+	"\x14avg_meaningful_files\x18\x06 \x01(\x01R\x12avgMeaningfulFiles\x120\n" +
+	"\x14avg_meaningful_lines\x18\a \x01(\x01R\x12avgMeaningfulLines\"\x80\x02\n" +
+	"\x14AuthorOnboardingData\x12*\n" +
+	"\x11first_commit_tick\x18\x01 \x01(\x05R\x0ffirstCommitTick\x12\x1f\n" +
+	"\vjoin_cohort\x18\x02 \x01(\tR\n" +
+	"joinCohort\x12E\n" +
+	"\tsnapshots\x18\x03 \x03(\v2'.pb.AuthorOnboardingData.SnapshotsEntryR\tsnapshots\x1aT\n" +
+	"\x0eSnapshotsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\x05R\x03key\x12,\n" +
+	"\x05value\x18\x02 \x01(\v2\x16.pb.OnboardingSnapshotR\x05value:\x028\x01\"\x80\x02\n" +
+	"\vCohortStats\x12\x16\n" +
+	"\x06cohort\x18\x01 \x01(\tR\x06cohort\x12!\n" +
+	"\fauthor_count\x18\x02 \x01(\x05R\vauthorCount\x12R\n" +
+	"\x11average_snapshots\x18\x03 \x03(\v2%.pb.CohortStats.AverageSnapshotsEntryR\x10averageSnapshots\x1ab\n" +
+	"\x15AverageSnapshotsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\x05R\x03key\x123\n" +
+	"\x05value\x18\x02 \x01(\v2\x1d.pb.OnboardingAverageSnapshotR\x05value:\x028\x01\"\xc0\x03\n" +
+	"\x11OnboardingResults\x12<\n" +
+	"\aauthors\x18\x01 \x03(\v2\".pb.OnboardingResults.AuthorsEntryR\aauthors\x12<\n" +
+	"\acohorts\x18\x02 \x03(\v2\".pb.OnboardingResults.CohortsEntryR\acohorts\x12\x1f\n" +
+	"\vwindow_days\x18\x03 \x03(\x05R\n" +
+	"windowDays\x121\n" +
+	"\x14meaningful_threshold\x18\x04 \x01(\x05R\x13meaningfulThreshold\x12\x1b\n" +
+	"\tdev_index\x18\x05 \x03(\tR\bdevIndex\x12\x1b\n" +
+	"\ttick_size\x18\x06 \x01(\x03R\btickSize\x1aT\n" +
+	"\fAuthorsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\x05R\x03key\x12.\n" +
+	"\x05value\x18\x02 \x01(\v2\x18.pb.AuthorOnboardingDataR\x05value:\x028\x01\x1aK\n" +
+	"\fCohortsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12%\n" +
+	"\x05value\x18\x02 \x01(\v2\x0f.pb.CohortStatsR\x05value:\x028\x01\"\xef\x02\n" +
+	"\bFileRisk\x12\x12\n" +
+	"\x04path\x18\x01 \x01(\tR\x04path\x12\x1d\n" +
+	"\n" +
+	"risk_score\x18\x02 \x01(\x01R\triskScore\x12\x12\n" +
+	"\x04size\x18\x03 \x01(\x05R\x04size\x12\x14\n" +
+	"\x05churn\x18\x04 \x01(\x05R\x05churn\x12'\n" +
+	"\x0fcoupling_degree\x18\x05 \x01(\x05R\x0ecouplingDegree\x12%\n" +
+	"\x0eownership_gini\x18\x06 \x01(\x01R\rownershipGini\x12'\n" +
+	"\x0fsize_normalized\x18\a \x01(\x01R\x0esizeNormalized\x12)\n" +
+	"\x10churn_normalized\x18\b \x01(\x01R\x0fchurnNormalized\x12/\n" +
+	"\x13coupling_normalized\x18\t \x01(\x01R\x12couplingNormalized\x121\n" +
+	"\x14ownership_normalized\x18\n" +
+	" \x01(\x01R\x13ownershipNormalized\"Y\n" +
+	"\x12HotspotRiskResults\x12\x1f\n" +
+	"\vwindow_days\x18\x01 \x01(\x05R\n" +
+	"windowDays\x12\"\n" +
+	"\x05files\x18\x02 \x03(\v2\f.pb.FileRiskR\x05files\"\xdb\x01\n" +
+	"\x17RefactoringProxyResults\x12\x14\n" +
+	"\x05ticks\x18\x01 \x03(\x05R\x05ticks\x12#\n" +
+	"\rrename_ratios\x18\x02 \x03(\x02R\frenameRatios\x12%\n" +
+	"\x0eis_refactoring\x18\x03 \x03(\bR\risRefactoring\x12#\n" +
+	"\rtotal_changes\x18\x04 \x03(\x05R\ftotalChanges\x12\x1c\n" +
+	"\tthreshold\x18\x05 \x01(\x02R\tthreshold\x12\x1b\n" +
+	"\ttick_size\x18\x06 \x01(\x03R\btickSize\"X\n" +
+	"\x1bCodeChurnSparseHistoryEntry\x12#\n" +
+	"\rprevious_tick\x18\x01 \x01(\x05R\fpreviousTick\x12\x14\n" +
+	"\x05delta\x18\x02 \x01(\x03R\x05delta\"\x8e\x01\n" +
+	"\x16CodeChurnDeleteHistory\x12\x16\n" +
+	"\x06author\x18\x01 \x01(\x05R\x06author\x12!\n" +
+	"\fcurrent_tick\x18\x02 \x01(\x05R\vcurrentTick\x129\n" +
+	"\aentries\x18\x03 \x03(\v2\x1f.pb.CodeChurnSparseHistoryEntryR\aentries\"\xf4\x01\n" +
+	"\x11CodeChurnFileStat\x12\x12\n" +
+	"\x04file\x18\x01 \x01(\tR\x04file\x12%\n" +
+	"\x0einserted_lines\x18\x02 \x01(\x05R\rinsertedLines\x12\x1f\n" +
+	"\vowned_lines\x18\x03 \x01(\x05R\n" +
+	"ownedLines\x12\"\n" +
+	"\fmemorability\x18\x04 \x01(\x02R\fmemorability\x12\x1c\n" +
+	"\tawareness\x18\x05 \x01(\x02R\tawareness\x12A\n" +
+	"\x0edelete_history\x18\x06 \x03(\v2\x1a.pb.CodeChurnDeleteHistoryR\rdeleteHistory\"B\n" +
+	"\x13CodeChurnAuthorStat\x12+\n" +
+	"\x05files\x18\x01 \x03(\v2\x15.pb.CodeChurnFileStatR\x05files\"\xc0\x01\n" +
+	"\x18CodeChurnAnalysisResults\x12 \n" +
+	"\vgranularity\x18\x01 \x01(\x05R\vgranularity\x12\x1a\n" +
+	"\bsampling\x18\x02 \x01(\x05R\bsampling\x12\x1b\n" +
+	"\ttick_size\x18\x03 \x01(\x03R\btickSize\x12\x16\n" +
+	"\x06people\x18\x04 \x03(\tR\x06people\x121\n" +
+	"\aauthors\x18\x05 \x03(\v2\x17.pb.CodeChurnAuthorStatR\aauthors\"\xfd\x01\n" +
 	"\x0fAnalysisResults\x12$\n" +
 	"\x06header\x18\x01 \x01(\v2\f.pb.MetadataR\x06header\x12=\n" +
-	"\bcontents\x18\x02 \x03(\v2!.pb.AnalysisResults.ContentsEntryR\bcontents\x1a;\n" +
+	"\bcontents\x18\x02 \x03(\v2!.pb.AnalysisResults.ContentsEntryR\bcontents\x12H\n" +
+	"\x11refactoring_proxy\x18\x03 \x01(\v2\x1b.pb.RefactoringProxyResultsR\x10refactoringProxy\x1a;\n" +
 	"\rContentsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\fR\x05value:\x028\x01B\x18Z\x16labours-go/internal/pbb\x06proto3"
@@ -1319,65 +3878,175 @@ func file_pb_proto_rawDescGZIP() []byte {
 	return file_pb_proto_rawDescData
 }
 
-var file_pb_proto_msgTypes = make([]protoimpl.MessageInfo, 26)
+var file_pb_proto_msgTypes = make([]protoimpl.MessageInfo, 83)
 var file_pb_proto_goTypes = []any{
-	(*BurndownSparseMatrixRow)(nil),   // 0: pb.BurndownSparseMatrixRow
-	(*BurndownSparseMatrix)(nil),      // 1: pb.BurndownSparseMatrix
-	(*BurndownAnalysisResults)(nil),   // 2: pb.BurndownAnalysisResults
-	(*CompressedSparseRowMatrix)(nil), // 3: pb.CompressedSparseRowMatrix
-	(*FilesOwnership)(nil),            // 4: pb.FilesOwnership
-	(*Metadata)(nil),                  // 5: pb.Metadata
-	(*Couples)(nil),                   // 6: pb.Couples
-	(*TouchedFiles)(nil),              // 7: pb.TouchedFiles
-	(*CouplesAnalysisResults)(nil),    // 8: pb.CouplesAnalysisResults
-	(*DeveloperStat)(nil),             // 9: pb.DeveloperStat
-	(*LanguageStat)(nil),              // 10: pb.LanguageStat
-	(*LineStats)(nil),                 // 11: pb.LineStats
-	(*DevTick)(nil),                   // 12: pb.DevTick
-	(*TickDevs)(nil),                  // 13: pb.TickDevs
-	(*DevsAnalysisResults)(nil),       // 14: pb.DevsAnalysisResults
-	(*ShotnessRecord)(nil),            // 15: pb.ShotnessRecord
-	(*ShotnessAnalysisResults)(nil),   // 16: pb.ShotnessAnalysisResults
-	(*AnalysisResults)(nil),           // 17: pb.AnalysisResults
-	nil,                               // 18: pb.FilesOwnership.ValueEntry
-	nil,                               // 19: pb.Metadata.RunTimePerItemEntry
-	nil,                               // 20: pb.DeveloperStat.LanguagesEntry
-	nil,                               // 21: pb.DevTick.LanguagesEntry
-	nil,                               // 22: pb.TickDevs.DevsEntry
-	nil,                               // 23: pb.DevsAnalysisResults.TicksEntry
-	nil,                               // 24: pb.ShotnessRecord.CountersEntry
-	nil,                               // 25: pb.AnalysisResults.ContentsEntry
+	(*Metadata)(nil),                           // 0: pb.Metadata
+	(*BurndownSparseMatrixRow)(nil),            // 1: pb.BurndownSparseMatrixRow
+	(*BurndownSparseMatrix)(nil),               // 2: pb.BurndownSparseMatrix
+	(*FilesOwnership)(nil),                     // 3: pb.FilesOwnership
+	(*BurndownAnalysisResults)(nil),            // 4: pb.BurndownAnalysisResults
+	(*CompressedSparseRowMatrix)(nil),          // 5: pb.CompressedSparseRowMatrix
+	(*Couples)(nil),                            // 6: pb.Couples
+	(*TouchedFiles)(nil),                       // 7: pb.TouchedFiles
+	(*CouplesAnalysisResults)(nil),             // 8: pb.CouplesAnalysisResults
+	(*ShotnessRecord)(nil),                     // 9: pb.ShotnessRecord
+	(*ShotnessAnalysisResults)(nil),            // 10: pb.ShotnessAnalysisResults
+	(*FileHistory)(nil),                        // 11: pb.FileHistory
+	(*FileHistoryResultMessage)(nil),           // 12: pb.FileHistoryResultMessage
+	(*LineStats)(nil),                          // 13: pb.LineStats
+	(*DevTick)(nil),                            // 14: pb.DevTick
+	(*TickDevs)(nil),                           // 15: pb.TickDevs
+	(*DevsAnalysisResults)(nil),                // 16: pb.DevsAnalysisResults
+	(*Sentiment)(nil),                          // 17: pb.Sentiment
+	(*CommentSentimentResults)(nil),            // 18: pb.CommentSentimentResults
+	(*CommitFile)(nil),                         // 19: pb.CommitFile
+	(*Commit)(nil),                             // 20: pb.Commit
+	(*CommitsAnalysisResults)(nil),             // 21: pb.CommitsAnalysisResults
+	(*Typo)(nil),                               // 22: pb.Typo
+	(*TyposDataset)(nil),                       // 23: pb.TyposDataset
+	(*ImportsPerTick)(nil),                     // 24: pb.ImportsPerTick
+	(*ImportsPerLanguage)(nil),                 // 25: pb.ImportsPerLanguage
+	(*ImportsPerDeveloper)(nil),                // 26: pb.ImportsPerDeveloper
+	(*ImportsPerDeveloperResults)(nil),         // 27: pb.ImportsPerDeveloperResults
+	(*TemporalDimension)(nil),                  // 28: pb.TemporalDimension
+	(*DeveloperTemporalActivity)(nil),          // 29: pb.DeveloperTemporalActivity
+	(*TemporalActivityTick)(nil),               // 30: pb.TemporalActivityTick
+	(*TemporalActivityTickDevs)(nil),           // 31: pb.TemporalActivityTickDevs
+	(*TemporalActivityResults)(nil),            // 32: pb.TemporalActivityResults
+	(*BusFactorTickSnapshot)(nil),              // 33: pb.BusFactorTickSnapshot
+	(*BusFactorAnalysisResults)(nil),           // 34: pb.BusFactorAnalysisResults
+	(*OwnershipConcentrationTickSnapshot)(nil), // 35: pb.OwnershipConcentrationTickSnapshot
+	(*OwnershipConcentrationResults)(nil),      // 36: pb.OwnershipConcentrationResults
+	(*KnowledgeDiffusionFileData)(nil),         // 37: pb.KnowledgeDiffusionFileData
+	(*KnowledgeDiffusionResults)(nil),          // 38: pb.KnowledgeDiffusionResults
+	(*OnboardingSnapshot)(nil),                 // 39: pb.OnboardingSnapshot
+	(*OnboardingAverageSnapshot)(nil),          // 40: pb.OnboardingAverageSnapshot
+	(*AuthorOnboardingData)(nil),               // 41: pb.AuthorOnboardingData
+	(*CohortStats)(nil),                        // 42: pb.CohortStats
+	(*OnboardingResults)(nil),                  // 43: pb.OnboardingResults
+	(*FileRisk)(nil),                           // 44: pb.FileRisk
+	(*HotspotRiskResults)(nil),                 // 45: pb.HotspotRiskResults
+	(*RefactoringProxyResults)(nil),            // 46: pb.RefactoringProxyResults
+	(*CodeChurnSparseHistoryEntry)(nil),        // 47: pb.CodeChurnSparseHistoryEntry
+	(*CodeChurnDeleteHistory)(nil),             // 48: pb.CodeChurnDeleteHistory
+	(*CodeChurnFileStat)(nil),                  // 49: pb.CodeChurnFileStat
+	(*CodeChurnAuthorStat)(nil),                // 50: pb.CodeChurnAuthorStat
+	(*CodeChurnAnalysisResults)(nil),           // 51: pb.CodeChurnAnalysisResults
+	(*AnalysisResults)(nil),                    // 52: pb.AnalysisResults
+	nil,                                        // 53: pb.Metadata.RunTimePerItemEntry
+	nil,                                        // 54: pb.FilesOwnership.ValueEntry
+	nil,                                        // 55: pb.ShotnessRecord.CountersEntry
+	nil,                                        // 56: pb.FileHistory.ChangesByDeveloperEntry
+	nil,                                        // 57: pb.FileHistoryResultMessage.FilesEntry
+	nil,                                        // 58: pb.DevTick.LanguagesEntry
+	nil,                                        // 59: pb.TickDevs.DevsEntry
+	nil,                                        // 60: pb.DevsAnalysisResults.TicksEntry
+	nil,                                        // 61: pb.CommentSentimentResults.SentimentByTickEntry
+	nil,                                        // 62: pb.ImportsPerTick.CountsEntry
+	nil,                                        // 63: pb.ImportsPerLanguage.TicksEntry
+	nil,                                        // 64: pb.ImportsPerDeveloper.LanguagesEntry
+	nil,                                        // 65: pb.TemporalActivityTickDevs.DevsEntry
+	nil,                                        // 66: pb.TemporalActivityResults.ActivitiesEntry
+	nil,                                        // 67: pb.TemporalActivityResults.TicksEntry
+	nil,                                        // 68: pb.BusFactorTickSnapshot.AuthorLinesEntry
+	nil,                                        // 69: pb.BusFactorAnalysisResults.SnapshotsEntry
+	nil,                                        // 70: pb.BusFactorAnalysisResults.SubsystemBusFactorEntry
+	nil,                                        // 71: pb.OwnershipConcentrationTickSnapshot.AuthorLinesEntry
+	nil,                                        // 72: pb.OwnershipConcentrationResults.SnapshotsEntry
+	nil,                                        // 73: pb.OwnershipConcentrationResults.SubsystemGiniEntry
+	nil,                                        // 74: pb.OwnershipConcentrationResults.SubsystemHhiEntry
+	nil,                                        // 75: pb.KnowledgeDiffusionFileData.UniqueEditorsOverTimeEntry
+	nil,                                        // 76: pb.KnowledgeDiffusionResults.FilesEntry
+	nil,                                        // 77: pb.KnowledgeDiffusionResults.DistributionEntry
+	nil,                                        // 78: pb.AuthorOnboardingData.SnapshotsEntry
+	nil,                                        // 79: pb.CohortStats.AverageSnapshotsEntry
+	nil,                                        // 80: pb.OnboardingResults.AuthorsEntry
+	nil,                                        // 81: pb.OnboardingResults.CohortsEntry
+	nil,                                        // 82: pb.AnalysisResults.ContentsEntry
 }
 var file_pb_proto_depIdxs = []int32{
-	0,  // 0: pb.BurndownSparseMatrix.rows:type_name -> pb.BurndownSparseMatrixRow
-	1,  // 1: pb.BurndownAnalysisResults.project:type_name -> pb.BurndownSparseMatrix
-	1,  // 2: pb.BurndownAnalysisResults.files:type_name -> pb.BurndownSparseMatrix
-	1,  // 3: pb.BurndownAnalysisResults.people:type_name -> pb.BurndownSparseMatrix
-	3,  // 4: pb.BurndownAnalysisResults.people_interaction:type_name -> pb.CompressedSparseRowMatrix
-	4,  // 5: pb.BurndownAnalysisResults.files_ownership:type_name -> pb.FilesOwnership
-	18, // 6: pb.FilesOwnership.value:type_name -> pb.FilesOwnership.ValueEntry
-	19, // 7: pb.Metadata.run_time_per_item:type_name -> pb.Metadata.RunTimePerItemEntry
-	3,  // 8: pb.Couples.matrix:type_name -> pb.CompressedSparseRowMatrix
-	6,  // 9: pb.CouplesAnalysisResults.file_couples:type_name -> pb.Couples
-	6,  // 10: pb.CouplesAnalysisResults.people_couples:type_name -> pb.Couples
-	7,  // 11: pb.CouplesAnalysisResults.people_files:type_name -> pb.TouchedFiles
-	20, // 12: pb.DeveloperStat.languages:type_name -> pb.DeveloperStat.LanguagesEntry
-	11, // 13: pb.DevTick.stats:type_name -> pb.LineStats
-	21, // 14: pb.DevTick.languages:type_name -> pb.DevTick.LanguagesEntry
-	22, // 15: pb.TickDevs.devs:type_name -> pb.TickDevs.DevsEntry
-	23, // 16: pb.DevsAnalysisResults.ticks:type_name -> pb.DevsAnalysisResults.TicksEntry
-	24, // 17: pb.ShotnessRecord.counters:type_name -> pb.ShotnessRecord.CountersEntry
-	15, // 18: pb.ShotnessAnalysisResults.records:type_name -> pb.ShotnessRecord
-	5,  // 19: pb.AnalysisResults.header:type_name -> pb.Metadata
-	25, // 20: pb.AnalysisResults.contents:type_name -> pb.AnalysisResults.ContentsEntry
-	11, // 21: pb.DevTick.LanguagesEntry.value:type_name -> pb.LineStats
-	12, // 22: pb.TickDevs.DevsEntry.value:type_name -> pb.DevTick
-	13, // 23: pb.DevsAnalysisResults.TicksEntry.value:type_name -> pb.TickDevs
-	24, // [24:24] is the sub-list for method output_type
-	24, // [24:24] is the sub-list for method input_type
-	24, // [24:24] is the sub-list for extension type_name
-	24, // [24:24] is the sub-list for extension extendee
-	0,  // [0:24] is the sub-list for field type_name
+	53, // 0: pb.Metadata.run_time_per_item:type_name -> pb.Metadata.RunTimePerItemEntry
+	1,  // 1: pb.BurndownSparseMatrix.rows:type_name -> pb.BurndownSparseMatrixRow
+	54, // 2: pb.FilesOwnership.value:type_name -> pb.FilesOwnership.ValueEntry
+	2,  // 3: pb.BurndownAnalysisResults.project:type_name -> pb.BurndownSparseMatrix
+	2,  // 4: pb.BurndownAnalysisResults.files:type_name -> pb.BurndownSparseMatrix
+	2,  // 5: pb.BurndownAnalysisResults.people:type_name -> pb.BurndownSparseMatrix
+	5,  // 6: pb.BurndownAnalysisResults.people_interaction:type_name -> pb.CompressedSparseRowMatrix
+	3,  // 7: pb.BurndownAnalysisResults.files_ownership:type_name -> pb.FilesOwnership
+	2,  // 8: pb.BurndownAnalysisResults.repositories:type_name -> pb.BurndownSparseMatrix
+	5,  // 9: pb.Couples.matrix:type_name -> pb.CompressedSparseRowMatrix
+	6,  // 10: pb.CouplesAnalysisResults.file_couples:type_name -> pb.Couples
+	6,  // 11: pb.CouplesAnalysisResults.people_couples:type_name -> pb.Couples
+	7,  // 12: pb.CouplesAnalysisResults.people_files:type_name -> pb.TouchedFiles
+	55, // 13: pb.ShotnessRecord.counters:type_name -> pb.ShotnessRecord.CountersEntry
+	9,  // 14: pb.ShotnessAnalysisResults.records:type_name -> pb.ShotnessRecord
+	56, // 15: pb.FileHistory.changes_by_developer:type_name -> pb.FileHistory.ChangesByDeveloperEntry
+	57, // 16: pb.FileHistoryResultMessage.files:type_name -> pb.FileHistoryResultMessage.FilesEntry
+	13, // 17: pb.DevTick.stats:type_name -> pb.LineStats
+	58, // 18: pb.DevTick.languages:type_name -> pb.DevTick.LanguagesEntry
+	59, // 19: pb.TickDevs.devs:type_name -> pb.TickDevs.DevsEntry
+	60, // 20: pb.DevsAnalysisResults.ticks:type_name -> pb.DevsAnalysisResults.TicksEntry
+	61, // 21: pb.CommentSentimentResults.sentiment_by_tick:type_name -> pb.CommentSentimentResults.SentimentByTickEntry
+	13, // 22: pb.CommitFile.stats:type_name -> pb.LineStats
+	19, // 23: pb.Commit.files:type_name -> pb.CommitFile
+	20, // 24: pb.CommitsAnalysisResults.commits:type_name -> pb.Commit
+	22, // 25: pb.TyposDataset.typos:type_name -> pb.Typo
+	62, // 26: pb.ImportsPerTick.counts:type_name -> pb.ImportsPerTick.CountsEntry
+	63, // 27: pb.ImportsPerLanguage.ticks:type_name -> pb.ImportsPerLanguage.TicksEntry
+	64, // 28: pb.ImportsPerDeveloper.languages:type_name -> pb.ImportsPerDeveloper.LanguagesEntry
+	26, // 29: pb.ImportsPerDeveloperResults.imports:type_name -> pb.ImportsPerDeveloper
+	28, // 30: pb.DeveloperTemporalActivity.weekdays:type_name -> pb.TemporalDimension
+	28, // 31: pb.DeveloperTemporalActivity.hours:type_name -> pb.TemporalDimension
+	28, // 32: pb.DeveloperTemporalActivity.months:type_name -> pb.TemporalDimension
+	28, // 33: pb.DeveloperTemporalActivity.weeks:type_name -> pb.TemporalDimension
+	65, // 34: pb.TemporalActivityTickDevs.devs:type_name -> pb.TemporalActivityTickDevs.DevsEntry
+	66, // 35: pb.TemporalActivityResults.activities:type_name -> pb.TemporalActivityResults.ActivitiesEntry
+	67, // 36: pb.TemporalActivityResults.ticks:type_name -> pb.TemporalActivityResults.TicksEntry
+	68, // 37: pb.BusFactorTickSnapshot.author_lines:type_name -> pb.BusFactorTickSnapshot.AuthorLinesEntry
+	69, // 38: pb.BusFactorAnalysisResults.snapshots:type_name -> pb.BusFactorAnalysisResults.SnapshotsEntry
+	70, // 39: pb.BusFactorAnalysisResults.subsystem_bus_factor:type_name -> pb.BusFactorAnalysisResults.SubsystemBusFactorEntry
+	71, // 40: pb.OwnershipConcentrationTickSnapshot.author_lines:type_name -> pb.OwnershipConcentrationTickSnapshot.AuthorLinesEntry
+	72, // 41: pb.OwnershipConcentrationResults.snapshots:type_name -> pb.OwnershipConcentrationResults.SnapshotsEntry
+	73, // 42: pb.OwnershipConcentrationResults.subsystem_gini:type_name -> pb.OwnershipConcentrationResults.SubsystemGiniEntry
+	74, // 43: pb.OwnershipConcentrationResults.subsystem_hhi:type_name -> pb.OwnershipConcentrationResults.SubsystemHhiEntry
+	75, // 44: pb.KnowledgeDiffusionFileData.unique_editors_over_time:type_name -> pb.KnowledgeDiffusionFileData.UniqueEditorsOverTimeEntry
+	76, // 45: pb.KnowledgeDiffusionResults.files:type_name -> pb.KnowledgeDiffusionResults.FilesEntry
+	77, // 46: pb.KnowledgeDiffusionResults.distribution:type_name -> pb.KnowledgeDiffusionResults.DistributionEntry
+	78, // 47: pb.AuthorOnboardingData.snapshots:type_name -> pb.AuthorOnboardingData.SnapshotsEntry
+	79, // 48: pb.CohortStats.average_snapshots:type_name -> pb.CohortStats.AverageSnapshotsEntry
+	80, // 49: pb.OnboardingResults.authors:type_name -> pb.OnboardingResults.AuthorsEntry
+	81, // 50: pb.OnboardingResults.cohorts:type_name -> pb.OnboardingResults.CohortsEntry
+	44, // 51: pb.HotspotRiskResults.files:type_name -> pb.FileRisk
+	47, // 52: pb.CodeChurnDeleteHistory.entries:type_name -> pb.CodeChurnSparseHistoryEntry
+	48, // 53: pb.CodeChurnFileStat.delete_history:type_name -> pb.CodeChurnDeleteHistory
+	49, // 54: pb.CodeChurnAuthorStat.files:type_name -> pb.CodeChurnFileStat
+	50, // 55: pb.CodeChurnAnalysisResults.authors:type_name -> pb.CodeChurnAuthorStat
+	0,  // 56: pb.AnalysisResults.header:type_name -> pb.Metadata
+	82, // 57: pb.AnalysisResults.contents:type_name -> pb.AnalysisResults.ContentsEntry
+	46, // 58: pb.AnalysisResults.refactoring_proxy:type_name -> pb.RefactoringProxyResults
+	13, // 59: pb.FileHistory.ChangesByDeveloperEntry.value:type_name -> pb.LineStats
+	11, // 60: pb.FileHistoryResultMessage.FilesEntry.value:type_name -> pb.FileHistory
+	13, // 61: pb.DevTick.LanguagesEntry.value:type_name -> pb.LineStats
+	14, // 62: pb.TickDevs.DevsEntry.value:type_name -> pb.DevTick
+	15, // 63: pb.DevsAnalysisResults.TicksEntry.value:type_name -> pb.TickDevs
+	17, // 64: pb.CommentSentimentResults.SentimentByTickEntry.value:type_name -> pb.Sentiment
+	24, // 65: pb.ImportsPerLanguage.TicksEntry.value:type_name -> pb.ImportsPerTick
+	25, // 66: pb.ImportsPerDeveloper.LanguagesEntry.value:type_name -> pb.ImportsPerLanguage
+	30, // 67: pb.TemporalActivityTickDevs.DevsEntry.value:type_name -> pb.TemporalActivityTick
+	29, // 68: pb.TemporalActivityResults.ActivitiesEntry.value:type_name -> pb.DeveloperTemporalActivity
+	31, // 69: pb.TemporalActivityResults.TicksEntry.value:type_name -> pb.TemporalActivityTickDevs
+	33, // 70: pb.BusFactorAnalysisResults.SnapshotsEntry.value:type_name -> pb.BusFactorTickSnapshot
+	35, // 71: pb.OwnershipConcentrationResults.SnapshotsEntry.value:type_name -> pb.OwnershipConcentrationTickSnapshot
+	37, // 72: pb.KnowledgeDiffusionResults.FilesEntry.value:type_name -> pb.KnowledgeDiffusionFileData
+	39, // 73: pb.AuthorOnboardingData.SnapshotsEntry.value:type_name -> pb.OnboardingSnapshot
+	40, // 74: pb.CohortStats.AverageSnapshotsEntry.value:type_name -> pb.OnboardingAverageSnapshot
+	41, // 75: pb.OnboardingResults.AuthorsEntry.value:type_name -> pb.AuthorOnboardingData
+	42, // 76: pb.OnboardingResults.CohortsEntry.value:type_name -> pb.CohortStats
+	77, // [77:77] is the sub-list for method output_type
+	77, // [77:77] is the sub-list for method input_type
+	77, // [77:77] is the sub-list for extension type_name
+	77, // [77:77] is the sub-list for extension extendee
+	0,  // [0:77] is the sub-list for field type_name
 }
 
 func init() { file_pb_proto_init() }
@@ -1391,7 +4060,7 @@ func file_pb_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_pb_proto_rawDesc), len(file_pb_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   26,
+			NumMessages:   83,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
