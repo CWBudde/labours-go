@@ -98,6 +98,23 @@ func TestExecuteModesPrintsPythonMissingDataWarning(t *testing.T) {
 	}
 }
 
+func TestExecuteModesPrintsDevsParallelPeopleBurndownWarning(t *testing.T) {
+	previousQuiet := viper.GetBool("quiet")
+	defer viper.Set("quiet", previousQuiet)
+	viper.Set("quiet", true)
+
+	output := captureStdout(t, func() {
+		executeModes([]string{"devs-parallel"}, cliTestReader{}, filepath.Join(t.TempDir(), "devs-parallel.png"), nil, nil)
+	})
+
+	if !strings.Contains(output, "devs-parallel: Burndown stats for people were not collected. Re-run hercules with --burndown --burndown-people.") {
+		t.Fatalf("missing devs-parallel people burndown warning in output: %q", output)
+	}
+	if strings.Contains(output, "Error in mode devs-parallel") {
+		t.Fatalf("missing data should not be reported as hard mode error: %q", output)
+	}
+}
+
 func TestExecuteModesJSONWritesReaderData(t *testing.T) {
 	previousQuiet := viper.GetBool("quiet")
 	defer viper.Set("quiet", previousQuiet)

@@ -201,19 +201,19 @@ func TestGetPythonPlotSizeUsesMatplotlibDPI(t *testing.T) {
 
 	viper.Set("size", "")
 	width, height := GetPythonPlotSize(16, 12)
-	if got, want := int(width), 1600; got != want {
+	if got, want := int(width), 1200; got != want {
 		t.Fatalf("default width = %d, want %d", got, want)
 	}
-	if got, want := int(height), 1200; got != want {
+	if got, want := int(height), 900; got != want {
 		t.Fatalf("default height = %d, want %d", got, want)
 	}
 
 	viper.Set("size", "12,9")
 	width, height = GetPythonPlotSize(16, 12)
-	if got, want := int(width), 1200; got != want {
+	if got, want := int(width), 900; got != want {
 		t.Fatalf("custom width = %d, want %d", got, want)
 	}
-	if got, want := int(height), 900; got != want {
+	if got, want := int(height), 675; got != want {
 		t.Fatalf("custom height = %d, want %d", got, want)
 	}
 }

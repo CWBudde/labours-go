@@ -4,12 +4,15 @@ import (
 	"fmt"
 	"image/color"
 	"math"
+	"os"
 	"time"
 
 	"github.com/spf13/viper"
 	"gonum.org/v1/plot"
 	"gonum.org/v1/plot/plotter"
 	"gonum.org/v1/plot/vg"
+	vgdraw "gonum.org/v1/plot/vg/draw"
+	"gonum.org/v1/plot/vg/vgimg"
 	"labours-go/internal/progress"
 	"path/filepath"
 	"strings"
@@ -24,7 +27,7 @@ func PlotStackedBurndown(matrix [][]float64, dateRange []time.Time, output strin
 	// Initialize progress tracking for chart generation
 	quiet := viper.GetBool("quiet")
 	progEstimator := progress.NewProgressEstimator(!quiet)
-	
+
 	// Start multi-phase chart generation
 	totalPhases := 4 // setup, data processing, plotting, saving
 	progEstimator.StartMultiOperation(totalPhases, "Chart Generation")
@@ -38,7 +41,7 @@ func PlotStackedBurndown(matrix [][]float64, dateRange []time.Time, output strin
 	if relative {
 		p.Y.Label.Text = "Relative Fraction"
 	}
-	
+
 	// Apply theme styling
 	applyThemeToPlot(p)
 
@@ -59,7 +62,7 @@ func PlotStackedBurndown(matrix [][]float64, dateRange []time.Time, output strin
 
 	// Phase 2: Data processing
 	progEstimator.NextOperation("Processing chart data")
-	
+
 	// Convert dates to float64 for plotting (Unix timestamps)
 	timeValues := make([]float64, numPoints)
 	for i, date := range dateRange {
@@ -122,7 +125,7 @@ func PlotStackedBurndown(matrix [][]float64, dateRange []time.Time, output strin
 
 	// Phase 4: Saving chart
 	progEstimator.NextOperation("Saving chart")
-	
+
 	width, height := GetPlotSize(ChartTypeDefault)
 	if err := SavePlotWithFormat(p, width, height, output); err != nil {
 		progEstimator.FinishMultiOperation()
@@ -187,7 +190,7 @@ func generateColorPaletteFromTheme(n int) []color.Color {
 
 	themePalette := CurrentTheme.GetColorPalette()
 	opacity := uint8(float64(255) * CurrentTheme.Chart.FillOpacity)
-	
+
 	colors := make([]color.Color, n)
 	for i := 0; i < n; i++ {
 		if i < len(themePalette) {
@@ -341,7 +344,7 @@ func PlotBarChart(values []float64, labels []string, output string, title string
 	p := plot.New()
 	p.Title.Text = title
 	p.Y.Label.Text = "Value"
-	
+
 	// Apply theme styling
 	applyThemeToPlot(p)
 
@@ -376,7 +379,7 @@ func PlotBarChart(values []float64, labels []string, output string, title string
 func SavePlotWithFormat(p *plot.Plot, width, height vg.Length, output string) error {
 	// Detect format from file extension
 	ext := strings.ToLower(filepath.Ext(output))
-	
+
 	// Validate supported formats
 	supportedFormats := []string{".png", ".svg", ".pdf"}
 	isSupported := false
@@ -386,21 +389,58 @@ func SavePlotWithFormat(p *plot.Plot, width, height vg.Length, output string) er
 			break
 		}
 	}
-	
+
 	if !isSupported && ext != "" {
 		return fmt.Errorf("unsupported output format: %s. Supported formats: PNG, SVG, PDF", ext)
 	}
-	
+
 	// If no extension, default to PNG
 	if ext == "" {
 		output = output + ".png"
 	}
-	
+
 	// Save the plot - gonum/plot automatically detects format from extension
 	if err := p.Save(width, height, output); err != nil {
 		return fmt.Errorf("failed to save plot to %s: %v", output, err)
 	}
-	
+
+	return nil
+}
+
+// SavePNGWithBackground saves a PNG with an explicit canvas background.
+func SavePNGWithBackground(p *plot.Plot, width, height vg.Length, output string, background color.Color) error {
+	ext := strings.ToLower(filepath.Ext(output))
+	if ext == "" {
+		output += ".png"
+		ext = ".png"
+	}
+	if ext != ".png" {
+		return SavePlotWithFormat(p, width, height, output)
+	}
+
+	plotBackground := p.BackgroundColor
+	p.BackgroundColor = background
+	defer func() {
+		p.BackgroundColor = plotBackground
+	}()
+
+	canvas := vgimg.PngCanvas{
+		Canvas: vgimg.NewWith(
+			vgimg.UseWH(width, height),
+			vgimg.UseBackgroundColor(background),
+		),
+	}
+	p.Draw(vgdraw.New(canvas))
+
+	file, err := os.Create(output)
+	if err != nil {
+		return fmt.Errorf("failed to create plot file %s: %v", output, err)
+	}
+	defer file.Close()
+
+	if _, err := canvas.WriteTo(file); err != nil {
+		return fmt.Errorf("failed to save plot to %s: %v", output, err)
+	}
 	return nil
 }
 
@@ -411,22 +451,22 @@ func applyThemeToPlot(p *plot.Plot) {
 		p.Title.TextStyle.Font.Size = vg.Points(CurrentTheme.Text.TitleSize)
 	}
 	p.Title.TextStyle.Color = CurrentTheme.Text.Color.ToColor()
-	
+
 	// Apply axis styling
 	p.X.Label.TextStyle.Font.Size = vg.Points(CurrentTheme.Text.LabelSize)
 	p.X.Label.TextStyle.Color = CurrentTheme.Text.Color.ToColor()
 	p.Y.Label.TextStyle.Font.Size = vg.Points(CurrentTheme.Text.LabelSize)
 	p.Y.Label.TextStyle.Color = CurrentTheme.Text.Color.ToColor()
-	
+
 	// Apply background color
 	p.BackgroundColor = CurrentTheme.Background.ToColor()
-	
+
 	// Apply grid styling
 	if CurrentTheme.Grid.Show {
 		// Enable grid lines
 		p.Add(plotter.NewGrid())
 	}
-	
+
 	// Apply legend styling if enabled
 	if CurrentTheme.Chart.LegendShow {
 		p.Legend.TextStyle.Font.Size = vg.Points(CurrentTheme.Text.Size)

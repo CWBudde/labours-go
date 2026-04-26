@@ -144,6 +144,30 @@ func TestPythonCompatibleFlagsAreRegistered(t *testing.T) {
 	}
 }
 
+func TestFallbackFlagsAreBoundToViper(t *testing.T) {
+	for _, name := range []string{"devs-parallel-fallback", "sentiment-fallback"} {
+		flag := rootCmd.PersistentFlags().Lookup(name)
+		if flag == nil {
+			t.Fatalf("expected flag %q to be registered", name)
+		}
+		previousFlag := flag.Value.String()
+		previousViper := viper.GetBool(name)
+		defer func(name, previousFlag string, previousViper bool) {
+			if err := rootCmd.PersistentFlags().Set(name, previousFlag); err != nil {
+				t.Fatalf("failed to restore flag %q: %v", name, err)
+			}
+			viper.Set(name, previousViper)
+		}(name, previousFlag, previousViper)
+
+		if err := rootCmd.PersistentFlags().Set(name, "true"); err != nil {
+			t.Fatalf("failed to set flag %q: %v", name, err)
+		}
+		if !viper.GetBool(name) {
+			t.Fatalf("expected viper key %q to follow flag value", name)
+		}
+	}
+}
+
 func TestPlanModeOutputSingleMode(t *testing.T) {
 	previousBackend := viper.GetString("backend")
 	defer viper.Set("backend", previousBackend)

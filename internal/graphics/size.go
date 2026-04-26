@@ -91,15 +91,19 @@ func GetPlotSizeInches(chartType ChartType) (width, height float64) {
 func GetPythonPlotSize(defaultWidth, defaultHeight float64) (width, height vg.Length) {
 	sizeStr := viper.GetString("size")
 	if sizeStr == "" {
-		return vg.Length(defaultWidth * 100), vg.Length(defaultHeight * 100)
+		return pythonInchesToVG(defaultWidth), pythonInchesToVG(defaultHeight)
 	}
 
 	parsedWidth, parsedHeight, err := parsePlotSizeFloats(sizeStr)
 	if err != nil {
 		fmt.Printf("Warning: %v, using default size\n", err)
-		return vg.Length(defaultWidth * 100), vg.Length(defaultHeight * 100)
+		return pythonInchesToVG(defaultWidth), pythonInchesToVG(defaultHeight)
 	}
-	return vg.Length(parsedWidth * 100), vg.Length(parsedHeight * 100)
+	return pythonInchesToVG(parsedWidth), pythonInchesToVG(parsedHeight)
+}
+
+func pythonInchesToVG(inches float64) vg.Length {
+	return vg.Length(inches * 100 * 72 / 96)
 }
 
 func parsePlotSizeFloats(sizeStr string) (width, height float64, err error) {

@@ -138,7 +138,7 @@ func PlotBurndownPythonStyle(data *burndown.ProcessedBurndown, output string, re
 	_ = legendLoc // TODO: Implement legend positioning
 
 	width, height := GetPythonPlotSize(16, 12)
-	if err := SavePlotWithFormat(p, width, height, output); err != nil {
+	if err := SavePNGWithBackground(p, width, height, output, color.Transparent); err != nil {
 		return err
 	}
 
