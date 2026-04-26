@@ -54,6 +54,15 @@ type viewOptions struct {
 	RerenderDisabledMsg string
 }
 
+type referenceRecipe struct {
+	Name          string
+	Input         string
+	Mode          string
+	ExtraArgs     []string
+	OutputIsDir   bool
+	GeneratedFile string
+}
+
 type metrics struct {
 	RMSE        float64
 	AvgDiff     float64
@@ -196,8 +205,8 @@ func rerenderArtifact(repoRoot, name string) error {
 }
 
 func rerenderAllArtifacts(repoRoot string) error {
-	for _, name := range []string{"burndown_absolute", "burndown_relative"} {
-		if err := runLaboursReferenceUpdate(repoRoot, name); err != nil {
+	for _, recipe := range laboursReferenceRecipes() {
+		if err := runLaboursReferenceUpdate(repoRoot, recipe.Name); err != nil {
 			return err
 		}
 	}
@@ -205,10 +214,19 @@ func rerenderAllArtifacts(repoRoot string) error {
 }
 
 func runLaboursReferenceUpdate(repoRoot, name string) error {
-	cmd, err := newLaboursReferenceUpdateCommand(repoRoot, name)
+	recipe, ok := findLaboursReferenceRecipe(name)
+	if !ok {
+		return fmt.Errorf("no labours reference rerender recipe for %q", name)
+	}
+
+	cmd, finalOutput, generatedOutput, cleanup, err := newLaboursReferenceUpdateCommand(repoRoot, recipe)
 	if err != nil {
 		return err
 	}
+	if cleanup != nil {
+		defer cleanup()
+	}
+
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Stderr = &out
@@ -220,24 +238,81 @@ func runLaboursReferenceUpdate(repoRoot, name string) error {
 		}
 		return fmt.Errorf("labours render failed for %s: %w: %s", name, err, msg)
 	}
+
+	if generatedOutput != finalOutput {
+		if err := copyFile(generatedOutput, finalOutput); err != nil {
+			return fmt.Errorf("copy generated artifact for %s: %w", name, err)
+		}
+	}
 	return nil
 }
 
-func newLaboursReferenceUpdateCommand(repoRoot, name string) (*exec.Cmd, error) {
+func laboursReferenceRecipes() []referenceRecipe {
+	return []referenceRecipe{
+		{
+			Name:  "burndown_absolute",
+			Input: filepath.Join("example_data", "hercules_burndown.yaml"),
+			Mode:  "burndown-project",
+		},
+		{
+			Name:      "burndown_relative",
+			Input:     filepath.Join("example_data", "hercules_burndown.yaml"),
+			Mode:      "burndown-project",
+			ExtraArgs: []string{"--relative"},
+		},
+		{
+			Name:  "devs",
+			Input: filepath.Join("example_data", "hercules_devs.yaml"),
+			Mode:  "devs",
+		},
+		{
+			Name:  "languages",
+			Input: filepath.Join("example_data", "hercules_devs.yaml"),
+			Mode:  "languages",
+		},
+		{
+			Name:          "old_vs_new",
+			Input:         filepath.Join("example_data", "hercules_devs.yaml"),
+			Mode:          "old-vs-new",
+			OutputIsDir:   true,
+			GeneratedFile: "old_vs_new_analysis.png",
+		},
+	}
+}
+
+func findLaboursReferenceRecipe(name string) (referenceRecipe, bool) {
+	for _, recipe := range laboursReferenceRecipes() {
+		if recipe.Name == name {
+			return recipe, true
+		}
+	}
+	return referenceRecipe{}, false
+}
+
+func newLaboursReferenceUpdateCommand(repoRoot string, recipe referenceRecipe) (*exec.Cmd, string, string, func(), error) {
+	finalOutput := filepath.Join(repoRoot, "analysis_results", "reference", "go_"+recipe.Name+".png")
+	outputArg := finalOutput
+	generatedOutput := finalOutput
+	var cleanup func()
+
+	if recipe.OutputIsDir {
+		tempDir, err := os.MkdirTemp("", "labours-parity-"+recipe.Name+"-")
+		if err != nil {
+			return nil, "", "", nil, err
+		}
+		outputArg = tempDir
+		generatedOutput = filepath.Join(tempDir, recipe.GeneratedFile)
+		cleanup = func() { _ = os.RemoveAll(tempDir) }
+	}
+
 	args := []string{
 		"run", ".",
-		"-i", filepath.Join("example_data", "hercules_burndown.yaml"),
-		"-m", "burndown-project",
-		"-o", filepath.Join("analysis_results", "reference", "go_"+name+".png"),
+		"-i", recipe.Input,
+		"-m", recipe.Mode,
+		"-o", outputArg,
 		"--quiet",
 	}
-	switch name {
-	case "burndown_absolute":
-	case "burndown_relative":
-		args = append(args, "--relative")
-	default:
-		return nil, fmt.Errorf("no labours reference rerender recipe for %q", name)
-	}
+	args = append(args, recipe.ExtraArgs...)
 
 	cmd := exec.Command("go", args...)
 	cmd.Dir = repoRoot
@@ -247,7 +322,7 @@ func newLaboursReferenceUpdateCommand(repoRoot, name string) (*exec.Cmd, error) 
 		cmd.Env = setEnv(cmd.Env, "GOCACHE", "/tmp/labours-parity-gocache")
 	}
 
-	return cmd, nil
+	return cmd, finalOutput, generatedOutput, cleanup, nil
 }
 
 func setEnv(env []string, key, value string) []string {
@@ -263,6 +338,27 @@ func setEnv(env []string, key, value string) []string {
 		env = append(env, prefix+value)
 	}
 	return env
+}
+
+func copyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	if err := os.MkdirAll(filepath.Dir(dst), 0755); err != nil {
+		return err
+	}
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	if _, err := io.Copy(out, in); err != nil {
+		_ = out.Close()
+		return err
+	}
+	return out.Close()
 }
 
 func loadCases(useParity bool, parityDir, baselineDir, artifactDir, baselineFilePrefix, artifactFilePrefix, nameFilter, namePrefix string) (loadResult, error) {

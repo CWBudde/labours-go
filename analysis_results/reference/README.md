@@ -12,6 +12,18 @@ This directory contains side-by-side comparisons between the **original Python l
 - **`python_burndown_relative.png`** - Original Python implementation (100% normalized)
 - **`go_burndown_relative.png`** - New Go implementation (100% normalized)
 
+### Developer Activity
+- **`python_devs.png`** - Original Python implementation
+- **`go_devs.png`** - New Go implementation
+
+### Language Distribution
+- **`python_languages.png`** - Original Python implementation
+- **`go_languages.png`** - New Go implementation
+
+### Old vs New
+- **`python_old_vs_new.png`** - Original Python implementation
+- **`go_old_vs_new.png`** - New Go implementation
+
 ## 🔍 **What to Compare**
 
 ### Visual Elements
@@ -90,6 +102,10 @@ go run main.go -i example_data/hercules_burndown.yaml \
     -m burndown-project --relative \
     -o analysis_results/reference/go_burndown_relative.png
 ```
+
+The `just parity-update` recipe regenerates all Go-side references currently
+supported by the viewer. The `just parity-update-python` recipe regenerates the
+Python-side references when `../hercules/python` is available.
 
 ## 🎉 **Validation Results**
 

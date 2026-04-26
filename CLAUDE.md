@@ -39,9 +39,6 @@ Implemented or partially implemented modes:
 - `devs-parallel`
 - `run-times`
 - `sentiment`
-
-Known missing modes outside the current Hercules report list:
-
 - `refactoring-proxy`
 
 Known compatibility risks:

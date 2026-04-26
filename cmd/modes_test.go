@@ -115,6 +115,35 @@ func TestExecuteModesPrintsDevsParallelPeopleBurndownWarning(t *testing.T) {
 	}
 }
 
+func TestRunAllModesUsesPythonAllComposition(t *testing.T) {
+	previousQuiet := viper.GetBool("quiet")
+	defer viper.Set("quiet", previousQuiet)
+	viper.Set("quiet", true)
+
+	oldHandlers := make(map[string]func(readers.Reader, string, *time.Time, *time.Time) error, len(pythonAllModes))
+	var called []string
+	for _, mode := range pythonAllModes {
+		oldHandlers[mode] = modeHandlers[mode]
+		modeName := mode
+		modeHandlers[mode] = func(readers.Reader, string, *time.Time, *time.Time) error {
+			called = append(called, modeName)
+			return nil
+		}
+	}
+	defer func() {
+		for mode, handler := range oldHandlers {
+			modeHandlers[mode] = handler
+		}
+	}()
+
+	if err := runAllModes(cliTestReader{}, t.TempDir(), nil, nil); err != nil {
+		t.Fatalf("runAllModes() unexpected error: %v", err)
+	}
+	if strings.Join(called, ",") != strings.Join(pythonAllModes, ",") {
+		t.Fatalf("runAllModes() called %#v, want %#v", called, pythonAllModes)
+	}
+}
+
 func TestExecuteModesJSONWritesReaderData(t *testing.T) {
 	previousQuiet := viper.GetBool("quiet")
 	defer viper.Set("quiet", previousQuiet)

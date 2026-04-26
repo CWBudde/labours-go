@@ -194,21 +194,35 @@ func PrintSurvivalFunction(matrix [][]float64) {
 	}
 }
 
-// generatePythonLaboursColorPalette matches Python labours' default
-// matplotlib style.use("ggplot") stackplot color cycle.
+// generatePythonLaboursColorPalette matches Python labours' tab20 color cycle.
 func generatePythonLaboursColorPalette(n int) []color.Color {
-	ggplotColors := []color.Color{
-		color.RGBA{R: 226, G: 74, B: 51, A: 255},  // #E24A33
-		color.RGBA{R: 52, G: 138, B: 189, A: 255}, // #348ABD
-		color.RGBA{R: 152, G: 142, B: 213, A: 255},
-		color.RGBA{R: 119, G: 119, B: 119, A: 255},
-		color.RGBA{R: 246, G: 184, B: 71, A: 255},
+	tab20Colors := []color.Color{
+		color.RGBA{R: 31, G: 119, B: 180, A: 255},
+		color.RGBA{R: 174, G: 199, B: 232, A: 255},
+		color.RGBA{R: 255, G: 127, B: 14, A: 255},
+		color.RGBA{R: 255, G: 187, B: 120, A: 255},
+		color.RGBA{R: 44, G: 160, B: 44, A: 255},
+		color.RGBA{R: 152, G: 223, B: 138, A: 255},
+		color.RGBA{R: 214, G: 39, B: 40, A: 255},
+		color.RGBA{R: 255, G: 152, B: 150, A: 255},
+		color.RGBA{R: 148, G: 103, B: 189, A: 255},
+		color.RGBA{R: 197, G: 176, B: 213, A: 255},
+		color.RGBA{R: 140, G: 86, B: 75, A: 255},
+		color.RGBA{R: 196, G: 156, B: 148, A: 255},
+		color.RGBA{R: 227, G: 119, B: 194, A: 255},
+		color.RGBA{R: 247, G: 182, B: 210, A: 255},
+		color.RGBA{R: 127, G: 127, B: 127, A: 255},
+		color.RGBA{R: 199, G: 199, B: 199, A: 255},
+		color.RGBA{R: 188, G: 189, B: 34, A: 255},
+		color.RGBA{R: 219, G: 219, B: 141, A: 255},
+		color.RGBA{R: 23, G: 190, B: 207, A: 255},
+		color.RGBA{R: 158, G: 218, B: 229, A: 255},
 	}
 
 	colors := make([]color.Color, n)
 	for i := 0; i < n; i++ {
-		if i < len(ggplotColors) {
-			colors[i] = ggplotColors[i]
+		if i < len(tab20Colors) {
+			colors[i] = tab20Colors[i]
 		} else {
 			colors[i] = generateHSVColorWithOpacity(i, n, 255)
 		}

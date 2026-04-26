@@ -39,7 +39,7 @@ var modeHandlers = map[string]func(reader readers.Reader, output string, startTi
 	"knowledge-diffusion":     knowledgeDiffusion,
 	"hotspot-risk":            hotspotRisk,
 	"sentiment":               sentiment,
-	"all":                     runAllModes,
+	"refactoring-proxy":       refactoringProxy,
 }
 
 func executeModes(modes []string, reader readers.Reader, output string, startTime, endTime *time.Time) {
@@ -195,6 +195,13 @@ func missingAnalysisWarning(mode string, err error) (string, bool) {
 	case "sentiment":
 		return "Sentiment stats were not collected. Re-run hercules with --sentiment.", true
 	case "devs-parallel":
+		msg := strings.ToLower(err.Error())
+		if strings.Contains(msg, "people cooccurrence") {
+			return couplesWarning, true
+		}
+		if strings.Contains(msg, "devs time series") {
+			return devsWarning, true
+		}
 		return "devs-parallel: " + burndownPeopleWarning, true
 	case "devs", "devs-efforts", "old-vs-new", "languages":
 		return devsWarning, true
@@ -341,39 +348,28 @@ func sentiment(reader readers.Reader, output string, startTime, endTime *time.Ti
 	return modes.Sentiment(reader, output, sentimentFallbackEnabled)
 }
 
+func refactoringProxy(reader readers.Reader, output string, startTime, endTime *time.Time) error {
+	return modes.RefactoringProxy(reader, output)
+}
+
 func runAllModes(reader readers.Reader, output string, startTime, endTime *time.Time) error {
-	// 'all' mode runs the most commonly used analysis modes
-	// This matches the Python labours behavior for the 'all' meta-mode
-	allModes := []func(readers.Reader, string, *time.Time, *time.Time) error{
-		burndownProject,
-		devs,
-		ownershipBurndown,
-		couplesFiles,
-		devsEfforts,
-		languages,
-	}
-
-	modeNames := []string{
-		"burndown-project",
-		"devs",
-		"ownership",
-		"couples-files",
-		"devs-efforts",
-		"languages",
-	}
-
 	if !viper.GetBool("quiet") {
-		fmt.Printf("Running 'all' mode: executing %d analysis modes\n", len(allModes))
+		fmt.Printf("Running 'all' mode: executing %d analysis modes\n", len(pythonAllModes))
 	}
 
-	for i, modeFunc := range allModes {
+	for _, modeName := range pythonAllModes {
 		if !viper.GetBool("quiet") {
-			fmt.Printf("  Running %s...\n", modeNames[i])
+			fmt.Printf("  Running %s...\n", modeName)
 		}
 
-		if err := modeFunc(reader, output, startTime, endTime); err != nil {
-			fmt.Printf("  Error in mode %s: %v\n", modeNames[i], err)
-			// Continue with other modes even if one fails
+		modeFunc, ok := modeHandlers[modeName]
+		if !ok {
+			printModeUnavailable(modeName)
+			continue
+		}
+		modeOutput := planModeOutput(output, modeName, len(pythonAllModes))
+		if err := modeFunc(reader, modeOutput, startTime, endTime); err != nil {
+			handleModeError(modeName, err)
 		}
 	}
 
@@ -531,6 +527,16 @@ func extractModeDataForJSON(reader readers.Reader, mode string) (interface{}, er
 			return nil, err
 		}
 		return map[string]interface{}{"hotspot_risk": data}, nil
+	case "refactoring-proxy":
+		refactoringReader, ok := reader.(readers.RefactoringProxyReader)
+		if !ok {
+			return nil, fmt.Errorf("reader does not expose refactoring proxy data")
+		}
+		data, err := refactoringReader.GetRefactoringProxy()
+		if err != nil {
+			return nil, err
+		}
+		return map[string]interface{}{"refactoring_proxy": data}, nil
 	}
 
 	return nil, fmt.Errorf("JSON output is not implemented for mode %s", mode)

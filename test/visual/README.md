@@ -87,6 +87,9 @@ just test-python-compat
 # Regenerate Go-side PNGs beside the existing Python references
 just parity-update
 
+# Regenerate Python-side PNG references from ../hercules/python
+just parity-update-python
+
 # Open the interactive PNG comparison viewer
 just parity-viewer
 

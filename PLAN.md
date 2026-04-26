@@ -40,7 +40,7 @@ Critical gaps found during inspection and follow-up implementation:
 - The CLI now normalizes output paths before dispatch: single-file modes receive a concrete file path, and multi-asset modes receive the requested directory or the parent directory of a requested file path.
 - The default-report protobuf fixture now runs through every default mode without CLI-level mode failures; visual parity remains to be proven.
 - `hercules report --all --strict` with the copied SIVA fixture now exits successfully with no "mode not implemented" or hard mode errors from the Go binary. It still prints expected missing-data warnings for repository/file/person burndown analyses absent from that fixture.
-- `go test ./...` currently fails only in the visual Python compatibility/regression tests. The latest tracked baseline is 213 passed, 11 failed, 1 skipped.
+- `go test ./...` currently fails only in the visual Python compatibility/regression tests. The latest tracked baseline is 217 passed, 11 failed, 1 skipped.
 - README and CLAUDE status claims were corrected in Phase 0 so they no longer describe the project as production-ready.
 
 ## Hercules Contract to Match
@@ -128,7 +128,7 @@ Therefore every mode must accept a single output file path and write that path, 
 | `ownership-concentration` | Basic implementation | Improve Python parity and subsystem output. |
 | `knowledge-diffusion` | Basic implementation | Improve optional top files/time trend parity. |
 | `hotspot-risk` | Basic implementation | Improve table-like output and risk metric parity. |
-| `refactoring-proxy` | Missing locally, in Python CLI | Parse `RefactoringProxyResults`; implement if aiming beyond Hercules report. |
+| `refactoring-proxy` | Implemented | Parses `RefactoringProxyResults` and writes a rename-ratio chart. Not used by Hercules report. |
 
 ## Phase 0: Baseline and Truth Cleanup
 
@@ -306,9 +306,12 @@ Status as of 2026-04-26:
 - `sentiment` now requires real `CommentSentimentResults` protobuf data by default and gates the legacy developer/language heuristic behind explicit `--sentiment-fallback`.
 - `sentiment` and `devs-parallel` now sanitize zero/empty values so `gonum/plot` no longer rejects NaN bar data.
 - `devs-parallel` no longer synthesizes data by default when people burndown is missing; the legacy synthetic path requires explicit `--devs-parallel-fallback`, and the current Go analysis respects `--max-people`.
+- `devs-parallel` now loads the same required data groups as Python `load_devs_parallel`: ownership burndown, people co-occurrence, and dev time-series. It ranks developers by commits, lines, ownership, coupling, and commit co-occurrence.
+- `refactoring-proxy` is in scope for the complete port and is now implemented as a protobuf-backed chart mode, although Hercules report does not invoke it.
+- `labours -f pb -m all` expands to Python's `all` mode composition and the direct internal `all` handler uses the same list and output planning.
 - `hercules report --all --strict --labours-cmd ./labours` exits 0 on `/tmp/labours-go-hercules.siva` and writes report assets under `/tmp/labours-go-hercules-report-all-phase4`.
-- Current full test baseline after Phase 4 fallback-gating work: `go test ./...` reports 213 passed, 11 failed, 1 skipped. Remaining failures are the pre-existing visual compatibility failures.
-- Remaining Phase 4 work is semantic parity: real multi-repository fixtures, real sentiment fixture validation, and a Python-compatible `devs-parallel` ranking/plot implementation.
+- Current full test baseline after Phase 4 devs-parallel/refactoring-proxy work: `go test ./...` reports 217 passed, 11 failed, 1 skipped. Remaining failures are the pre-existing visual compatibility failures.
+- Remaining Phase 4 work is fixture-gated: a current Hercules binary with TensorFlow support is needed for real sentiment protobuf validation, and a richer report-all fixture is needed for zero-warning repository/people/sentiment coverage. The local `../hercules/hercules --pb --quiet --sentiment ...` check on 2026-04-26 failed with `sentiment analysis is unavailable in this build; rebuild with -tags tensorflow`.
 
 Tasks:
 
@@ -316,23 +319,23 @@ Tasks:
 - [x] Implement `burndown-repos-combined`.
 - [x] Complete `couples-shotness` from real shotness co-occurrence data or define the exact Go equivalent.
 - [x] Prefer real `CommentSentimentResults` in `sentiment` when protobuf data is present.
-- [ ] Validate `sentiment` with a real current-Hercules sentiment protobuf fixture.
+- [ ] Validate `sentiment` with a real current-Hercules sentiment protobuf fixture. Blocked locally: `../hercules/hercules` is built without TensorFlow support.
 - [x] Remove or explicitly gate heuristic `sentiment` fallback from the strict compatibility path.
 - [x] Guard `sentiment` against NaN bar values on zero-activity fallback data.
 - [x] Guard `devs-parallel` against NaN bar values on zero-activity fallback data.
-- [ ] Port `devs-parallel` ownership burndown logic from Python.
-- [ ] Port `devs-parallel` people co-occurrence logic from Python.
-- [ ] Port `devs-parallel` devs time-series logic from Python.
-- [ ] Port `devs-parallel` filtering/max-people behavior from Python.
-- [ ] Decide whether `refactoring-proxy` is in scope for "complete port" even though Hercules report currently does not list it.
-- [ ] Implement `refactoring-proxy` after report-all if it is in scope.
+- [x] Port `devs-parallel` ownership burndown logic from Python.
+- [x] Port `devs-parallel` people co-occurrence logic from Python.
+- [x] Port `devs-parallel` devs time-series logic from Python.
+- [x] Port `devs-parallel` filtering/max-people behavior from Python.
+- [x] Decide whether `refactoring-proxy` is in scope for "complete port" even though Hercules report currently does not list it.
+- [x] Implement `refactoring-proxy` after report-all if it is in scope.
 
 Acceptance criteria:
 
 - [x] `hercules report --all --strict -o /tmp/report <repo>` has zero hard mode errors with Go labours on the copied Hercules SIVA fixture.
-- [ ] `hercules report --all -o /tmp/report <repo>` has zero missing-data warnings with a fixture that includes repository burndown, people burndown, and sentiment payloads.
-- [ ] `labours -f pb -m all` matches Python `all` mode composition.
-- [ ] `labours -f pb -m all` matches Python `all` mode output behavior.
+- [ ] `hercules report --all -o /tmp/report <repo>` has zero missing-data warnings with a fixture that includes repository burndown, people burndown, and sentiment payloads. Blocked locally: no such fixture exists under `test/testdata/hercules/`, and sentiment generation requires a TensorFlow-enabled Hercules build.
+- [x] `labours -f pb -m all` matches Python `all` mode composition.
+- [x] `labours -f pb -m all` matches Python `all` mode output behavior.
 
 ## Phase 5: Compatibility Test Harness
 

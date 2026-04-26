@@ -25,31 +25,39 @@ type ParallelismMetrics struct {
 	ActiveDevelopers   []string
 }
 
+type ParallelDeveloperData struct {
+	Name                string
+	CommitsRank         int
+	Commits             int
+	LinesRank           int
+	Lines               int
+	OwnershipRank       int
+	Ownership           int
+	CouplesIndex        int
+	CouplesCluster      int
+	CommitCooccIndex    int
+	CommitCooccCluster  int
+	AverageOverlapScore float64
+}
+
 // DevsParallel analyzes parallel development patterns and visualizes when developers work concurrently.
 func DevsParallel(reader readers.Reader, output string, maxPeople int, allowSyntheticFallback bool) error {
 	fmt.Println("Analyzing parallel development patterns...")
 
-	// Get people burndown data to analyze temporal activity
-	peopleBurndown, err := reader.GetPeopleBurndown()
+	parallelData, err := loadDevsParallelData(reader, maxPeople)
 	if err != nil {
 		if allowSyntheticFallback {
-			fmt.Printf("Warning: could not get people burndown data: %v\n", err)
+			fmt.Printf("Warning: could not load devs-parallel data: %v\n", err)
 			return generateSyntheticParallelAnalysis(reader, output)
 		}
 		return err
 	}
 
-	if len(peopleBurndown) == 0 {
-		if allowSyntheticFallback {
-			fmt.Println("No people burndown data available, using synthetic data")
-			return generateSyntheticParallelAnalysis(reader, output)
-		}
-		return fmt.Errorf("%w: people burndown", readers.ErrAnalysisMissing)
+	if len(parallelData) == 0 {
+		return fmt.Errorf("%w: devs-parallel", readers.ErrAnalysisMissing)
 	}
-	peopleBurndown = filterPeopleBurndownByActivity(peopleBurndown, maxPeople)
 
-	// Calculate parallelism metrics
-	metrics := calculateParallelismMetrics(peopleBurndown)
+	metrics := calculateParallelismMetricsFromParallelData(parallelData)
 
 	// Generate visualizations
 	if err := plotParallelActivity(metrics, output); err != nil {
@@ -65,6 +73,98 @@ func DevsParallel(reader readers.Reader, output string, maxPeople int, allowSynt
 
 	fmt.Println("Parallel development analysis completed successfully.")
 	return nil
+}
+
+func loadDevsParallelData(reader readers.Reader, maxPeople int) ([]ParallelDeveloperData, error) {
+	people, ownership, err := reader.GetOwnershipBurndown()
+	if err != nil {
+		return nil, fmt.Errorf("%w: devs-parallel ownership burndown: %v", readers.ErrAnalysisMissing, err)
+	}
+
+	couplingPeople, couplingMatrix, err := reader.GetPeopleCooccurrence()
+	if err != nil {
+		return nil, fmt.Errorf("%w: devs-parallel people cooccurrence: %v", readers.ErrAnalysisMissing, err)
+	}
+
+	timeSeries, err := reader.GetDeveloperTimeSeriesData()
+	if err != nil {
+		return nil, fmt.Errorf("%w: devs-parallel devs time series: %v", readers.ErrAnalysisMissing, err)
+	}
+
+	return calculateParallelDeveloperData(people, ownership, couplingPeople, couplingMatrix, timeSeries, maxPeople), nil
+}
+
+func calculateParallelDeveloperData(
+	people []string,
+	ownership map[string][][]int,
+	couplingPeople []string,
+	couplingMatrix [][]int,
+	timeSeries *readers.DeveloperTimeSeriesData,
+	maxPeople int,
+) []ParallelDeveloperData {
+	if timeSeries == nil || len(timeSeries.People) == 0 || len(timeSeries.Days) == 0 {
+		return nil
+	}
+
+	nameByDevIndex := timeSeries.People
+	if len(people) > 0 {
+		nameByDevIndex = people
+	}
+
+	commitsByName := make(map[string]int)
+	linesByName := make(map[string]int)
+	activeDaysByName := make(map[string]map[int]bool)
+	for day, devs := range timeSeries.Days {
+		for devIndex, stats := range devs {
+			if devIndex < 0 || devIndex >= len(nameByDevIndex) {
+				continue
+			}
+			name := nameByDevIndex[devIndex]
+			commitsByName[name] += stats.Commits
+			linesByName[name] += stats.LinesAdded + stats.LinesRemoved + stats.LinesModified
+			if stats.Commits > 0 || stats.LinesAdded > 0 || stats.LinesRemoved > 0 || stats.LinesModified > 0 {
+				if activeDaysByName[name] == nil {
+					activeDaysByName[name] = make(map[int]bool)
+				}
+				activeDaysByName[name][day] = true
+			}
+		}
+	}
+
+	chosen := topNamesByValue(commitsByName, maxPeople)
+	if len(chosen) == 0 {
+		return nil
+	}
+
+	ownershipByName := make(map[string]int)
+	for _, name := range chosen {
+		ownershipByName[name] = finalOwnershipTotal(ownership[name])
+	}
+	commitsRank := rankNamesByValue(commitsByName, chosen)
+	linesRank := rankNamesByValue(linesByName, chosen)
+	ownershipRank := rankNamesByValue(ownershipByName, chosen)
+	couplesOrder := orderNamesByCoupling(chosen, couplingPeople, couplingMatrix)
+	commitOrder := orderNamesByActiveDayOverlap(chosen, activeDaysByName)
+	averageOverlap := averageOverlapScores(chosen, activeDaysByName)
+
+	result := make([]ParallelDeveloperData, 0, len(chosen))
+	for _, name := range chosen {
+		result = append(result, ParallelDeveloperData{
+			Name:                name,
+			CommitsRank:         commitsRank[name],
+			Commits:             commitsByName[name],
+			LinesRank:           linesRank[name],
+			Lines:               linesByName[name],
+			OwnershipRank:       ownershipRank[name],
+			Ownership:           ownershipByName[name],
+			CouplesIndex:        couplesOrder[name],
+			CouplesCluster:      0,
+			CommitCooccIndex:    commitOrder[name],
+			CommitCooccCluster:  0,
+			AverageOverlapScore: averageOverlap[name],
+		})
+	}
+	return result
 }
 
 func filterPeopleBurndownByActivity(peopleBurndown []readers.PeopleBurndown, maxPeople int) []readers.PeopleBurndown {
@@ -93,6 +193,161 @@ func peopleBurndownActivity(person readers.PeopleBurndown) int {
 		}
 	}
 	return total
+}
+
+func topNamesByValue(values map[string]int, maxPeople int) []string {
+	names := make([]string, 0, len(values))
+	for name, value := range values {
+		if value > 0 {
+			names = append(names, name)
+		}
+	}
+	sortNamesByValue(names, values)
+	if maxPeople > 0 && len(names) > maxPeople {
+		fmt.Printf("Warning: truncated people to the most active %d\n", maxPeople)
+		names = names[:maxPeople]
+	}
+	return names
+}
+
+func rankNamesByValue(values map[string]int, chosen []string) map[string]int {
+	names := append([]string(nil), chosen...)
+	sortNamesByValue(names, values)
+	ranks := make(map[string]int, len(names))
+	for rank, name := range names {
+		ranks[name] = rank
+	}
+	return ranks
+}
+
+func sortNamesByValue(names []string, values map[string]int) {
+	sort.SliceStable(names, func(i, j int) bool {
+		left := values[names[i]]
+		right := values[names[j]]
+		if left == right {
+			return names[i] < names[j]
+		}
+		return left > right
+	})
+}
+
+func finalOwnershipTotal(matrix [][]int) int {
+	if len(matrix) == 0 {
+		return 0
+	}
+	final := matrix[len(matrix)-1]
+	total := 0
+	for _, value := range final {
+		total += value
+	}
+	return total
+}
+
+func orderNamesByCoupling(chosen, couplingPeople []string, couplingMatrix [][]int) map[string]int {
+	indexByName := make(map[string]int, len(couplingPeople))
+	for i, name := range couplingPeople {
+		indexByName[name] = i
+	}
+	values := make(map[string]int, len(chosen))
+	for _, name := range chosen {
+		idx, ok := indexByName[name]
+		if !ok || idx < 0 || idx >= len(couplingMatrix) {
+			continue
+		}
+		total := 0
+		for _, other := range chosen {
+			otherIdx, ok := indexByName[other]
+			if ok && otherIdx >= 0 && otherIdx < len(couplingMatrix[idx]) {
+				total += couplingMatrix[idx][otherIdx]
+			}
+		}
+		values[name] = total
+	}
+	return rankNamesByValue(values, chosen)
+}
+
+func orderNamesByActiveDayOverlap(chosen []string, activeDaysByName map[string]map[int]bool) map[string]int {
+	values := make(map[string]int, len(chosen))
+	for _, name := range chosen {
+		total := 0
+		for _, other := range chosen {
+			if name == other {
+				continue
+			}
+			total += activeDayIntersection(activeDaysByName[name], activeDaysByName[other])
+		}
+		values[name] = total
+	}
+	return rankNamesByValue(values, chosen)
+}
+
+func averageOverlapScores(chosen []string, activeDaysByName map[string]map[int]bool) map[string]float64 {
+	scores := make(map[string]float64, len(chosen))
+	for _, name := range chosen {
+		total := 0.0
+		count := 0
+		for _, other := range chosen {
+			if name == other {
+				continue
+			}
+			total += activeDayJaccard(activeDaysByName[name], activeDaysByName[other])
+			count++
+		}
+		if count > 0 {
+			scores[name] = total / float64(count)
+		}
+	}
+	return scores
+}
+
+func activeDayIntersection(left, right map[int]bool) int {
+	if len(left) > len(right) {
+		left, right = right, left
+	}
+	total := 0
+	for day := range left {
+		if right[day] {
+			total++
+		}
+	}
+	return total
+}
+
+func activeDayJaccard(left, right map[int]bool) float64 {
+	intersection := activeDayIntersection(left, right)
+	union := len(left) + len(right) - intersection
+	if union == 0 {
+		return 0
+	}
+	return float64(intersection) / float64(union)
+}
+
+func calculateParallelismMetricsFromParallelData(data []ParallelDeveloperData) ParallelismMetrics {
+	metrics := ParallelismMetrics{
+		TotalPeriods:       5,
+		ParallelPeriods:    len(data),
+		ParallelismIndex:   100,
+		PeakConcurrency:    len(data),
+		AverageConcurrency: float64(len(data)),
+		DeveloperOverlaps:  make(map[string]map[string]float64, len(data)),
+		PeriodConcurrency:  make([]int, 5),
+		ActiveDevelopers:   make([]string, 0, len(data)),
+	}
+	for i := range metrics.PeriodConcurrency {
+		metrics.PeriodConcurrency[i] = len(data)
+	}
+	for _, dev := range data {
+		metrics.ActiveDevelopers = append(metrics.ActiveDevelopers, dev.Name)
+		metrics.DeveloperOverlaps[dev.Name] = make(map[string]float64, len(data))
+		for _, other := range data {
+			if dev.Name == other.Name {
+				metrics.DeveloperOverlaps[dev.Name][other.Name] = 1
+			} else {
+				metrics.DeveloperOverlaps[dev.Name][other.Name] = dev.AverageOverlapScore
+			}
+		}
+	}
+	return metrics
 }
 
 // calculateParallelismMetrics analyzes the temporal activity data to find parallel development patterns
