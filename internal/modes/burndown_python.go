@@ -200,15 +200,23 @@ func GenerateBurndownRepositoryPython(reader readers.Reader, output string, rela
 			continue
 		}
 
-		repoOutput := filepath.Join(output, fmt.Sprintf("burndown-repository_%s.png", sanitizeFilename(repository.Repository)))
-		if err := graphics.PlotBurndownPythonStyle(processedData, repoOutput, relative); err != nil {
+		repoBase := filepath.Join(output, fmt.Sprintf("burndown-repository_%s", sanitizeFilename(repository.Repository)))
+		repoPNG := repoBase + ".png"
+		if err := graphics.PlotBurndownPythonStyle(processedData, repoPNG, relative); err != nil {
 			if !quiet {
 				fmt.Printf("Warning: failed to create plot for repository %s: %v\n", repository.Repository, err)
 			}
 			continue
 		}
+		repoSVG := repoBase + ".svg"
+		if err := graphics.PlotBurndownPythonStyle(processedData, repoSVG, relative); err != nil {
+			if !quiet {
+				fmt.Printf("Warning: failed to create SVG plot for repository %s: %v\n", repository.Repository, err)
+			}
+			continue
+		}
 		if !quiet {
-			fmt.Printf("Chart saved: %s\n", repoOutput)
+			fmt.Printf("Charts saved: %s and %s\n", repoPNG, repoSVG)
 		}
 	}
 

@@ -295,7 +295,7 @@ var modeOutputConventions = map[string]outputConvention{
 	"burndown-repository": {
 		Kind:        outputAssetDir,
 		Description: "writes one chart per repository into the requested asset directory",
-		Assets:      []string{"burndown-repository_<sanitized-repository>.png"},
+		Assets:      []string{"burndown-repository_<sanitized-repository>.png", "burndown-repository_<sanitized-repository>.svg"},
 	},
 	"burndown-repos-combined": {
 		Kind:        outputSingleFile,
@@ -325,7 +325,7 @@ var modeOutputConventions = map[string]outputConvention{
 	"couples-shotness": {
 		Kind:        outputAssetDir,
 		Description: "writes shotness coupling charts into the requested directory",
-		Assets:      []string{"shotness_coupling_heatmap.png", "top_shotness_coupling_pairs.png"},
+		Assets:      []string{"shotness_coupling_heatmap.png", "shotness_coupling_heatmap.svg", "top_shotness_coupling_pairs.png", "top_shotness_coupling_pairs.svg"},
 	},
 	"shotness": {
 		Kind:        outputAssetDir,
@@ -340,7 +340,7 @@ var modeOutputConventions = map[string]outputConvention{
 	"devs-efforts": {
 		Kind:        outputAssetDir,
 		Description: "writes developer effort charts into the requested directory",
-		Assets:      []string{"devs_efforts_scatter.png", "devs_productivity_ranking.png"},
+		Assets:      []string{"devs_efforts_scatter.png", "devs_efforts_scatter.svg", "devs_productivity_ranking.png", "devs_productivity_ranking.svg"},
 	},
 	"old-vs-new": {
 		Kind:        outputAssetDir,
@@ -365,7 +365,7 @@ var modeOutputConventions = map[string]outputConvention{
 	"run-times": {
 		Kind:        outputAssetDir,
 		Description: "writes runtime charts into the requested directory",
-		Assets:      []string{"runtime_breakdown.png", "runtime_percentage.png"},
+		Assets:      []string{"runtime_breakdown.png", "runtime_breakdown.svg", "runtime_percentage.png", "runtime_percentage.svg"},
 	},
 	"bus-factor": {
 		Kind:        outputCompanions,

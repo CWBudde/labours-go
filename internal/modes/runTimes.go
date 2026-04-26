@@ -2,7 +2,6 @@ package modes
 
 import (
 	"fmt"
-	"path/filepath"
 	"sort"
 
 	"github.com/spf13/viper"
@@ -18,7 +17,7 @@ import (
 func RunTimes(reader readers.Reader, output string) error {
 	quiet := viper.GetBool("quiet")
 	progEstimator := progress.NewProgressEstimator(!quiet)
-	
+
 	totalPhases := 3 // data extraction, analysis, plotting
 	progEstimator.StartMultiOperation(totalPhases, "Runtime Analysis")
 
@@ -58,16 +57,16 @@ func RunTimes(reader readers.Reader, output string) error {
 
 // RuntimeMetric represents a single runtime measurement
 type RuntimeMetric struct {
-	Operation string
-	TimeMs    float64
+	Operation  string
+	TimeMs     float64
 	Percentage float64
 }
 
 // RuntimeAnalysis represents the complete runtime analysis results
 type RuntimeAnalysis struct {
-	Metrics      []RuntimeMetric
-	TotalTime    float64
-	Statistics   RuntimeStatistics
+	Metrics    []RuntimeMetric
+	TotalTime  float64
+	Statistics RuntimeStatistics
 }
 
 // RuntimeStatistics provides summary statistics about runtime performance
@@ -89,25 +88,25 @@ func analyzeRuntimeStats(runtimeStats map[string]float64) RuntimeAnalysis {
 	minTime := float64(^uint(0) >> 1) // Max float
 	slowestOp := ""
 	fastestOp := ""
-	
+
 	// Calculate total time first
 	for _, time := range runtimeStats {
 		totalTime += time
 	}
-	
+
 	// Create metrics with percentages
 	for operation, time := range runtimeStats {
 		percentage := 0.0
 		if totalTime > 0 {
 			percentage = (time / totalTime) * 100
 		}
-		
+
 		metrics = append(metrics, RuntimeMetric{
 			Operation:  operation,
 			TimeMs:     time,
 			Percentage: percentage,
 		})
-		
+
 		// Track min/max
 		if time > maxTime {
 			maxTime = time
@@ -118,18 +117,18 @@ func analyzeRuntimeStats(runtimeStats map[string]float64) RuntimeAnalysis {
 			fastestOp = operation
 		}
 	}
-	
+
 	// Sort by time (descending)
 	sort.Slice(metrics, func(i, j int) bool {
 		return metrics[i].TimeMs > metrics[j].TimeMs
 	})
-	
+
 	// Calculate average
 	avgTime := 0.0
 	if len(metrics) > 0 {
 		avgTime = totalTime / float64(len(metrics))
 	}
-	
+
 	return RuntimeAnalysis{
 		Metrics:   metrics,
 		TotalTime: totalTime,
@@ -151,12 +150,12 @@ func plotRuntimeAnalysis(analysis RuntimeAnalysis, output string) error {
 	if err := plotRuntimeBreakdown(analysis, output); err != nil {
 		return err
 	}
-	
+
 	// Create pie chart showing percentage breakdown
 	if err := plotRuntimePieChart(analysis, output); err != nil {
 		return err
 	}
-	
+
 	return nil
 }
 
@@ -165,32 +164,32 @@ func plotRuntimeBreakdown(analysis RuntimeAnalysis, output string) error {
 	if len(analysis.Metrics) == 0 {
 		return fmt.Errorf("no runtime metrics available")
 	}
-	
+
 	p := plot.New()
 	p.Title.Text = "Runtime Analysis Breakdown"
 	p.X.Label.Text = "Operations (by time)"
 	p.Y.Label.Text = "Time (milliseconds)"
-	
+
 	// Prepare data for bar chart (show top 15 operations)
 	maxOps := len(analysis.Metrics)
 	if maxOps > 15 {
 		maxOps = 15
 	}
-	
+
 	values := make(plotter.Values, maxOps)
 	for i := 0; i < maxOps; i++ {
 		values[i] = analysis.Metrics[i].TimeMs
 	}
-	
+
 	// Create bar chart
 	bars, err := plotter.NewBarChart(values, vg.Points(30))
 	if err != nil {
 		return fmt.Errorf("error creating bar chart: %v", err)
 	}
-	
+
 	bars.Color = graphics.ColorPalette[5]
 	p.Add(bars)
-	
+
 	// Create custom tick marks with operation names
 	ticks := make([]plot.Tick, maxOps)
 	for i := 0; i < maxOps; i++ {
@@ -205,14 +204,13 @@ func plotRuntimeBreakdown(analysis RuntimeAnalysis, output string) error {
 		}
 	}
 	p.X.Tick.Marker = plot.ConstantTicks(ticks)
-	
-	// Save the plot
-	outputFile := filepath.Join(output, "runtime_breakdown.png")
-	if err := p.Save(16*vg.Inch, 8*vg.Inch, outputFile); err != nil {
+
+	pngFile, svgFile, err := savePlotPNGAndSVG(p, 16*vg.Inch, 8*vg.Inch, output, "runtime_breakdown")
+	if err != nil {
 		return fmt.Errorf("failed to save runtime breakdown plot: %v", err)
 	}
-	
-	fmt.Printf("Saved runtime breakdown plot to %s\n", outputFile)
+
+	fmt.Printf("Saved runtime breakdown plots to %s and %s\n", pngFile, svgFile)
 	return nil
 }
 
@@ -221,35 +219,35 @@ func plotRuntimePieChart(analysis RuntimeAnalysis, output string) error {
 	if len(analysis.Metrics) == 0 {
 		return fmt.Errorf("no runtime metrics available")
 	}
-	
+
 	// Use a simple stacked bar chart as pie charts are complex in gonum/plot
 	p := plot.New()
 	p.Title.Text = "Runtime Percentage Distribution"
 	p.X.Label.Text = "Cumulative Percentage"
 	p.Y.Label.Text = "Operations"
-	
+
 	// Prepare data for stacked representation (top 10 operations)
 	maxOps := len(analysis.Metrics)
 	if maxOps > 10 {
 		maxOps = 10
 	}
-	
+
 	// Create horizontal bars showing percentages
 	values := make(plotter.Values, maxOps)
 	for i := 0; i < maxOps; i++ {
 		values[i] = analysis.Metrics[i].Percentage
 	}
-	
+
 	// Create horizontal bar chart
 	bars, err := plotter.NewBarChart(values, vg.Points(25))
 	if err != nil {
 		return fmt.Errorf("error creating percentage chart: %v", err)
 	}
-	
+
 	bars.Color = graphics.ColorPalette[6]
 	bars.Horizontal = true
 	p.Add(bars)
-	
+
 	// Create tick marks with operation names and percentages
 	ticks := make([]plot.Tick, maxOps)
 	for i := 0; i < maxOps; i++ {
@@ -264,15 +262,14 @@ func plotRuntimePieChart(analysis RuntimeAnalysis, output string) error {
 		}
 	}
 	p.Y.Tick.Marker = plot.ConstantTicks(ticks)
-	
-	// Save the plot
-	outputFile := filepath.Join(output, "runtime_percentage.png")
-	if err := p.Save(16*vg.Inch, 10*vg.Inch, outputFile); err != nil {
+
+	pngFile, svgFile, err := savePlotPNGAndSVG(p, 16*vg.Inch, 10*vg.Inch, output, "runtime_percentage")
+	if err != nil {
 		return fmt.Errorf("failed to save runtime percentage plot: %v", err)
 	}
-	
-	fmt.Printf("Saved runtime percentage plot to %s\n", outputFile)
-	
+
+	fmt.Printf("Saved runtime percentage plots to %s and %s\n", pngFile, svgFile)
+
 	// Print summary information
 	fmt.Printf("Runtime Analysis Summary:\n")
 	fmt.Printf("  Total operations: %d\n", analysis.Statistics.TotalOperations)
@@ -280,6 +277,6 @@ func plotRuntimePieChart(analysis RuntimeAnalysis, output string) error {
 	fmt.Printf("  Average runtime per operation: %.2f ms\n", analysis.Statistics.AverageTime)
 	fmt.Printf("  Slowest operation: %s (%.2f ms)\n", analysis.Statistics.SlowestOp, analysis.Statistics.MaxTime)
 	fmt.Printf("  Fastest operation: %s (%.2f ms)\n", analysis.Statistics.FastestOp, analysis.Statistics.MinTime)
-	
+
 	return nil
 }

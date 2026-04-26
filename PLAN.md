@@ -386,13 +386,14 @@ Status as of 2026-04-27:
 - `README.md` now defines the output convention for every implemented mode.
 - `cmd` has a central output convention table used by the output planner, and tests require every implemented mode to have a documented convention.
 - `burndown-file` is now planned as a basename fanout mode instead of a directory-style asset mode, matching its handler behavior and preserving requested file basenames.
+- Directory-style chart modes now write SVG companions next to PNG assets, and report metric companion assets are tested for both PNG and SVG output paths.
 
 Tasks:
 
 - [x] Define output convention for each mode in a table.
 - [x] Enforce output convention for each mode in tests.
-- [ ] Support PNG consistently across modes.
-- [ ] Support SVG consistently across modes.
+- [x] Support PNG consistently across modes.
+- [x] Support SVG consistently across modes.
 - [ ] Decide whether TensorFlow projector behavior is implemented or intentionally disabled.
 - [ ] If projector behavior is implemented, write projector metadata/vector files compatible with Python labours.
 - [ ] If projector behavior is not implemented, document that `--disable-projector` is effectively always true and adjust Hercules report expectations if necessary.

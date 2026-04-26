@@ -2,7 +2,6 @@ package modes
 
 import (
 	"fmt"
-	"path/filepath"
 	"sort"
 
 	"github.com/spf13/viper"
@@ -18,7 +17,7 @@ import (
 func DevsEfforts(reader readers.Reader, output string, maxPeople int) error {
 	quiet := viper.GetBool("quiet")
 	progEstimator := progress.NewProgressEstimator(!quiet)
-	
+
 	totalPhases := 4 // data extraction, selection, analysis, plotting
 	progEstimator.StartMultiOperation(totalPhases, "Developer Efforts Analysis")
 
@@ -71,7 +70,7 @@ type EffortMetric struct {
 // analyzeDevEfforts performs effort analysis on developer statistics
 func analyzeDevEfforts(stats []readers.DeveloperStat) []EffortMetric {
 	metrics := make([]EffortMetric, 0, len(stats))
-	
+
 	// Calculate metrics for each developer
 	for _, stat := range stats {
 		metric := EffortMetric{
@@ -84,19 +83,19 @@ func analyzeDevEfforts(stats []readers.DeveloperStat) []EffortMetric {
 		}
 		metrics = append(metrics, metric)
 	}
-	
+
 	// Sort by combined productivity score (commits + lines changed)
 	sort.Slice(metrics, func(i, j int) bool {
 		scoreI := float64(metrics[i].Commits) + float64(metrics[i].LinesAdded+metrics[i].LinesRemoved+metrics[i].LinesModified)*0.01
 		scoreJ := float64(metrics[j].Commits) + float64(metrics[j].LinesAdded+metrics[j].LinesRemoved+metrics[j].LinesModified)*0.01
 		return scoreI > scoreJ
 	})
-	
+
 	// Assign productivity ranks
 	for i := range metrics {
 		metrics[i].ProductivityRank = i + 1
 	}
-	
+
 	return metrics
 }
 
@@ -106,12 +105,12 @@ func plotDevEfforts(metrics []EffortMetric, output string) error {
 	if err := plotCommitsVsLines(metrics, output); err != nil {
 		return err
 	}
-	
+
 	// Create productivity ranking bar chart
 	if err := plotProductivityRanking(metrics, output); err != nil {
 		return err
 	}
-	
+
 	return nil
 }
 
@@ -121,23 +120,23 @@ func plotCommitsVsLines(metrics []EffortMetric, output string) error {
 	p.Title.Text = "Developer Efforts: Commits vs Lines Changed"
 	p.X.Label.Text = "Total Commits"
 	p.Y.Label.Text = "Total Lines Changed"
-	
+
 	// Prepare data points
 	pts := make(plotter.XYs, len(metrics))
 	for i, metric := range metrics {
 		pts[i].X = float64(metric.Commits)
 		pts[i].Y = float64(metric.LinesAdded + metric.LinesRemoved + metric.LinesModified)
 	}
-	
+
 	// Create scatter plot
 	scatter, err := plotter.NewScatter(pts)
 	if err != nil {
 		return fmt.Errorf("error creating scatter plot: %v", err)
 	}
-	
+
 	scatter.Color = graphics.ColorPalette[0]
 	p.Add(scatter)
-	
+
 	// Add developer names as labels (simplified)
 	for i, metric := range metrics {
 		if i < 10 { // Only label top 10 to avoid clutter
@@ -150,14 +149,13 @@ func plotCommitsVsLines(metrics []EffortMetric, output string) error {
 			}
 		}
 	}
-	
-	// Save the plot
-	outputFile := filepath.Join(output, "devs_efforts_scatter.png")
-	if err := p.Save(16*vg.Inch, 8*vg.Inch, outputFile); err != nil {
+
+	pngFile, svgFile, err := savePlotPNGAndSVG(p, 16*vg.Inch, 8*vg.Inch, output, "devs_efforts_scatter")
+	if err != nil {
 		return fmt.Errorf("failed to save scatter plot: %v", err)
 	}
-	
-	fmt.Printf("Saved developer efforts scatter plot to %s\n", outputFile)
+
+	fmt.Printf("Saved developer efforts scatter plots to %s and %s\n", pngFile, svgFile)
 	return nil
 }
 
@@ -167,34 +165,33 @@ func plotProductivityRanking(metrics []EffortMetric, output string) error {
 	p.Title.Text = "Developer Productivity Ranking"
 	p.X.Label.Text = "Developer Rank"
 	p.Y.Label.Text = "Productivity Score (Commits + Lines/100)"
-	
+
 	// Prepare data for top developers only
 	maxDev := len(metrics)
 	if maxDev > 20 {
 		maxDev = 20 // Show top 20 developers
 	}
-	
+
 	values := make(plotter.Values, maxDev)
 	for i := 0; i < maxDev; i++ {
 		metric := metrics[i]
 		values[i] = float64(metric.Commits) + float64(metric.LinesAdded+metric.LinesRemoved+metric.LinesModified)*0.01
 	}
-	
+
 	// Create bar chart
 	bars, err := plotter.NewBarChart(values, vg.Points(20))
 	if err != nil {
 		return fmt.Errorf("error creating bar chart: %v", err)
 	}
-	
+
 	bars.Color = graphics.ColorPalette[1]
 	p.Add(bars)
-	
-	// Save the plot
-	outputFile := filepath.Join(output, "devs_productivity_ranking.png")
-	if err := p.Save(16*vg.Inch, 8*vg.Inch, outputFile); err != nil {
+
+	pngFile, svgFile, err := savePlotPNGAndSVG(p, 16*vg.Inch, 8*vg.Inch, output, "devs_productivity_ranking")
+	if err != nil {
 		return fmt.Errorf("failed to save productivity ranking plot: %v", err)
 	}
-	
-	fmt.Printf("Saved developer productivity ranking to %s\n", outputFile)
+
+	fmt.Printf("Saved developer productivity ranking plots to %s and %s\n", pngFile, svgFile)
 	return nil
 }
