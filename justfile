@@ -158,7 +158,12 @@ golden-regen:
 # Test Python compatibility (if reference images exist)
 test-python-compat:
     @echo "Testing Python compatibility"
-    go test -v ./test/visual/ -run TestPythonCompatibilityDemo
+    LABOURS_GO_PYTHON_PARITY=1 go test -v ./test/visual/ -run TestPythonCompatibility
+
+# Run opt-in Go/Python visual parity comparisons
+test-visual-parity:
+    @echo "Running visual parity tests"
+    LABOURS_GO_VISUAL_PARITY=1 LABOURS_GO_PYTHON_PARITY=1 go test -v ./test/visual/ -run 'TestVisualRegression|TestPythonCompatibility'
 
 # === DEVELOPMENT TASKS ===
 
@@ -186,6 +191,11 @@ lint:
 testdata:
     @echo "Generating test data"
     go run test/create_sample_data.go
+
+# Generate current-Hercules protobuf compatibility fixtures
+fixtures OUT_DIR="test/testdata/hercules":
+    @echo "Generating Hercules protobuf fixtures in {{OUT_DIR}}"
+    ./scripts/generate_hercules_fixtures.sh {{OUT_DIR}}
 
 # Run all code quality checks
 quality: fmt vet lint

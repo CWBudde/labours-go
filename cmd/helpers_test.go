@@ -297,3 +297,76 @@ func TestPlanModeOutputMultiAssetModes(t *testing.T) {
 		})
 	}
 }
+
+func TestModeOutputConventionsCoverImplementedModes(t *testing.T) {
+	for mode := range modeHandlers {
+		convention, ok := modeOutputConventions[mode]
+		if !ok {
+			t.Fatalf("mode %q is missing an output convention", mode)
+		}
+		if convention.Kind == "" {
+			t.Fatalf("mode %q has an empty output convention kind", mode)
+		}
+		if convention.Description == "" {
+			t.Fatalf("mode %q has an empty output convention description", mode)
+		}
+		if len(convention.Assets) == 0 {
+			t.Fatalf("mode %q does not document any output assets", mode)
+		}
+	}
+
+	for mode := range modeOutputConventions {
+		if _, ok := modeHandlers[mode]; !ok {
+			t.Fatalf("output convention exists for non-implemented mode %q", mode)
+		}
+	}
+}
+
+func TestOutputConventionsMatchPlanner(t *testing.T) {
+	previousBackend := viper.GetString("backend")
+	defer viper.Set("backend", previousBackend)
+	viper.Set("backend", "auto")
+
+	tmpDir := t.TempDir()
+	requestedFile := filepath.Join(tmpDir, "requested.svg")
+
+	for mode, convention := range modeOutputConventions {
+		t.Run(mode, func(t *testing.T) {
+			got := planModeOutput(requestedFile, mode, 1)
+			switch convention.Kind {
+			case outputAssetDir:
+				if got != tmpDir {
+					t.Fatalf("asset-directory mode planned %q, want %q", got, tmpDir)
+				}
+				if !isMultiAssetMode(mode) {
+					t.Fatalf("asset-directory mode %q is not treated as multi-asset", mode)
+				}
+			case outputSingleFile, outputFileFanout, outputCompanions:
+				if got != requestedFile {
+					t.Fatalf("%s mode planned %q, want requested file %q", convention.Kind, got, requestedFile)
+				}
+				if isMultiAssetMode(mode) {
+					t.Fatalf("%s mode %q should not be treated as directory-style multi-asset", convention.Kind, mode)
+				}
+			default:
+				t.Fatalf("unknown output convention kind %q", convention.Kind)
+			}
+		})
+	}
+}
+
+func TestFileFanoutModesKeepRequestedBasename(t *testing.T) {
+	previousBackend := viper.GetString("backend")
+	defer viper.Set("backend", previousBackend)
+	viper.Set("backend", "auto")
+
+	tmpDir := t.TempDir()
+	for _, mode := range []string{"burndown-file", "burndown-person"} {
+		t.Run(mode, func(t *testing.T) {
+			requested := filepath.Join(tmpDir, mode+".png")
+			if got := planModeOutput(requested, mode, 1); got != requested {
+				t.Fatalf("planModeOutput() = %q, want basename-preserving path %q", got, requested)
+			}
+		})
+	}
+}

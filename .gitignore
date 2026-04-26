@@ -51,6 +51,7 @@ Thumbs.db
 
 # Test and build output directories
 test_output/
+test/analysis_output/
 build/
 dist/
 bin/

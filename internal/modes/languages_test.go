@@ -15,7 +15,7 @@ type MockLanguageReader struct {
 	languageStats []readers.LanguageStat
 }
 
-func (m *MockLanguageReader) Read(file io.Reader) error                        { return nil }
+func (m *MockLanguageReader) Read(file io.Reader) error                         { return nil }
 func (m *MockLanguageReader) GetName() string                                   { return "mock-repo" }
 func (m *MockLanguageReader) GetHeader() (int64, int64)                         { return 0, 0 }
 func (m *MockLanguageReader) GetProjectBurndown() (string, [][]int)             { return "", nil }
@@ -26,15 +26,17 @@ func (m *MockLanguageReader) GetPeopleBurndown() ([]readers.PeopleBurndown, erro
 func (m *MockLanguageReader) GetOwnershipBurndown() ([]string, map[string][][]int, error) {
 	return nil, nil, nil
 }
-func (m *MockLanguageReader) GetPeopleInteraction() ([]string, [][]int, error)   { return nil, nil, nil }
-func (m *MockLanguageReader) GetFileCooccurrence() ([]string, [][]int, error)    { return nil, nil, nil }
-func (m *MockLanguageReader) GetPeopleCooccurrence() ([]string, [][]int, error)  { return nil, nil, nil }
-func (m *MockLanguageReader) GetShotnessCooccurrence() ([]string, [][]int, error) { return nil, nil, nil }
+func (m *MockLanguageReader) GetPeopleInteraction() ([]string, [][]int, error)  { return nil, nil, nil }
+func (m *MockLanguageReader) GetFileCooccurrence() ([]string, [][]int, error)   { return nil, nil, nil }
+func (m *MockLanguageReader) GetPeopleCooccurrence() ([]string, [][]int, error) { return nil, nil, nil }
+func (m *MockLanguageReader) GetShotnessCooccurrence() ([]string, [][]int, error) {
+	return nil, nil, nil
+}
 func (m *MockLanguageReader) GetShotnessRecords() ([]readers.ShotnessRecord, error) { return nil, nil }
-func (m *MockLanguageReader) GetDeveloperStats() ([]readers.DeveloperStat, error) { return nil, nil }
-func (m *MockLanguageReader) GetRuntimeStats() (map[string]float64, error)       { return nil, nil }
-func (m *MockLanguageReader) GetBurndownParameters() (burndown.BurndownParameters, error) { 
-	return burndown.BurndownParameters{}, nil 
+func (m *MockLanguageReader) GetDeveloperStats() ([]readers.DeveloperStat, error)   { return nil, nil }
+func (m *MockLanguageReader) GetRuntimeStats() (map[string]float64, error)          { return nil, nil }
+func (m *MockLanguageReader) GetBurndownParameters() (burndown.BurndownParameters, error) {
+	return burndown.BurndownParameters{}, nil
 }
 func (m *MockLanguageReader) GetProjectBurndownWithHeader() (burndown.BurndownHeader, string, [][]int, error) {
 	return burndown.BurndownHeader{}, "", nil, nil
@@ -122,6 +124,42 @@ func TestLanguagesSingleLanguage(t *testing.T) {
 	pngFile := filepath.Join(tmpDir, "languages.png")
 	if _, err := os.Stat(pngFile); os.IsNotExist(err) {
 		t.Errorf("PNG output file was not created: %s", pngFile)
+	}
+}
+
+func TestBuildLanguageEvolutionIncludesLastTickAcrossDST(t *testing.T) {
+	path := filepath.Join("..", "..", "example_data", "hercules_devs.yaml")
+	file, err := os.Open(path)
+	if err != nil {
+		t.Fatalf("open fixture: %v", err)
+	}
+	defer file.Close()
+
+	reader := &readers.YamlReader{}
+	if err := reader.Read(file); err != nil {
+		t.Fatalf("Read() unexpected error = %v", err)
+	}
+
+	timeSeries, err := reader.GetDeveloperTimeSeriesData()
+	if err != nil {
+		t.Fatalf("GetDeveloperTimeSeriesData() unexpected error = %v", err)
+	}
+
+	data, err := buildLanguageEvolution(timeSeries, 1734315181, 1754512384, "raw")
+	if err != nil {
+		t.Fatalf("buildLanguageEvolution() unexpected error = %v", err)
+	}
+	if len(data.Matrix) == 0 {
+		t.Fatal("expected language matrix rows")
+	}
+
+	last := data.Matrix[len(data.Matrix)-1]
+	total := 0.0
+	for _, value := range last {
+		total += value
+	}
+	if total != 7667 {
+		t.Fatalf("last cumulative language total = %.0f, want 7667", total)
 	}
 }
 

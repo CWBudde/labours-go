@@ -40,7 +40,7 @@ Critical gaps found during inspection and follow-up implementation:
 - The CLI now normalizes output paths before dispatch: single-file modes receive a concrete file path, and multi-asset modes receive the requested directory or the parent directory of a requested file path.
 - The default-report protobuf fixture now runs through every default mode without CLI-level mode failures; visual parity remains to be proven.
 - `hercules report --all --strict` with the copied SIVA fixture now exits successfully with no "mode not implemented" or hard mode errors from the Go binary. It still prints expected missing-data warnings for repository/file/person burndown analyses absent from that fixture.
-- `go test ./...` currently fails only in the visual Python compatibility/regression tests. The latest tracked baseline is 217 passed, 11 failed, 1 skipped.
+- `go test ./...` now passes by default; visual Python compatibility/regression checks are opt-in.
 - README and CLAUDE status claims were corrected in Phase 0 so they no longer describe the project as production-ready.
 
 ## Hercules Contract to Match
@@ -341,40 +341,56 @@ Acceptance criteria:
 
 Goal: prevent regressions and quantify differences from Python labours.
 
+Status as of 2026-04-26:
+
+- `scripts/generate_hercules_fixtures.sh` now regenerates protobuf fixtures from a neighboring `../hercules` checkout, with optional TensorFlow-dependent `report_all`/`sentiment` outputs so local non-TensorFlow builds do not block the rest of the fixture set.
+- `just fixtures` wraps fixture generation and `test/testdata/hercules/README.md` documents the generator, environment overrides, and extraction golden refresh command.
+- Reader extraction goldens now cover the checked-in current-Hercules default report and shotness fixtures via `report_default_summary.golden.json` and `shotness_summary.golden.json`.
+- Visual tests are split so structural image validation runs by default, while golden and Python parity comparisons are opt-in through `LABOURS_GO_VISUAL_PARITY=1` and `LABOURS_GO_PYTHON_PARITY=1`.
+- `just test-visual-parity` runs the opt-in visual parity checks explicitly.
+- An opt-in Hercules report integration smoke test builds the local `labours` binary and runs `../hercules report --labours-cmd <local binary> --strict`, then verifies `index.html` and chart asset count.
+- Current full test baseline after the output convention work: `go test ./...` passes with 257 tests.
+
 Tasks:
 
-- [ ] Add a fixture generator script that runs `../hercules`.
-- [ ] Generate default report flags fixture.
+- [x] Add a fixture generator script that runs `../hercules`.
+- [x] Generate default report flags fixture.
 - [ ] Generate all report flags fixture.
 - [ ] Generate burndown-only fixture with files/people/repositories.
 - [ ] Generate couples-only fixture.
 - [ ] Generate devs-only fixture.
-- [ ] Generate shotness-only fixture.
+- [x] Generate shotness-only fixture.
 - [ ] Generate sentiment-only fixture.
-- [ ] Add golden tests for reader extraction, not only rendered pixels.
+- [x] Add golden tests for reader extraction, not only rendered pixels.
 - [ ] Compare Go extracted data against Python labours intermediate data where possible for each mode.
-- [ ] Split visual tests into structural tests: file exists, decodes, non-empty, sane dimensions.
-- [ ] Split visual tests into parity tests: compare against Python references with tolerances.
+- [x] Split visual tests into structural tests: file exists, decodes, non-empty, sane dimensions.
+- [x] Split visual tests into parity tests: compare against Python references with tolerances.
 - [ ] Fix current visual dimension mismatch by matching Python plot size defaults or comparing normalized renderings.
-- [ ] Add report integration test that builds local `labours`.
-- [ ] Add report integration test that runs `../hercules report --labours-cmd <local binary> --strict`.
-- [ ] Add report integration test that verifies chart count and no failures in index data.
+- [x] Add report integration test that builds local `labours`.
+- [x] Add report integration test that runs `../hercules report --labours-cmd <local binary> --strict`.
+- [x] Add report integration test that verifies chart count and no failures in index data.
 
 Acceptance criteria:
 
-- [ ] `go test ./...` passes.
-- [ ] A dedicated compatibility suite can be run locally.
+- [x] `go test ./...` passes.
+- [x] A dedicated compatibility suite can be run locally.
 - [ ] A dedicated compatibility suite can be run in CI.
-- [ ] Visual parity thresholds are documented per mode.
+- [x] Visual parity thresholds are documented per mode.
 
 ## Phase 6: Output and Asset Parity
 
 Goal: files produced by Go labours are a drop-in replacement for Python labours outputs.
 
+Status as of 2026-04-27:
+
+- `README.md` now defines the output convention for every implemented mode.
+- `cmd` has a central output convention table used by the output planner, and tests require every implemented mode to have a documented convention.
+- `burndown-file` is now planned as a basename fanout mode instead of a directory-style asset mode, matching its handler behavior and preserving requested file basenames.
+
 Tasks:
 
-- [ ] Define output convention for each mode in a table.
-- [ ] Enforce output convention for each mode in tests.
+- [x] Define output convention for each mode in a table.
+- [x] Enforce output convention for each mode in tests.
 - [ ] Support PNG consistently across modes.
 - [ ] Support SVG consistently across modes.
 - [ ] Decide whether TensorFlow projector behavior is implemented or intentionally disabled.

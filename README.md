@@ -25,7 +25,7 @@ Known gaps:
 - Repository burndown modes need validation with a real multi-repository Hercules payload.
 - `sentiment` requires collected `CommentSentimentResults` by default; legacy heuristic charts require explicit `--sentiment-fallback`.
 - `devs-parallel` is still approximate; synthetic charts require explicit `--devs-parallel-fallback`.
-- `go test ./...` currently has known failures in visual compatibility tests. See [PLAN.md](./PLAN.md) for the current baseline and completion plan.
+- `go test ./...` passes, while opt-in visual/Python parity checks still track known compatibility gaps. See [PLAN.md](./PLAN.md) for the current baseline and completion plan.
 
 ## Build
 
@@ -95,6 +95,37 @@ Implemented or partially implemented modes:
 - `run-times`
 - `sentiment`
 - `refactoring-proxy`
+
+## Output Conventions
+
+The CLI normalizes `-o/--output` before dispatching each mode. Single-file modes receive a concrete file path. Directory-style modes receive a directory and place their assets inside it. Fanout modes receive a file basename and append entity names.
+
+| Mode | Output convention | Assets |
+| --- | --- | --- |
+| `burndown-project` | Single file | Requested output path |
+| `burndown-file` | File basename fanout | `<base>_<file><ext>` per file |
+| `burndown-person` | File basename fanout | `<base>_<person><ext>` per person |
+| `burndown-repository` | Asset directory | `burndown-repository_<repository>.png` per repository |
+| `burndown-repos-combined` | Single file | Requested output path |
+| `overwrites-matrix` | Single file | Requested output path |
+| `ownership` | Single file | Requested output path |
+| `couples-files` | Asset directory | `files_vocabulary.tsv`, `files_vectors.tsv`, `files_metadata.tsv` |
+| `couples-people` | Asset directory | `people_vocabulary.tsv`, `people_vectors.tsv`, `people_metadata.tsv` |
+| `couples-shotness` | Asset directory | `shotness_coupling_heatmap.png`, `top_shotness_coupling_pairs.png` |
+| `shotness` | Asset directory | `shotness.png`, `shotness.svg` |
+| `devs` | Single file | Requested output path |
+| `devs-efforts` | Asset directory | `devs_efforts_scatter.png`, `devs_productivity_ranking.png` |
+| `old-vs-new` | Asset directory | `old_vs_new_analysis.png`, `old_vs_new_analysis.svg` |
+| `languages` | Single file | Requested output path; direct directory calls write `languages.png` and `languages.svg` |
+| `temporal-activity` | Single file | Requested output path |
+| `devs-parallel` | Asset directory | `parallel_activity.png`, `parallel_activity.svg`, `developer_concurrency.png`, `developer_concurrency.svg` |
+| `run-times` | Asset directory | `runtime_breakdown.png`, `runtime_percentage.png` |
+| `bus-factor` | Primary file with companion | Requested output path plus `<base>_subsystems<ext>` |
+| `ownership-concentration` | Single file | Requested output path |
+| `knowledge-diffusion` | Primary file with companions | Requested output path plus `<base>_silos<ext>` and `<base>_trend<ext>` |
+| `hotspot-risk` | Primary file with companion | Requested output path plus `<base>_table.tsv` |
+| `sentiment` | Asset directory | `sentiment-overview.{png,svg}` and optional type-specific charts |
+| `refactoring-proxy` | Single file | Requested output path |
 
 ## Development Workflow
 

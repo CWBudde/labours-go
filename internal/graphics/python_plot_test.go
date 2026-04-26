@@ -12,7 +12,7 @@ import (
 )
 
 func TestGeneratePythonLaboursColorPaletteMatchesPythonTab20Cycle(t *testing.T) {
-	colors := generatePythonLaboursColorPalette(2)
+	colors := PythonLaboursColorPalette(2)
 	if len(colors) != 2 {
 		t.Fatalf("palette length = %d, want 2", len(colors))
 	}

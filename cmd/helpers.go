@@ -261,22 +261,146 @@ func generateOutputPath(basePath string, format string) string {
 	return nameWithoutExt + ext
 }
 
-var multiAssetModes = map[string]struct{}{
-	"burndown-file":       {},
-	"burndown-repository": {},
-	"couples-files":       {},
-	"couples-people":      {},
-	"couples-shotness":    {},
-	"devs-efforts":        {},
-	"devs-parallel":       {},
-	"old-vs-new":          {},
-	"run-times":           {},
-	"sentiment":           {},
-	"shotness":            {},
+type outputConventionKind string
+
+const (
+	outputSingleFile outputConventionKind = "single-file"
+	outputFileFanout outputConventionKind = "file-fanout"
+	outputAssetDir   outputConventionKind = "asset-directory"
+	outputCompanions outputConventionKind = "primary-file-with-companions"
+)
+
+type outputConvention struct {
+	Kind        outputConventionKind
+	Description string
+	Assets      []string
+}
+
+var modeOutputConventions = map[string]outputConvention{
+	"burndown-project": {
+		Kind:        outputSingleFile,
+		Description: "writes exactly the requested chart file",
+		Assets:      []string{"<output>"},
+	},
+	"burndown-file": {
+		Kind:        outputFileFanout,
+		Description: "uses the requested file path as a basename and writes one chart per file",
+		Assets:      []string{"<base>_<sanitized-file><ext>"},
+	},
+	"burndown-person": {
+		Kind:        outputFileFanout,
+		Description: "uses the requested file path as a basename and writes one chart per person",
+		Assets:      []string{"<base>_<sanitized-person><ext>"},
+	},
+	"burndown-repository": {
+		Kind:        outputAssetDir,
+		Description: "writes one chart per repository into the requested asset directory",
+		Assets:      []string{"burndown-repository_<sanitized-repository>.png"},
+	},
+	"burndown-repos-combined": {
+		Kind:        outputSingleFile,
+		Description: "writes exactly the requested combined repository chart file",
+		Assets:      []string{"<output>"},
+	},
+	"overwrites-matrix": {
+		Kind:        outputSingleFile,
+		Description: "writes exactly the requested matrix chart file",
+		Assets:      []string{"<output>"},
+	},
+	"ownership": {
+		Kind:        outputSingleFile,
+		Description: "writes exactly the requested ownership chart file",
+		Assets:      []string{"<output>"},
+	},
+	"couples-files": {
+		Kind:        outputAssetDir,
+		Description: "writes TensorBoard-style file coupling projector assets into the requested directory",
+		Assets:      []string{"files_vocabulary.tsv", "files_vectors.tsv", "files_metadata.tsv"},
+	},
+	"couples-people": {
+		Kind:        outputAssetDir,
+		Description: "writes TensorBoard-style people coupling projector assets into the requested directory",
+		Assets:      []string{"people_vocabulary.tsv", "people_vectors.tsv", "people_metadata.tsv"},
+	},
+	"couples-shotness": {
+		Kind:        outputAssetDir,
+		Description: "writes shotness coupling charts into the requested directory",
+		Assets:      []string{"shotness_coupling_heatmap.png", "top_shotness_coupling_pairs.png"},
+	},
+	"shotness": {
+		Kind:        outputAssetDir,
+		Description: "prints statistics and writes PNG/SVG charts into the requested directory",
+		Assets:      []string{"shotness.png", "shotness.svg"},
+	},
+	"devs": {
+		Kind:        outputSingleFile,
+		Description: "writes exactly the requested developer chart file",
+		Assets:      []string{"<output>"},
+	},
+	"devs-efforts": {
+		Kind:        outputAssetDir,
+		Description: "writes developer effort charts into the requested directory",
+		Assets:      []string{"devs_efforts_scatter.png", "devs_productivity_ranking.png"},
+	},
+	"old-vs-new": {
+		Kind:        outputAssetDir,
+		Description: "writes PNG/SVG old-vs-new charts into the requested directory",
+		Assets:      []string{"old_vs_new_analysis.png", "old_vs_new_analysis.svg"},
+	},
+	"languages": {
+		Kind:        outputSingleFile,
+		Description: "writes the requested chart file; direct directory calls write languages.png and languages.svg",
+		Assets:      []string{"<output>"},
+	},
+	"temporal-activity": {
+		Kind:        outputSingleFile,
+		Description: "writes exactly the requested temporal activity chart file",
+		Assets:      []string{"<output>"},
+	},
+	"devs-parallel": {
+		Kind:        outputAssetDir,
+		Description: "writes parallel development PNG/SVG charts into the requested directory",
+		Assets:      []string{"parallel_activity.png", "parallel_activity.svg", "developer_concurrency.png", "developer_concurrency.svg"},
+	},
+	"run-times": {
+		Kind:        outputAssetDir,
+		Description: "writes runtime charts into the requested directory",
+		Assets:      []string{"runtime_breakdown.png", "runtime_percentage.png"},
+	},
+	"bus-factor": {
+		Kind:        outputCompanions,
+		Description: "writes the requested timeline chart plus a subsystem summary sibling",
+		Assets:      []string{"<output>", "<base>_subsystems<ext>"},
+	},
+	"ownership-concentration": {
+		Kind:        outputSingleFile,
+		Description: "writes exactly the requested concentration chart file",
+		Assets:      []string{"<output>"},
+	},
+	"knowledge-diffusion": {
+		Kind:        outputCompanions,
+		Description: "writes the requested distribution chart plus silo and trend sibling charts",
+		Assets:      []string{"<output>", "<base>_silos<ext>", "<base>_trend<ext>"},
+	},
+	"hotspot-risk": {
+		Kind:        outputCompanions,
+		Description: "writes the requested risk chart plus a TSV table sibling",
+		Assets:      []string{"<output>", "<base>_table.tsv"},
+	},
+	"sentiment": {
+		Kind:        outputAssetDir,
+		Description: "writes sentiment charts into the requested directory",
+		Assets:      []string{"sentiment-overview.png", "sentiment-overview.svg", "sentiment-developers.png", "sentiment-developers.svg", "sentiment-languages.png", "sentiment-languages.svg"},
+	},
+	"refactoring-proxy": {
+		Kind:        outputSingleFile,
+		Description: "writes exactly the requested refactoring proxy chart file",
+		Assets:      []string{"<output>"},
+	},
 }
 
 func planModeOutput(baseOutput, mode string, modeCount int) string {
-	if isMultiAssetMode(mode) {
+	if outputConventionFor(mode).Kind == outputAssetDir {
 		return planMultiAssetModeOutput(baseOutput)
 	}
 
@@ -310,8 +434,18 @@ func planMultiAssetModeOutput(baseOutput string) string {
 }
 
 func isMultiAssetMode(mode string) bool {
-	_, ok := multiAssetModes[mode]
-	return ok
+	return outputConventionFor(mode).Kind == outputAssetDir
+}
+
+func outputConventionFor(mode string) outputConvention {
+	if convention, ok := modeOutputConventions[mode]; ok {
+		return convention
+	}
+	return outputConvention{
+		Kind:        outputSingleFile,
+		Description: "writes exactly the requested chart file",
+		Assets:      []string{"<output>"},
+	}
 }
 
 func isDirectoryPath(path string) bool {

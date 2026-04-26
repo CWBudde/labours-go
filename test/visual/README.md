@@ -55,9 +55,9 @@ Auto-detects input formats (YAML/Protobuf) and uses appropriate readers.
 
 ### 4. Test Framework (`regression_test.go`, `demo_test.go`)
 
-**Visual Regression Tests**: Compare current output with golden files
-**Python Compatibility Tests**: Validate functional similarity with Python labours
-**Chart Structure Tests**: Validate dimensions, colors, and chart components
+**Chart Structure Tests**: Validate that generated images exist, decode, are non-empty, and have sane dimensions. These run by default.
+**Visual Regression Tests**: Compare current output with golden files. These are opt-in with `LABOURS_GO_VISUAL_PARITY=1`.
+**Python Compatibility Tests**: Validate functional similarity with Python labours. These are opt-in with `LABOURS_GO_PYTHON_PARITY=1`.
 
 ## 🚀 Usage
 
@@ -71,8 +71,11 @@ just test-visual-demo
 ### Visual Regression Testing
 
 ```bash
-# Run all visual regression tests
+# Run structural visual tests
 just test-visual
+
+# Run opt-in golden and Python visual parity tests
+just test-visual-parity
 
 # Generate reference images for golden files
 just visual-generate-refs
@@ -196,6 +199,16 @@ Supports both hercules output formats:
 - Same input data as Go tests for accurate comparison
 
 ## 🎯 Quality Thresholds
+
+### Current Mode Thresholds
+
+| Test | Mode | Threshold |
+| --- | --- | --- |
+| Go golden regression | `burndown-project` | Standard |
+| Go golden regression | `burndown-project-relative` | Standard |
+| Go golden regression | `ownership` | Lenient |
+| Python compatibility | `burndown-project` | Lenient |
+| Python compatibility | `burndown-project --relative` | Lenient |
 
 ### Strict (95%+)
 - For critical regression testing

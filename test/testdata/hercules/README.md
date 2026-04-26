@@ -2,6 +2,17 @@
 
 These fixtures are generated from the neighboring `../hercules` checkout and are intended for reader/schema compatibility tests.
 
+Regenerate the fixture set with:
+
+```bash
+just fixtures
+```
+
+The script behind that target is `scripts/generate_hercules_fixtures.sh`. It accepts an optional output directory and supports:
+
+- `HERCULES_BIN=/path/to/hercules`
+- `HERCULES_FIXTURE_REPO=/path/to/repo-or-siva`
+
 ## `report_default.pb`
 
 Generated on 2026-04-26 from:
@@ -38,3 +49,11 @@ Generated on 2026-04-26 from:
 
 The source repository fixture is `../hercules/cmd/hercules/test_data/hercules.siva`.
 This file covers the `ShotnessAnalysisResults` payload used by `shotness` and `couples-shotness` in report-all workflows.
+
+## Extraction Goldens
+
+`report_default_summary.golden.json` and `shotness_summary.golden.json` are stable reader extraction summaries for the checked-in fixtures. Regenerate them after intentionally replacing the `.pb` fixtures with:
+
+```bash
+LABOURS_GO_UPDATE_GOLDENS=1 go test ./internal/readers -run ExtractionGolden
+```

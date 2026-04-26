@@ -69,7 +69,7 @@ func PlotBurndownPythonStyle(data *burndown.ProcessedBurndown, output string, re
 		}
 	}
 
-	colors := generatePythonLaboursColorPalette(numSeries)
+	colors := PythonLaboursColorPalette(numSeries)
 
 	// Create cumulative data for stacking (bottom to top like Python's stackplot)
 	cumulative := make([][]float64, numSeries)
@@ -195,7 +195,7 @@ func PrintSurvivalFunction(matrix [][]float64) {
 }
 
 // generatePythonLaboursColorPalette matches Python labours' tab20 color cycle.
-func generatePythonLaboursColorPalette(n int) []color.Color {
+func PythonLaboursColorPalette(n int) []color.Color {
 	tab20Colors := []color.Color{
 		color.RGBA{R: 31, G: 119, B: 180, A: 255},
 		color.RGBA{R: 174, G: 199, B: 232, A: 255},

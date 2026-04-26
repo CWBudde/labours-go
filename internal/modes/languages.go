@@ -2,11 +2,15 @@ package modes
 
 import (
 	"fmt"
+	"image/color"
+	"math"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
+	"github.com/spf13/viper"
 	"gonum.org/v1/plot"
 	"gonum.org/v1/plot/plotter"
 	"gonum.org/v1/plot/vg"
@@ -17,6 +21,8 @@ import (
 // Languages generates language statistics and visualization showing the distribution
 // of programming languages used in the repository.
 func Languages(reader readers.Reader, output string) error {
+	timeSeries, timeSeriesErr := reader.GetDeveloperTimeSeriesData()
+
 	// Step 1: Read language statistics
 	languageStats, err := reader.GetLanguageStats()
 	if err != nil {
@@ -33,12 +39,315 @@ func Languages(reader readers.Reader, output string) error {
 	})
 
 	// Step 3: Generate visualization
-	if err := plotLanguages(languageStats, output); err != nil {
+	startUnix, endUnix := reader.GetHeader()
+	if timeSeriesErr == nil && timeSeries != nil && len(timeSeries.Days) > 0 && startUnix > 0 && endUnix > startUnix {
+		err = plotLanguageEvolution(timeSeries, startUnix, endUnix, viper.GetString("resample"), output)
+	} else {
+		err = plotLanguages(languageStats, output)
+	}
+	if err != nil {
 		return fmt.Errorf("failed to generate language plot: %v", err)
 	}
 
 	fmt.Printf("Language analysis completed. Found %d languages.\n", len(languageStats))
 	return nil
+}
+
+type languageEvolution struct {
+	Languages []string
+	Dates     []time.Time
+	Matrix    [][]float64
+	Total     float64
+}
+
+func plotLanguageEvolution(timeSeries *readers.DeveloperTimeSeriesData, startUnix, endUnix int64, resample, output string) error {
+	data, err := buildLanguageEvolution(timeSeries, startUnix, endUnix, resample)
+	if err != nil {
+		return err
+	}
+
+	p := plot.New()
+	p.Title.Text = fmt.Sprintf("Language Evolution Over Time\n(Total: %s lines)", formatFloatWithCommas(data.Total))
+	p.X.Label.Text = "Time"
+	p.Y.Label.Text = "Lines of Code"
+
+	colors := graphics.PythonLaboursColorPalette(len(data.Languages))
+	if len(data.Dates) > 1 {
+		cumulative := make([]float64, len(data.Dates))
+		for langIndex, lang := range data.Languages {
+			top := make([]float64, len(data.Dates))
+			bottom := make([]float64, len(data.Dates))
+			for i := range data.Dates {
+				bottom[i] = cumulative[i]
+				cumulative[i] += data.Matrix[i][langIndex]
+				top[i] = cumulative[i]
+			}
+			poly, err := stackedAreaPolygon(data.Dates, top, bottom)
+			if err != nil {
+				return err
+			}
+			poly.Color = colorToRGBA(colors[langIndex%len(colors)], 204)
+			poly.LineStyle.Width = 0
+			p.Add(poly)
+			p.Legend.Add(lang, poly)
+		}
+	} else {
+		for langIndex, lang := range data.Languages {
+			line, err := plotter.NewLine(plotter.XYs{{X: float64(data.Dates[0].Unix()), Y: 0}, {X: float64(data.Dates[0].Unix()), Y: data.Total}})
+			if err != nil {
+				return err
+			}
+			line.Color = colorToRGBA(colors[langIndex%len(colors)], 204)
+			p.Legend.Add(lang, line)
+		}
+	}
+
+	p.Legend.Left = true
+	p.Legend.Top = true
+	p.X.Tick.Label.Rotation = math.Pi / 6
+	p.X.Tick.Label.XAlign = -0.5
+	p.X.Tick.Marker = yearlyTicks(data.Dates[0].AddDate(-2, 0, 0), data.Dates[len(data.Dates)-1].AddDate(2, 0, 0))
+	if len(data.Dates) == 1 {
+		p.X.Min = float64(data.Dates[0].AddDate(-2, 0, 0).Unix())
+		p.X.Max = float64(data.Dates[0].AddDate(2, 0, 0).Unix())
+	} else {
+		p.X.Min = float64(data.Dates[0].Unix())
+		p.X.Max = float64(data.Dates[len(data.Dates)-1].Unix())
+	}
+	p.Y.Min = 0
+	p.Y.Max = math.Max(data.Total*1.05, 1)
+
+	width, height := graphics.GetPythonPlotSize(16, 12)
+	outputs, err := languageOutputPaths(output)
+	if err != nil {
+		return err
+	}
+
+	for _, outputPath := range outputs {
+		if err := graphics.SavePNGWithBackground(p, width, height, outputPath, color.Transparent); err != nil {
+			return err
+		}
+		fmt.Printf("Language chart saved to %s\n", outputPath)
+	}
+	return nil
+}
+
+func buildLanguageEvolution(timeSeries *readers.DeveloperTimeSeriesData, startUnix, endUnix int64, resample string) (languageEvolution, error) {
+	start, end, totalDays := timeSeriesCalendarRange(timeSeries, startUnix, endUnix, 0)
+	if totalDays <= 0 {
+		return languageEvolution{}, fmt.Errorf("no temporal data to plot")
+	}
+
+	totalLangs := make(map[string]int)
+	for _, devs := range timeSeries.Days {
+		for _, stats := range devs {
+			for lang, vals := range stats.Languages {
+				if lang == "" {
+					continue
+				}
+				for _, v := range vals {
+					totalLangs[lang] += v
+				}
+			}
+		}
+	}
+	if len(totalLangs) == 0 {
+		return languageEvolution{}, fmt.Errorf("no language data to plot")
+	}
+
+	type langTotal struct {
+		Name  string
+		Total int
+	}
+	sortedLangs := make([]langTotal, 0, len(totalLangs))
+	for lang, total := range totalLangs {
+		sortedLangs = append(sortedLangs, langTotal{Name: lang, Total: total})
+	}
+	sort.Slice(sortedLangs, func(i, j int) bool {
+		if sortedLangs[i].Total == sortedLangs[j].Total {
+			return sortedLangs[i].Name < sortedLangs[j].Name
+		}
+		return sortedLangs[i].Total > sortedLangs[j].Total
+	})
+
+	topCount := min(len(sortedLangs), 10)
+	topLanguages := make(map[string]bool, topCount)
+	for _, item := range sortedLangs[:topCount] {
+		topLanguages[item.Name] = true
+	}
+	languages := make([]string, 0, topCount+1)
+	for lang := range topLanguages {
+		languages = append(languages, lang)
+	}
+	sort.Strings(languages)
+	if len(sortedLangs) > topCount {
+		languages = append(languages, "Other")
+	}
+	langIndex := make(map[string]int, len(languages))
+	for i, lang := range languages {
+		langIndex[lang] = i
+	}
+
+	daily := make([][]float64, totalDays)
+	cumulative := make(map[string]int)
+	for i := range daily {
+		daily[i] = make([]float64, len(languages))
+	}
+	days := make([]int, 0, len(timeSeries.Days))
+	for day := range timeSeries.Days {
+		days = append(days, day)
+	}
+	sort.Ints(days)
+	for _, day := range days {
+		if day < 0 || day >= totalDays {
+			continue
+		}
+		for _, stats := range timeSeries.Days[day] {
+			for lang, vals := range stats.Languages {
+				if lang == "" || len(vals) < 2 {
+					continue
+				}
+				target := lang
+				if !topLanguages[lang] {
+					if _, ok := langIndex["Other"]; !ok {
+						continue
+					}
+					target = "Other"
+				}
+				cumulative[target] += vals[0] - vals[1]
+			}
+		}
+		for i, lang := range languages {
+			daily[day][i] = math.Max(0, float64(cumulative[lang]))
+		}
+	}
+	for day := 1; day < totalDays; day++ {
+		for i := range languages {
+			if daily[day][i] == 0 && daily[day-1][i] > 0 {
+				daily[day][i] = daily[day-1][i]
+			}
+		}
+	}
+
+	dates, matrix := resampleLanguageMatrix(daily, start, end, resample)
+	total := 0.0
+	for _, row := range matrix {
+		for _, value := range row {
+			total += value
+		}
+	}
+	return languageEvolution{Languages: languages, Dates: dates, Matrix: matrix, Total: total}, nil
+}
+
+func resampleLanguageMatrix(daily [][]float64, start, end time.Time, resample string) ([]time.Time, [][]float64) {
+	freq := resample
+	switch freq {
+	case "", "year":
+		freq = "YE"
+	case "month":
+		freq = "ME"
+	case "day", "raw", "no":
+		freq = "D"
+	case "week":
+		freq = "W"
+	}
+
+	var dates []time.Time
+	switch freq {
+	case "YE", "A":
+		for year := start.Year(); year <= end.Year(); year++ {
+			dt := time.Date(year, time.December, 31, start.Hour(), start.Minute(), start.Second(), start.Nanosecond(), start.Location())
+			if !dt.Before(start) && !dt.After(end) {
+				dates = append(dates, dt)
+			}
+		}
+	case "ME", "M":
+		for current := languageMonthEnd(start.Year(), start.Month(), start); !current.After(end); {
+			if !current.Before(start) {
+				dates = append(dates, current)
+			}
+			next := current.AddDate(0, 1, 0)
+			current = languageMonthEnd(next.Year(), next.Month(), start)
+		}
+	case "W":
+		for current := start; !current.After(end); current = current.AddDate(0, 0, 7) {
+			dates = append(dates, current)
+		}
+	default:
+		for i := range daily {
+			dates = append(dates, start.AddDate(0, 0, i))
+		}
+	}
+	if len(dates) == 0 {
+		dates = []time.Time{start}
+	}
+
+	matrix := make([][]float64, len(dates))
+	for i, dt := range dates {
+		day := calendarDayIndex(start, dt)
+		if day < 0 {
+			day = 0
+		}
+		if day >= len(daily) {
+			day = len(daily) - 1
+		}
+		matrix[i] = append([]float64(nil), daily[day]...)
+	}
+	return dates, matrix
+}
+
+func languageMonthEnd(year int, month time.Month, ref time.Time) time.Time {
+	return time.Date(year, month+1, 1, ref.Hour(), ref.Minute(), ref.Second(), ref.Nanosecond(), ref.Location()).AddDate(0, 0, -1)
+}
+
+func stackedAreaPolygon(dates []time.Time, top, bottom []float64) (*plotter.Polygon, error) {
+	if len(dates) != len(top) || len(dates) != len(bottom) {
+		return nil, fmt.Errorf("stacked area length mismatch")
+	}
+	points := make(plotter.XYs, len(dates)*2)
+	for i := range dates {
+		points[i] = plotter.XY{X: float64(dates[i].Unix()), Y: top[i]}
+	}
+	for i := range dates {
+		j := len(dates) - 1 - i
+		points[len(dates)+i] = plotter.XY{X: float64(dates[j].Unix()), Y: bottom[j]}
+	}
+	return plotter.NewPolygon(points)
+}
+
+func yearlyTicks(start, end time.Time) plot.ConstantTicks {
+	var ticks []plot.Tick
+	for year := start.Year(); year <= end.Year(); year++ {
+		dt := time.Date(year, time.January, 1, 0, 0, 0, 0, start.Location())
+		ticks = append(ticks, plot.Tick{Value: float64(dt.Unix()), Label: fmt.Sprintf("%d", year)})
+	}
+	return plot.ConstantTicks(ticks)
+}
+
+func formatFloatWithCommas(v float64) string {
+	s := fmt.Sprintf("%.1f", v)
+	parts := strings.SplitN(s, ".", 2)
+	intPart := parts[0]
+	var out []byte
+	for i, r := range reverseString(intPart) {
+		if i > 0 && i%3 == 0 {
+			out = append(out, ',')
+		}
+		out = append(out, byte(r))
+	}
+	formatted := reverseString(string(out))
+	if len(parts) == 2 {
+		formatted += "." + parts[1]
+	}
+	return formatted
+}
+
+func reverseString(s string) string {
+	runes := []rune(s)
+	for i, j := 0, len(runes)-1; i < j; i, j = i+1, j-1 {
+		runes[i], runes[j] = runes[j], runes[i]
+	}
+	return string(runes)
 }
 
 // plotLanguages creates a bar chart showing language distribution by lines of code
@@ -81,15 +390,15 @@ func plotLanguages(languageStats []readers.LanguageStat, output string) error {
 		p.X.Tick.Label.YAlign = -0.5
 	}
 
-	// Save the plot with dynamic sizing
-	width, height := graphics.GetPlotSize(graphics.ChartTypeDefault)
+	// Python labours applies the shared plot style default of 16x12 inches.
+	width, height := graphics.GetPythonPlotSize(16, 12)
 	outputs, err := languageOutputPaths(output)
 	if err != nil {
 		return err
 	}
 
 	for _, outputPath := range outputs {
-		if err := graphics.SavePlotWithFormat(p, width, height, outputPath); err != nil {
+		if err := graphics.SavePNGWithBackground(p, width, height, outputPath, color.Transparent); err != nil {
 			return err
 		}
 		fmt.Printf("Language chart saved to %s\n", outputPath)

@@ -95,6 +95,43 @@ func TestGenerateDevsPlotSingleDeveloper(t *testing.T) {
 	}
 }
 
+func TestBuildDeveloperSeriesRowsUsesAllTicks(t *testing.T) {
+	path := filepath.Join("..", "..", "example_data", "hercules_devs.yaml")
+	file, err := os.Open(path)
+	if err != nil {
+		t.Fatalf("open fixture: %v", err)
+	}
+	defer file.Close()
+
+	reader := &readers.YamlReader{}
+	if err := reader.Read(file); err != nil {
+		t.Fatalf("Read() unexpected error: %v", err)
+	}
+
+	timeSeries, err := reader.GetDeveloperTimeSeriesData()
+	if err != nil {
+		t.Fatalf("GetDeveloperTimeSeriesData() unexpected error: %v", err)
+	}
+
+	rows, _ := buildDeveloperSeriesRows(timeSeries, 1734315181, 1754512384, 20)
+	if len(rows) != 1 {
+		t.Fatalf("rows = %d, want 1", len(rows))
+	}
+	row := rows[0]
+	if row.Commits != 8 {
+		t.Fatalf("commits = %d, want 8", row.Commits)
+	}
+	if row.LinesAdded != 9330 {
+		t.Fatalf("lines added = %d, want 9330", row.LinesAdded)
+	}
+	if row.LinesRemove != 1663 {
+		t.Fatalf("lines removed = %d, want 1663", row.LinesRemove)
+	}
+	if row.LinesChange != 957 {
+		t.Fatalf("lines changed = %d, want 957", row.LinesChange)
+	}
+}
+
 func TestSortDevelopersByCommits(t *testing.T) {
 	devStats := []readers.DeveloperStat{
 		{Name: "Alice", Commits: 30},
