@@ -23,8 +23,8 @@ Known gaps:
 
 - Current Hercules report modes are wired, but several still need Python-labours semantic and visual parity work.
 - Repository burndown modes need validation with a real multi-repository Hercules payload.
-- `sentiment` uses `CommentSentimentResults` when present, but still has a heuristic fallback for payloads without collected sentiment data.
-- `devs-parallel` is still approximate and can synthesize fallback data instead of matching Python's calculations.
+- `sentiment` requires collected `CommentSentimentResults` by default; legacy heuristic charts require explicit `--sentiment-fallback`.
+- `devs-parallel` is still approximate; synthetic charts require explicit `--devs-parallel-fallback`.
 - `go test ./...` currently has known failures in visual compatibility tests. See [PLAN.md](./PLAN.md) for the current baseline and completion plan.
 
 ## Build

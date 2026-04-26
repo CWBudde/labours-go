@@ -50,6 +50,8 @@ func initializeFlags() {
 	rootCmd.PersistentFlags().Int("temporal-legend-threshold", 32, "Maximum number of developers to show legend for in temporal activity charts. 0 disables the limit.")
 	rootCmd.PersistentFlags().Int("temporal-legend-single-col-threshold", 10, "Maximum number of developers for single-column legend in temporal activity charts.")
 	rootCmd.PersistentFlags().Bool("sentiment", false, "Include sentiment analysis in the output (Python compatibility)")
+	rootCmd.PersistentFlags().Bool("sentiment-fallback", false, "Allow heuristic sentiment charts when collected sentiment data is missing")
+	rootCmd.PersistentFlags().Bool("devs-parallel-fallback", false, "Allow synthetic devs-parallel charts when people burndown data is missing")
 
 	// Progress and output control flags
 	rootCmd.PersistentFlags().BoolP("quiet", "q", false, "Disable progress bars and reduce output")

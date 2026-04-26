@@ -85,3 +85,44 @@ func GetPlotSizeInches(chartType ChartType) (width, height float64) {
 	w, h := GetPlotSize(chartType)
 	return float64(w / vg.Inch), float64(h / vg.Inch)
 }
+
+// GetPythonPlotSize returns dimensions that match matplotlib's default PNG
+// export convention: figure size in inches rendered at 100 DPI.
+func GetPythonPlotSize(defaultWidth, defaultHeight float64) (width, height vg.Length) {
+	sizeStr := viper.GetString("size")
+	if sizeStr == "" {
+		return vg.Length(defaultWidth * 100), vg.Length(defaultHeight * 100)
+	}
+
+	parsedWidth, parsedHeight, err := parsePlotSizeFloats(sizeStr)
+	if err != nil {
+		fmt.Printf("Warning: %v, using default size\n", err)
+		return vg.Length(defaultWidth * 100), vg.Length(defaultHeight * 100)
+	}
+	return vg.Length(parsedWidth * 100), vg.Length(parsedHeight * 100)
+}
+
+func parsePlotSizeFloats(sizeStr string) (width, height float64, err error) {
+	parts := strings.Split(strings.TrimSpace(sizeStr), ",")
+	if len(parts) != 2 {
+		return 0, 0, fmt.Errorf("invalid size format '%s': expected 'width,height' (e.g., '12,9')", sizeStr)
+	}
+
+	width, err = strconv.ParseFloat(strings.TrimSpace(parts[0]), 64)
+	if err != nil {
+		return 0, 0, fmt.Errorf("invalid width '%s': %w", parts[0], err)
+	}
+
+	height, err = strconv.ParseFloat(strings.TrimSpace(parts[1]), 64)
+	if err != nil {
+		return 0, 0, fmt.Errorf("invalid height '%s': %w", parts[1], err)
+	}
+
+	if width <= 0 || height <= 0 {
+		return 0, 0, fmt.Errorf("dimensions must be positive: got width=%.1f, height=%.1f", width, height)
+	}
+	if width > 50 || height > 50 {
+		return 0, 0, fmt.Errorf("dimensions too large: got width=%.1f, height=%.1f (max 50 inches)", width, height)
+	}
+	return width, height, nil
+}

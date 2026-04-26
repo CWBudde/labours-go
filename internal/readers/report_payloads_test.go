@@ -334,6 +334,49 @@ func TestProtobufReader_CurrentHerculesShotnessFixture(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, index, len(records))
 	require.Len(t, cooccurrence, len(records))
+	requireShotnessCooccurrenceMatchesCounterOverlap(t, records, cooccurrence)
+}
+
+func TestProtobufReader_ShotnessCooccurrenceUsesCounterOverlap(t *testing.T) {
+	payload := &pb.AnalysisResults{
+		Contents: map[string][]byte{
+			"Shotness": marshalProto(t, &pb.ShotnessAnalysisResults{
+				Records: []*pb.ShotnessRecord{
+					{
+						Type:     "function",
+						Name:     "alpha",
+						File:     "a.go",
+						Counters: map[int32]int32{10: 3, 20: 1},
+					},
+					{
+						Type:     "function",
+						Name:     "beta",
+						File:     "b.go",
+						Counters: map[int32]int32{10: 2, 30: 5},
+					},
+					{
+						Type:     "function",
+						Name:     "gamma",
+						File:     "c.go",
+						Counters: map[int32]int32{20: 4, 30: 1},
+					},
+				},
+			}),
+		},
+	}
+	data := marshalProto(t, payload)
+
+	reader := &ProtobufReader{}
+	require.NoError(t, reader.Read(bytes.NewReader(data)))
+
+	index, cooccurrence, err := reader.GetShotnessCooccurrence()
+	require.NoError(t, err)
+	require.Equal(t, []string{"a.go:alpha", "b.go:beta", "c.go:gamma"}, index)
+	require.Equal(t, [][]int{
+		{4, 2, 1},
+		{2, 7, 1},
+		{1, 1, 5},
+	}, cooccurrence)
 }
 
 func marshalProto(t *testing.T, message proto.Message) []byte {
@@ -341,4 +384,27 @@ func marshalProto(t *testing.T, message proto.Message) []byte {
 	data, err := proto.Marshal(message)
 	require.NoError(t, err)
 	return data
+}
+
+func requireShotnessCooccurrenceMatchesCounterOverlap(t *testing.T, records []ShotnessRecord, matrix [][]int) {
+	t.Helper()
+	for i, record := range records {
+		require.Len(t, matrix[i], len(records))
+		for j, other := range records {
+			expected := 0
+			if i == j {
+				for _, count := range record.Counters {
+					expected += int(count)
+				}
+			} else {
+				for tick, count := range record.Counters {
+					if otherCount, exists := other.Counters[tick]; exists && count > 0 && otherCount > 0 {
+						expected += int(min32(count, otherCount))
+					}
+				}
+			}
+			require.Equalf(t, expected, matrix[i][j], "cooccurrence[%d][%d]", i, j)
+			require.Equalf(t, matrix[i][j], matrix[j][i], "cooccurrence matrix must be symmetric at [%d][%d]", i, j)
+		}
+	}
 }

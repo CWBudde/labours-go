@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"image/color"
 
+	"github.com/spf13/viper"
 	"gonum.org/v1/plot"
 	"gonum.org/v1/plot/plotter"
 	"labours-go/internal/burndown"
@@ -17,9 +18,9 @@ func PlotBurndownPythonStyle(data *burndown.ProcessedBurndown, output string, re
 
 	p := plot.New()
 	// Generate Python-compatible title: "repository 2 x 225 (granularity 30, sampling 30)"
-	p.Title.Text = fmt.Sprintf("%s %d x %d (granularity %d, sampling %d)", 
+	p.Title.Text = fmt.Sprintf("%s %d x %d (granularity %d, sampling %d)",
 		data.Name, len(data.Matrix), len(data.DateRange), data.Granularity, data.Sampling)
-	p.X.Label.Text = "Time" 
+	p.X.Label.Text = "Time"
 	p.Y.Label.Text = "Lines of code"
 	if relative {
 		p.Y.Label.Text = "Relative Fraction"
@@ -27,6 +28,7 @@ func PlotBurndownPythonStyle(data *burndown.ProcessedBurndown, output string, re
 
 	// Apply theme styling
 	applyThemeToPlot(p)
+	p.BackgroundColor = color.RGBA{R: 255, G: 255, B: 255, A: 0}
 
 	numSeries := len(data.Matrix)
 	numPoints := len(data.DateRange)
@@ -48,23 +50,31 @@ func PlotBurndownPythonStyle(data *burndown.ProcessedBurndown, output string, re
 		matrix = normalizeMatrixColumns(data.Matrix)
 	}
 
-	// DEBUG: Print matrix values to understand the data
-	fmt.Printf("DEBUG MATRIX ANALYSIS:\n")
-	fmt.Printf("  Matrix dimensions: %dx%d\n", len(matrix), len(matrix[0]))
-	for i := 0; i < len(matrix); i++ {
-		minVal, maxVal := matrix[i][0], matrix[i][0]
-		negCount, posCount := 0, 0
-		for j := 0; j < len(matrix[i]); j++ {
-			if matrix[i][j] < minVal { minVal = matrix[i][j] }
-			if matrix[i][j] > maxVal { maxVal = matrix[i][j] }
-			if matrix[i][j] < 0 { negCount++ }
-			if matrix[i][j] > 0 { posCount++ }
+	if !viper.GetBool("quiet") {
+		fmt.Printf("DEBUG MATRIX ANALYSIS:\n")
+		fmt.Printf("  Matrix dimensions: %dx%d\n", len(matrix), len(matrix[0]))
+		for i := 0; i < len(matrix); i++ {
+			minVal, maxVal := matrix[i][0], matrix[i][0]
+			negCount, posCount := 0, 0
+			for j := 0; j < len(matrix[i]); j++ {
+				if matrix[i][j] < minVal {
+					minVal = matrix[i][j]
+				}
+				if matrix[i][j] > maxVal {
+					maxVal = matrix[i][j]
+				}
+				if matrix[i][j] < 0 {
+					negCount++
+				}
+				if matrix[i][j] > 0 {
+					posCount++
+				}
+			}
+			fmt.Printf("  Layer %d: min=%.2f, max=%.2f, negatives=%d, positives=%d\n", i, minVal, maxVal, negCount, posCount)
 		}
-		fmt.Printf("  Layer %d: min=%.2f, max=%.2f, negatives=%d, positives=%d\n", i, minVal, maxVal, negCount, posCount)
 	}
-	
-	// Generate matplotlib-compatible color palette (matches Python exactly)
-	colors := generateMatplotlibColorPalette(numSeries)
+
+	colors := generatePythonLaboursColorPalette(numSeries)
 
 	// Create cumulative data for stacking (bottom to top like Python's stackplot)
 	cumulative := make([][]float64, numSeries)
@@ -127,8 +137,7 @@ func PlotBurndownPythonStyle(data *burndown.ProcessedBurndown, output string, re
 	}
 	_ = legendLoc // TODO: Implement legend positioning
 
-	// Save plot with dynamic sizing (respects --size flag)
-	width, height := GetPlotSize(ChartTypeDefault)
+	width, height := GetPythonPlotSize(16, 12)
 	if err := SavePlotWithFormat(p, width, height, output); err != nil {
 		return err
 	}
@@ -202,7 +211,7 @@ func PrintSurvivalFunction(matrix [][]float64) {
 	fmt.Println("           Ratio of survived lines")
 	// TODO: Implement Kaplan-Meier survival analysis like Python
 	// For now, just print a placeholder that shows we're processing survival data
-	
+
 	if len(matrix) > 0 && len(matrix[0]) > 0 {
 		total := 0.0
 		for i := range matrix {
@@ -210,7 +219,7 @@ func PrintSurvivalFunction(matrix [][]float64) {
 				total += matrix[i][j]
 			}
 		}
-		
+
 		for i := 0; i < len(matrix[0]); i++ {
 			alive := 0.0
 			for j := range matrix {
@@ -226,40 +235,25 @@ func PrintSurvivalFunction(matrix [][]float64) {
 	}
 }
 
-// generateMatplotlibColorPalette creates colors that exactly match Python matplotlib defaults
-func generateMatplotlibColorPalette(n int) []color.Color {
-	// Matplotlib default colors (C0, C1, C2, ...) - these exactly match Python pyplot
-	matplotlibColors := []color.Color{
-		color.RGBA{R: 31, G: 119, B: 180, A: 180},   // Blue (C0) - matplotlib default
-		color.RGBA{R: 255, G: 127, B: 14, A: 180},   // Orange (C1) 
-		color.RGBA{R: 44, G: 160, B: 44, A: 180},    // Green (C2)
-		color.RGBA{R: 214, G: 39, B: 40, A: 180},    // Red (C3)
-		color.RGBA{R: 148, G: 103, B: 189, A: 180},  // Purple (C4)
-		color.RGBA{R: 140, G: 86, B: 75, A: 180},    // Brown (C5)
-		color.RGBA{R: 227, G: 119, B: 194, A: 180},  // Pink (C6)
-		color.RGBA{R: 127, G: 127, B: 127, A: 180},  // Gray (C7)
-		color.RGBA{R: 188, G: 189, B: 34, A: 180},   // Olive (C8)
-		color.RGBA{R: 23, G: 190, B: 207, A: 180},   // Cyan (C9)
+// generatePythonLaboursColorPalette matches Python labours' default
+// matplotlib style.use("ggplot") stackplot color cycle.
+func generatePythonLaboursColorPalette(n int) []color.Color {
+	ggplotColors := []color.Color{
+		color.RGBA{R: 226, G: 74, B: 51, A: 255},  // #E24A33
+		color.RGBA{R: 52, G: 138, B: 189, A: 255}, // #348ABD
+		color.RGBA{R: 152, G: 142, B: 213, A: 255},
+		color.RGBA{R: 119, G: 119, B: 119, A: 255},
+		color.RGBA{R: 246, G: 184, B: 71, A: 255},
 	}
-	
-	// For burndown charts specifically, Python matplotlib uses C3 (Red) first for older code, then C0 (Blue) for newer
-	// This exactly matches the Python reference chart pattern
-	if n == 2 {
-		return []color.Color{
-			color.RGBA{R: 214, G: 39, B: 40, A: 200},   // Red (C3) for bottom layer (older/2024)
-			color.RGBA{R: 31, G: 119, B: 180, A: 200},  // Blue (C0) for top layer (newer/2025)
-		}
-	}
-	
+
 	colors := make([]color.Color, n)
 	for i := 0; i < n; i++ {
-		if i < len(matplotlibColors) {
-			colors[i] = matplotlibColors[i]
+		if i < len(ggplotColors) {
+			colors[i] = ggplotColors[i]
 		} else {
-			// Generate additional colors if needed
-			colors[i] = generateHSVColorWithOpacity(i, n, 180)
+			colors[i] = generateHSVColorWithOpacity(i, n, 255)
 		}
 	}
-	
+
 	return colors
 }

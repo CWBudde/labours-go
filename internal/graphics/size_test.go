@@ -3,65 +3,66 @@ package graphics
 import (
 	"testing"
 
+	"github.com/spf13/viper"
 	"gonum.org/v1/plot/vg"
 )
 
 func TestParsePlotSize(t *testing.T) {
 	tests := []struct {
-		name          string
-		sizeStr       string
-		chartType     ChartType
-		expectedWidth float64
+		name           string
+		sizeStr        string
+		chartType      ChartType
+		expectedWidth  float64
 		expectedHeight float64
-		expectError   bool
+		expectError    bool
 	}{
 		{
-			name:          "empty string uses default",
-			sizeStr:       "",
-			chartType:     ChartTypeDefault,
-			expectedWidth: 16.0,
+			name:           "empty string uses default",
+			sizeStr:        "",
+			chartType:      ChartTypeDefault,
+			expectedWidth:  16.0,
 			expectedHeight: 8.0,
-			expectError:   false,
+			expectError:    false,
 		},
 		{
-			name:          "empty string uses square default",
-			sizeStr:       "",
-			chartType:     ChartTypeSquare,
-			expectedWidth: 12.0,
+			name:           "empty string uses square default",
+			sizeStr:        "",
+			chartType:      ChartTypeSquare,
+			expectedWidth:  12.0,
 			expectedHeight: 12.0,
-			expectError:   false,
+			expectError:    false,
 		},
 		{
-			name:          "empty string uses compact default",
-			sizeStr:       "",
-			chartType:     ChartTypeCompact,
-			expectedWidth: 10.0,
+			name:           "empty string uses compact default",
+			sizeStr:        "",
+			chartType:      ChartTypeCompact,
+			expectedWidth:  10.0,
 			expectedHeight: 6.0,
-			expectError:   false,
+			expectError:    false,
 		},
 		{
-			name:          "valid size string",
-			sizeStr:       "14,10",
-			chartType:     ChartTypeDefault,
-			expectedWidth: 14.0,
+			name:           "valid size string",
+			sizeStr:        "14,10",
+			chartType:      ChartTypeDefault,
+			expectedWidth:  14.0,
 			expectedHeight: 10.0,
-			expectError:   false,
+			expectError:    false,
 		},
 		{
-			name:          "valid size string with spaces",
-			sizeStr:       " 12 , 8 ",
-			chartType:     ChartTypeDefault,
-			expectedWidth: 12.0,
+			name:           "valid size string with spaces",
+			sizeStr:        " 12 , 8 ",
+			chartType:      ChartTypeDefault,
+			expectedWidth:  12.0,
 			expectedHeight: 8.0,
-			expectError:   false,
+			expectError:    false,
 		},
 		{
-			name:          "Python labours compatible format",
-			sizeStr:       "16,12",
-			chartType:     ChartTypeDefault,
-			expectedWidth: 16.0,
+			name:           "Python labours compatible format",
+			sizeStr:        "16,12",
+			chartType:      ChartTypeDefault,
+			expectedWidth:  16.0,
 			expectedHeight: 12.0,
-			expectError:   false,
+			expectError:    false,
 		},
 		{
 			name:        "invalid format - no comma",
@@ -106,12 +107,12 @@ func TestParsePlotSize(t *testing.T) {
 			expectError: true,
 		},
 		{
-			name:          "decimal values",
-			sizeStr:       "12.5,8.5",
-			chartType:     ChartTypeDefault,
-			expectedWidth: 12.5,
+			name:           "decimal values",
+			sizeStr:        "12.5,8.5",
+			chartType:      ChartTypeDefault,
+			expectedWidth:  12.5,
 			expectedHeight: 8.5,
-			expectError:   false,
+			expectError:    false,
 		},
 	}
 
@@ -148,33 +149,33 @@ func TestParsePlotSize(t *testing.T) {
 
 func TestGetPlotSizeInches(t *testing.T) {
 	tests := []struct {
-		name          string
-		chartType     ChartType
-		expectedWidth float64
+		name           string
+		chartType      ChartType
+		expectedWidth  float64
 		expectedHeight float64
 	}{
 		{
-			name:          "default chart type",
-			chartType:     ChartTypeDefault,
-			expectedWidth: 16.0,
+			name:           "default chart type",
+			chartType:      ChartTypeDefault,
+			expectedWidth:  16.0,
 			expectedHeight: 8.0,
 		},
 		{
-			name:          "square chart type",
-			chartType:     ChartTypeSquare,
-			expectedWidth: 12.0,
+			name:           "square chart type",
+			chartType:      ChartTypeSquare,
+			expectedWidth:  12.0,
 			expectedHeight: 12.0,
 		},
 		{
-			name:          "compact chart type",
-			chartType:     ChartTypeCompact,
-			expectedWidth: 10.0,
+			name:           "compact chart type",
+			chartType:      ChartTypeCompact,
+			expectedWidth:  10.0,
 			expectedHeight: 6.0,
 		},
 		{
-			name:          "wide chart type",
-			chartType:     ChartTypeWide,
-			expectedWidth: 16.0,
+			name:           "wide chart type",
+			chartType:      ChartTypeWide,
+			expectedWidth:  16.0,
 			expectedHeight: 10.0,
 		},
 	}
@@ -191,6 +192,29 @@ func TestGetPlotSizeInches(t *testing.T) {
 				t.Errorf("height mismatch: expected %f, got %f", tt.expectedHeight, height)
 			}
 		})
+	}
+}
+
+func TestGetPythonPlotSizeUsesMatplotlibDPI(t *testing.T) {
+	oldSize := viper.GetString("size")
+	defer viper.Set("size", oldSize)
+
+	viper.Set("size", "")
+	width, height := GetPythonPlotSize(16, 12)
+	if got, want := int(width), 1600; got != want {
+		t.Fatalf("default width = %d, want %d", got, want)
+	}
+	if got, want := int(height), 1200; got != want {
+		t.Fatalf("default height = %d, want %d", got, want)
+	}
+
+	viper.Set("size", "12,9")
+	width, height = GetPythonPlotSize(16, 12)
+	if got, want := int(width), 1200; got != want {
+		t.Fatalf("custom width = %d, want %d", got, want)
+	}
+	if got, want := int(height), 900; got != want {
+		t.Fatalf("custom height = %d, want %d", got, want)
 	}
 }
 

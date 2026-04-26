@@ -1,6 +1,7 @@
 package modes
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"path/filepath"
@@ -23,25 +24,28 @@ type SentimentResult struct {
 	Score    float64 // Overall sentiment score (-1 to 1)
 }
 
-// Sentiment generates sentiment analysis based on available repository data
-// This analyzes patterns in developer activity and language usage to infer sentiment trends
-func Sentiment(reader readers.Reader, output string) error {
+// Sentiment generates sentiment analysis charts from collected sentiment data.
+// When allowHeuristicFallback is true, legacy developer/language heuristics are used
+// for old fixtures that do not contain CommentSentimentResults.
+func Sentiment(reader readers.Reader, output string, allowHeuristicFallback bool) error {
 	fmt.Println("Analyzing repository sentiment patterns...")
 
-	// Collect sentiment results from different data sources
 	var sentimentResults []SentimentResult
 	if sentimentReader, ok := reader.(readers.SentimentReader); ok {
 		ticks, err := sentimentReader.GetSentimentByTick()
 		if err == nil && len(ticks) > 0 {
 			sentimentResults = append(sentimentResults, sentimentResultsFromTicks(ticks)...)
-		}
-		if err != nil {
-			fmt.Printf("Warning: Could not read collected sentiment data: %v\n", err)
+		} else if err != nil && !errors.Is(err, readers.ErrAnalysisMissing) {
+			return fmt.Errorf("could not read collected sentiment data: %w", err)
 		}
 	}
 
+	if len(sentimentResults) == 0 && !allowHeuristicFallback {
+		return fmt.Errorf("%w: Sentiment", readers.ErrAnalysisMissing)
+	}
+
 	if len(sentimentResults) == 0 {
-		// Fall back to the older heuristic path for fixtures without CommentSentimentResults.
+		fmt.Println("Collected sentiment data is missing; using heuristic fallback because --sentiment-fallback is enabled.")
 		devResults, err := analyzeDeveloperSentiment(reader)
 		if err != nil {
 			fmt.Printf("Warning: Could not analyze developer sentiment: %v\n", err)

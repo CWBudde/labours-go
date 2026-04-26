@@ -47,8 +47,8 @@ Known missing modes outside the current Hercules report list:
 Known compatibility risks:
 
 - Repository burndown modes need validation with a real multi-repository Hercules payload.
-- `sentiment` uses `CommentSentimentResults` when present, but still has a heuristic fallback for payloads without collected sentiment data.
-- `devs-parallel` is approximate and can synthesize data instead of matching Python's calculations.
+- `sentiment` requires collected `CommentSentimentResults` by default; legacy heuristic charts require explicit `--sentiment-fallback`.
+- `devs-parallel` is approximate; synthetic charts require explicit `--devs-parallel-fallback`.
 - The current test baseline includes visual compatibility failures. See `PLAN.md`.
 
 ## Build and Development Commands

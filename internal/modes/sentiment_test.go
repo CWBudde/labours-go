@@ -1,6 +1,7 @@
 package modes
 
 import (
+	"errors"
 	"io"
 	"os"
 	"testing"
@@ -85,8 +86,8 @@ func TestSentiment(t *testing.T) {
 	// Create mock reader with test data
 	reader := &MockSentimentReader{}
 
-	// Run sentiment analysis
-	err = Sentiment(reader, tempDir)
+	// Run heuristic fallback analysis for legacy fixtures without collected sentiment data.
+	err = Sentiment(reader, tempDir, true)
 	if err != nil {
 		t.Fatalf("Sentiment analysis failed: %v", err)
 	}
@@ -106,6 +107,34 @@ func TestSentiment(t *testing.T) {
 		if _, err := os.Stat(filepath); os.IsNotExist(err) {
 			t.Errorf("Expected output file %s was not created", filename)
 		}
+	}
+}
+
+type CollectedSentimentReader struct {
+	*NoDataReader
+}
+
+func (c *CollectedSentimentReader) GetSentimentByTick() (map[int]readers.SentimentTick, error) {
+	return map[int]readers.SentimentTick{
+		0: {Value: 0.75},
+		1: {Value: -0.25},
+	}, nil
+}
+
+func TestSentimentUsesCollectedSentimentWithoutFallback(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "sentiment_collected_test")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	reader := &CollectedSentimentReader{NoDataReader: &NoDataReader{}}
+	if err := Sentiment(reader, tempDir, false); err != nil {
+		t.Fatalf("Sentiment analysis with collected data failed: %v", err)
+	}
+
+	if _, err := os.Stat(tempDir + "/sentiment-overview.png"); os.IsNotExist(err) {
+		t.Error("Expected sentiment overview output for collected sentiment data")
 	}
 }
 
@@ -151,9 +180,9 @@ func TestSentimentWithNoData(t *testing.T) {
 	defer os.RemoveAll(tempDir)
 
 	// This should return an error when no data is available
-	err = Sentiment(noDataReader, tempDir)
-	if err == nil {
-		t.Error("Expected error when no sentiment data is available, but got nil")
+	err = Sentiment(noDataReader, tempDir, false)
+	if !errors.Is(err, readers.ErrAnalysisMissing) {
+		t.Fatalf("Expected missing-analysis error when no sentiment data is available, got %v", err)
 	}
 }
 
@@ -180,7 +209,7 @@ func TestSentimentWithZeroActivityDoesNotCreateNaNBars(t *testing.T) {
 	defer os.RemoveAll(tempDir)
 
 	reader := &ZeroActivitySentimentReader{NoDataReader: &NoDataReader{}}
-	if err := Sentiment(reader, tempDir); err != nil {
+	if err := Sentiment(reader, tempDir, true); err != nil {
 		t.Fatalf("Sentiment analysis with zero activity failed: %v", err)
 	}
 

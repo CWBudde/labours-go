@@ -99,6 +99,20 @@ test-visual:
     @echo "Running visual regression tests"
     go test -v ./test/visual/...
 
+# Generate Go-side PNGs used by the Python-vs-Go parity viewer
+parity-update:
+    @echo "Generating Go parity reference images"
+    GOCACHE=/tmp/labours-parity-gocache go run . -i example_data/hercules_burndown.yaml -m burndown-project -o analysis_results/reference/go_burndown_absolute.png --quiet
+    GOCACHE=/tmp/labours-parity-gocache go run . -i example_data/hercules_burndown.yaml -m burndown-project -o analysis_results/reference/go_burndown_relative.png --relative --quiet
+
+# Start parity comparison viewer for Python labours references vs Go outputs
+parity-viewer PORT="8090" FILTER="":
+    PORT={{PORT}} GOCACHE=/tmp/labours-parity-gocache go run ./cmd/parityviewer --port {{PORT}} --name-filter "{{FILTER}}"
+
+# Print parity comparison rows for filtered cases without starting a server
+parity-viewer-print PORT="8090" FILTER="" PREFIX="":
+    PORT={{PORT}} GOCACHE=/tmp/labours-parity-gocache go run ./cmd/parityviewer --port {{PORT}} --name-filter "{{FILTER}}" --name-prefix "{{PREFIX}}" --print
+
 # Run benchmark tests
 test-bench:
     @echo "Running benchmark tests"

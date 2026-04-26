@@ -194,7 +194,7 @@ func missingAnalysisWarning(mode string, err error) (string, bool) {
 		return shotnessWarning, true
 	case "sentiment":
 		return "Sentiment stats were not collected. Re-run hercules with --sentiment.", true
-	case "devs", "devs-efforts", "old-vs-new", "languages":
+	case "devs", "devs-efforts", "old-vs-new", "languages", "devs-parallel":
 		return devsWarning, true
 	case "temporal-activity":
 		return "Temporal activity stats were not collected. Re-run hercules with --temporal-activity.", true
@@ -312,7 +312,7 @@ func temporalActivity(reader readers.Reader, output string, startTime, endTime *
 }
 
 func devsParallel(reader readers.Reader, output string, startTime, endTime *time.Time) error {
-	return modes.DevsParallel(reader, output)
+	return modes.DevsParallel(reader, output, viper.GetInt("max-people"), viper.GetBool("devs-parallel-fallback"))
 }
 
 func runTimes(reader readers.Reader, output string, startTime, endTime *time.Time) error {
@@ -336,7 +336,7 @@ func hotspotRisk(reader readers.Reader, output string, startTime, endTime *time.
 }
 
 func sentiment(reader readers.Reader, output string, startTime, endTime *time.Time) error {
-	return modes.Sentiment(reader, output)
+	return modes.Sentiment(reader, output, viper.GetBool("sentiment-fallback"))
 }
 
 func runAllModes(reader readers.Reader, output string, startTime, endTime *time.Time) error {

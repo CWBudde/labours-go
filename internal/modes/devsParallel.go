@@ -25,21 +25,28 @@ type ParallelismMetrics struct {
 	ActiveDevelopers   []string
 }
 
-// DevsParallel analyzes parallel development patterns and visualizes when developers work concurrently
-func DevsParallel(reader readers.Reader, output string) error {
+// DevsParallel analyzes parallel development patterns and visualizes when developers work concurrently.
+func DevsParallel(reader readers.Reader, output string, maxPeople int, allowSyntheticFallback bool) error {
 	fmt.Println("Analyzing parallel development patterns...")
 
 	// Get people burndown data to analyze temporal activity
 	peopleBurndown, err := reader.GetPeopleBurndown()
 	if err != nil {
-		fmt.Printf("Warning: could not get people burndown data: %v\n", err)
-		return generateSyntheticParallelAnalysis(reader, output)
+		if allowSyntheticFallback {
+			fmt.Printf("Warning: could not get people burndown data: %v\n", err)
+			return generateSyntheticParallelAnalysis(reader, output)
+		}
+		return err
 	}
 
 	if len(peopleBurndown) == 0 {
-		fmt.Println("No people burndown data available, using synthetic data")
-		return generateSyntheticParallelAnalysis(reader, output)
+		if allowSyntheticFallback {
+			fmt.Println("No people burndown data available, using synthetic data")
+			return generateSyntheticParallelAnalysis(reader, output)
+		}
+		return fmt.Errorf("%w: people burndown", readers.ErrAnalysisMissing)
 	}
+	peopleBurndown = filterPeopleBurndownByActivity(peopleBurndown, maxPeople)
 
 	// Calculate parallelism metrics
 	metrics := calculateParallelismMetrics(peopleBurndown)
@@ -58,6 +65,34 @@ func DevsParallel(reader readers.Reader, output string) error {
 
 	fmt.Println("Parallel development analysis completed successfully.")
 	return nil
+}
+
+func filterPeopleBurndownByActivity(peopleBurndown []readers.PeopleBurndown, maxPeople int) []readers.PeopleBurndown {
+	if maxPeople <= 0 || len(peopleBurndown) <= maxPeople {
+		return peopleBurndown
+	}
+
+	filtered := append([]readers.PeopleBurndown(nil), peopleBurndown...)
+	sort.SliceStable(filtered, func(i, j int) bool {
+		left := peopleBurndownActivity(filtered[i])
+		right := peopleBurndownActivity(filtered[j])
+		if left == right {
+			return filtered[i].Person < filtered[j].Person
+		}
+		return left > right
+	})
+	fmt.Printf("Warning: truncated people to the most active %d\n", maxPeople)
+	return filtered[:maxPeople]
+}
+
+func peopleBurndownActivity(person readers.PeopleBurndown) int {
+	total := 0
+	for _, row := range person.Matrix {
+		for _, value := range row {
+			total += value
+		}
+	}
+	return total
 }
 
 // calculateParallelismMetrics analyzes the temporal activity data to find parallel development patterns

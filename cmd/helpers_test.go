@@ -133,6 +133,8 @@ func TestDetectOutputFormatTreatsAggAsRenderingBackend(t *testing.T) {
 func TestPythonCompatibleFlagsAreRegistered(t *testing.T) {
 	for _, name := range []string{
 		"mode",
+		"devs-parallel-fallback",
+		"sentiment-fallback",
 		"temporal-legend-threshold",
 		"temporal-legend-single-col-threshold",
 	} {

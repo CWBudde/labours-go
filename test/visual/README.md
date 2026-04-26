@@ -81,6 +81,19 @@ just visual-generate-refs
 just test-python-compat
 ```
 
+### Python-vs-Go Parity Viewer
+
+```bash
+# Regenerate Go-side PNGs beside the existing Python references
+just parity-update
+
+# Open the interactive PNG comparison viewer
+just parity-viewer
+
+# Print comparison metrics without starting the server
+just parity-viewer-print
+```
+
 ### Custom Testing
 
 ```go

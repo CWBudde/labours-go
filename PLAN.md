@@ -35,7 +35,7 @@ Critical gaps found during inspection and follow-up implementation:
 - Hercules `report --all` additionally includes `burndown-repository` and `burndown-repos-combined`. These are now wired to protobuf repository burndown data, but the current copied Hercules SIVA fixture does not contain repository matrices, so full multi-repository parity still needs a dedicated fixture.
 - The local `pb.proto` was behind `../hercules/internal/pb/pb.proto` when this plan started. Phase 1 has synced the schema and regenerated Go bindings; remaining work is using those payloads in modes.
 - Reader accessors for default report payloads now exist, and the default report modes consume them. Additional compatibility work remains for parity and fixtures.
-- Some implemented modes are semantic approximations, not Python-labours ports. Notable examples: `sentiment` still has a heuristic fallback when `CommentSentimentResults` is absent, and `devs-parallel` can synthesize data instead of using the same ownership/coupling/devs calculations as Python.
+- Some implemented modes are semantic approximations, not Python-labours ports. Notable examples: `sentiment` has an explicit `--sentiment-fallback` heuristic path for legacy payloads, and `devs-parallel` has an explicit `--devs-parallel-fallback` synthetic path instead of using the same ownership/coupling/devs calculations as Python.
 - Coupling modes currently generate Go-native plots/assets, while Python `labours` trains embeddings and writes projector assets unless disabled.
 - The CLI now normalizes output paths before dispatch: single-file modes receive a concrete file path, and multi-asset modes receive the requested directory or the parent directory of a requested file path.
 - The default-report protobuf fixture now runs through every default mode without CLI-level mode failures; visual parity remains to be proven.
@@ -116,7 +116,7 @@ Therefore every mode must accept a single output file path and write that path, 
 | `couples-people` | Implemented differently | Same as couples-files; verify matrix preprocessing and projector behavior. |
 | `couples-shotness` | Partial | Python uses shotness co-occurrence embeddings; protobuf reader now exposes shotness co-occurrence data, but mode/output parity remains. |
 | `shotness` | Implemented | Verify printed stats and optional output behavior against Python. |
-| `sentiment` | Partial | Uses `CommentSentimentResults` when present and falls back to heuristics when absent. Validate against a real sentiment payload and remove or clearly gate the heuristic compatibility path. |
+| `sentiment` | Partial | Uses `CommentSentimentResults` by default and gates legacy heuristics behind `--sentiment-fallback`. Validate against a real sentiment payload. |
 | `temporal-activity` | Basic implementation | Improve chart parity, date filters, and legend threshold behavior. |
 | `devs` | Implemented | Verify aggregate/time-series math, language parsing, `--max-people`, JSON output. |
 | `devs-efforts` | Implemented | Verify Python parity and output names. |
@@ -302,20 +302,22 @@ Status as of 2026-04-26:
 - `burndown-repository` writes one chart per repository to the requested report chart directory when repository matrices are available.
 - `burndown-repos-combined` sums repository matrices and writes the requested combined chart path.
 - The current copied Hercules SIVA fixture does not include repository burndown matrices, so both repository modes now report Python-style missing-data warnings instead of "Mode not implemented yet".
-- `sentiment` now prefers real `CommentSentimentResults` protobuf data and keeps the existing developer/language heuristic only as a fallback for fixtures where sentiment was not collected.
+- `couples-shotness` now builds its Go-native coupling matrix from real shotness record counter overlap for both YAML and protobuf input, and the current Hercules `shotness.pb` fixture covers the protobuf path.
+- `sentiment` now requires real `CommentSentimentResults` protobuf data by default and gates the legacy developer/language heuristic behind explicit `--sentiment-fallback`.
 - `sentiment` and `devs-parallel` now sanitize zero/empty values so `gonum/plot` no longer rejects NaN bar data.
+- `devs-parallel` no longer synthesizes data by default when people burndown is missing; the legacy synthetic path requires explicit `--devs-parallel-fallback`, and the current Go analysis respects `--max-people`.
 - `hercules report --all --strict --labours-cmd ./labours` exits 0 on `/tmp/labours-go-hercules.siva` and writes report assets under `/tmp/labours-go-hercules-report-all-phase4`.
-- Current full test baseline after Phase 4 work: `go test ./...` reports 203 passed, 12 failed, 1 skipped. Remaining failures are the pre-existing visual compatibility failures.
-- Remaining Phase 4 work is semantic parity: real multi-repository fixtures, real sentiment fixture validation, and a Python-compatible `devs-parallel` implementation instead of synthetic fallback.
+- Current full test baseline after Phase 4 shotness co-occurrence work: `go test ./...` reports 204 passed, 12 failed, 1 skipped. Remaining failures are the pre-existing visual compatibility failures.
+- Remaining Phase 4 work is semantic parity: real multi-repository fixtures, real sentiment fixture validation, and a Python-compatible `devs-parallel` ranking/plot implementation.
 
 Tasks:
 
 - [x] Implement `burndown-repository`.
 - [x] Implement `burndown-repos-combined`.
-- [ ] Complete `couples-shotness` from real shotness co-occurrence data or define the exact Go equivalent.
+- [x] Complete `couples-shotness` from real shotness co-occurrence data or define the exact Go equivalent.
 - [x] Prefer real `CommentSentimentResults` in `sentiment` when protobuf data is present.
 - [ ] Validate `sentiment` with a real current-Hercules sentiment protobuf fixture.
-- [ ] Remove or explicitly gate heuristic `sentiment` fallback from the strict compatibility path.
+- [x] Remove or explicitly gate heuristic `sentiment` fallback from the strict compatibility path.
 - [x] Guard `sentiment` against NaN bar values on zero-activity fallback data.
 - [x] Guard `devs-parallel` against NaN bar values on zero-activity fallback data.
 - [ ] Port `devs-parallel` ownership burndown logic from Python.

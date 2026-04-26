@@ -210,17 +210,32 @@ func (r *ProtobufReader) GetShotnessCooccurrence() ([]string, [][]int, error) {
 	}
 
 	index := make([]string, 0, len(shotnessRecords))
-	matrix := make([][]int, len(shotnessRecords))
+	size := len(shotnessRecords)
+	matrix := make([][]int, size)
 	for i := range matrix {
-		matrix[i] = make([]int, len(shotnessRecords))
+		matrix[i] = make([]int, size)
 	}
 
 	for i, record := range shotnessRecords {
 		index = append(index, fmt.Sprintf("%s:%s", record.File, record.Name))
-		for tick, value := range record.Counters {
-			if tick >= 0 && int(tick) < len(shotnessRecords) {
-				matrix[i][tick] = int(value)
+		for j, other := range shotnessRecords {
+			if i == j {
+				total := int32(0)
+				for _, count := range record.Counters {
+					total += count
+				}
+				matrix[i][j] = int(total)
+				continue
 			}
+
+			overlap := int32(0)
+			for tick, count := range record.Counters {
+				otherCount, exists := other.Counters[tick]
+				if exists && count > 0 && otherCount > 0 {
+					overlap += min32(count, otherCount)
+				}
+			}
+			matrix[i][j] = int(overlap)
 		}
 	}
 	return index, matrix, nil
