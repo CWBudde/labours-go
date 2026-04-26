@@ -48,8 +48,8 @@ jobs:
       
     - name: Run tests
       run: |
-        make test-unit
-        make test-integration
+        go test -timeout=10m -race -coverprofile=coverage.out ./internal/... ./cmd/...
+        go test -timeout=10m -race ./test/integration/...
         
     - name: Upload coverage reports to Codecov
       uses: codecov/codecov-action@v3
@@ -88,7 +88,9 @@ jobs:
       run: go run test/create_sample_data.go
       
     - name: Run benchmarks
-      run: make test-bench
+      run: |
+        mkdir -p test_output
+        go test -bench=. -benchmem -run=^$ ./internal/... | tee test_output/benchmarks.txt
       
     - name: Upload benchmark results
       uses: actions/upload-artifact@v3

@@ -26,9 +26,6 @@ excludes = [
   # Go mod files
   "go.sum",
   "go.mod",
-  # Makefiles
-  "Makefile",
-  "**/Makefile",
 ]
 
 ### Go formatting
