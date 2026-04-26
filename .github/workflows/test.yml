@@ -127,6 +127,9 @@ jobs:
           gofmt -s -l .
           exit 1
         fi
+
+    - name: Check compatibility plan
+      run: test -s PLAN.md
         
     - name: Run go vet
       run: go vet ./...
@@ -222,13 +225,13 @@ jobs:
     - name: Build binary
       run: |
         mkdir -p bin
-        GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -ldflags="-w -s" -o bin/labours-go-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.goos == 'windows' && '.exe' || '' }} .
+        GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -ldflags="-w -s" -o bin/labours-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.goos == 'windows' && '.exe' || '' }} .
         
     - name: Upload build artifacts
       uses: actions/upload-artifact@v3
       with:
-        name: labours-go-${{ matrix.goos }}-${{ matrix.goarch }}
-        path: bin/labours-go-${{ matrix.goos }}-${{ matrix.goarch }}*
+        name: labours-${{ matrix.goos }}-${{ matrix.goarch }}
+        path: bin/labours-${{ matrix.goos }}-${{ matrix.goarch }}*
 
   integration:
     name: Integration Test
@@ -247,11 +250,11 @@ jobs:
     - name: Download build artifact
       uses: actions/download-artifact@v3
       with:
-        name: labours-go-linux-amd64
+        name: labours-linux-amd64
         path: bin/
         
     - name: Make binary executable
-      run: chmod +x bin/labours-go-linux-amd64
+      run: chmod +x bin/labours-linux-amd64
       
     - name: Generate test data
       run: go run test/create_sample_data.go
@@ -259,16 +262,16 @@ jobs:
     - name: Test binary with sample data
       run: |
         # Test basic functionality
-        ./bin/labours-go-linux-amd64 --help
+        ./bin/labours-linux-amd64 --help
         
         # Test with sample data (if we have it)
         if [ -f "test/testdata/simple_burndown.pb" ]; then
-          ./bin/labours-go-linux-amd64 -m burndown-project -i test/testdata/simple_burndown.pb -o test_output.png
+          ./bin/labours-linux-amd64 -m burndown-project -i test/testdata/simple_burndown.pb -o test_output.png
           if [ -f "test_output.png" ]; then
-            echo "✓ Binary successfully generated output"
+            echo "Binary successfully generated output"
             ls -la test_output.png
           else
-            echo "✗ Binary failed to generate output"
+            echo "Binary failed to generate output"
             exit 1
           fi
         fi

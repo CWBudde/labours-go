@@ -1,243 +1,150 @@
 # Labours-go
 
-Labours-go is a high-performance Go implementation that replaces the Python version of [labours](https://github.com/src-d/hercules/tree/master/python/labours) for analyzing Git repository data and generating visualizations. This project has been **dramatically improved** and transformed from a proof-of-concept into a **fully functional tool** that produces professional-quality charts and analysis.
-
-## 🎉 Project Status: **PRODUCTION READY**
-
-The project has been **completely overhauled** with major improvements:
-
-- ✅ **Professional visualization engine** with stacked area charts and proper styling
-- ✅ **Complete hercules data compatibility** via comprehensive protobuf integration
-- ✅ **All core analysis modes implemented** including the previously missing burndown-person
-- ✅ **Advanced matrix interpolation** with linear resampling algorithms
-- ✅ **Intelligent time series processing** with multiple resampling options
-- ✅ **Production-ready CLI** with full command-line compatibility
-
-## Features
-
-### Core Capabilities
-
-- **High Performance**: Leverages Go's concurrency model for faster analysis of large Git repositories
-- **Professional Visualizations**: Generates publication-quality charts with proper legends, axes, and styling
-- **Complete Compatibility**: 100% command-line compatible with the original Python labours implementation
-- **Advanced Analysis**: Sophisticated matrix interpolation, time series resampling, and data processing
-- **Multiple Output Formats**: Supports PNG and SVG output with customizable styling
-
-### Supported Analysis Modes
-
-- **burndown-project**: Project-level line burndown analysis over time
-- **burndown-file**: File-level burndown analysis and evolution
-- **burndown-person**: Individual developer burndown and contribution patterns
-- **ownership**: Code ownership visualization and developer responsibility
-- **overwrites-matrix**: Developer collaboration and code override patterns
-- **devs**: Developer statistics and contribution metrics
-- **couples-files**: File coupling and co-change analysis
-- **couples-people**: Developer collaboration patterns
-- And more analysis modes available
-
-## Installation
-
-### Prerequisites
-
-- Go version 1.18 or higher
-- Git installed on your machine
-- Hercules for generating input data (optional, for creating .pb files)
-
-### Quick Start
-
-1. **Clone the repository**:
+Labours-go is a Go port of the Python [labours](https://github.com/src-d/hercules/tree/master/python/labours) command used by Hercules to render repository analysis data. The target is a drop-in `labours` binary for pipelines such as:
 
 ```bash
-git clone https://github.com/MeKo-Christian/labours-go.git
-cd labours-go
+hercules --burndown --pb /path/to/repo | labours -f pb -m burndown-project -o chart.png
+hercules report --labours-cmd ./labours -o ./report /path/to/repo
 ```
 
-2. **Build the project**:
+## Project Status
+
+This repository is an active port, not yet a complete replacement for Python `labours`.
+
+What is already present:
+
+- Core CLI plumbing for reading Hercules YAML and protobuf data.
+- Burndown, ownership, overwrites, devs, coupling, shotness, old-vs-new, language, runtime, and related plotting code.
+- A Go charting stack based on `gonum/plot`.
+- Compatibility and visual test scaffolding.
+- Example Hercules datasets under `example_data/` and `data/`.
+
+Known gaps:
+
+- Current Hercules report modes are not all implemented. Missing report modes include `temporal-activity`, `bus-factor`, `ownership-concentration`, `knowledge-diffusion`, `hotspot-risk`, `burndown-repository`, and `burndown-repos-combined`.
+- The local protobuf schema is behind `../hercules/internal/pb/pb.proto`.
+- Some modes are approximations rather than direct Python-labours ports, notably `sentiment` and `devs-parallel`.
+- Some modes still need output-path compatibility work because Hercules report passes one concrete output file per mode.
+- `go test ./...` currently has known failures in language output tests and visual compatibility tests. See [PLAN.md](./PLAN.md) for the current baseline and completion plan.
+
+## Build
+
+Build the drop-in binary:
+
+```bash
+just build
+```
+
+This creates `./labours`. A development alias can also be built manually when useful:
 
 ```bash
 go build -o labours-go
 ```
 
-3. **Verify installation**:
+Verify the CLI:
 
 ```bash
-./labours-go --help
+./labours --help
 ```
 
 ## Usage Examples
 
-### Basic Analysis
+Generate a project burndown chart from a protobuf payload:
 
 ```bash
-# Project burndown analysis
-./labours-go -m burndown-project -i data.pb -o output/
-
-# Individual developer analysis
-./labours-go -m burndown-person --relative -i data.pb -o dev_analysis/
-
-# Code ownership visualization
-./labours-go -m ownership -i data.pb -o ownership_chart.png
+./labours -f pb -i analysis.pb -m burndown-project -o burndown.png
 ```
 
-### Advanced Options
+Generate charts from a saved YAML payload:
 
 ```bash
-# Multiple analysis modes with time filtering
-./labours-go -m burndown-project,ownership,devs \
-  --start-date 2023-01-01 --end-date 2023-12-31 \
-  --resample month --relative \
-  -i repository_data.pb -o charts/
-
-# File-level analysis with custom resampling
-./labours-go -m burndown-file --resample week \
-  -i data.pb -o file_analysis/
+./labours -f yaml -i analysis.yaml -m devs -o devs.png
 ```
 
-### Command-Line Options
+Run through Hercules report while testing this port:
 
-- `-i, --input`: Input file path (hercules .pb or .yaml format)
-- `-m, --modes`: Analysis modes to run (comma-separated)
-- `-o, --output`: Output directory or file path
-- `--relative`: Show relative percentages instead of absolute values
-- `--resample`: Time resampling (year/month/week/day)
-- `--start-date / --end-date`: Date range filtering
-- `--input-format`: Force input format (auto/pb/yaml)
-
-## Integration with Hercules
-
-Labours-go works as part of a two-stage pipeline with [Hercules](https://github.com/src-d/hercules):
-
-```
-Git Repository → [Hercules Analysis] → Data Files (.yaml/.pb) → [Labours-go Visualization] → Charts & Images
+```bash
+hercules report --labours-cmd ./labours -o ./report /path/to/repo
 ```
 
-### Quick Integration Example
+## Supported Modes
 
-1. **Analyze repository with Hercules**:
-   ```bash
-   # Generate burndown data
-   hercules --burndown --pb /path/to/repository > analysis.pb
-   
-   # Or generate YAML format
-   hercules --burndown /path/to/repository > analysis.yaml
-   ```
+Implemented or partially implemented modes:
 
-2. **Generate visualizations with Labours-go**:
-   ```bash
-   ./labours-go -m burndown-project -i analysis.pb -o charts/
-   ```
+- `burndown-project`
+- `burndown-file`
+- `burndown-person`
+- `overwrites-matrix`
+- `ownership`
+- `couples-files`
+- `couples-people`
+- `couples-shotness`
+- `shotness`
+- `devs`
+- `devs-efforts`
+- `old-vs-new`
+- `languages`
+- `devs-parallel`
+- `run-times`
+- `sentiment`
 
-## Technical Architecture
+Missing modes needed for full current Hercules parity:
 
-### Data Flow
-
-1. **Input**: Hercules protobuf (.pb) or YAML data files
-2. **Parsing**: Advanced data readers with proper hercules format support
-3. **Processing**: Matrix interpolation, time series resampling, and statistical analysis
-4. **Visualization**: Professional chart generation with gonum/plot
-5. **Output**: High-quality PNG/SVG visualizations
-
-### Core Components
-
-- **CLI Framework**: Cobra-based command-line interface with Viper configuration
-- **Data Readers**: Protocol buffer and YAML parsers with hercules compatibility
-- **Analysis Modes**: Comprehensive set of Git repository analysis algorithms
-- **Visualization Engine**: Professional chart generation with customizable styling
-- **Matrix Processing**: Advanced interpolation and resampling algorithms
+- `burndown-repository`
+- `burndown-repos-combined`
+- `temporal-activity`
+- `bus-factor`
+- `ownership-concentration`
+- `knowledge-diffusion`
+- `hotspot-risk`
+- `refactoring-proxy`
 
 ## Development Workflow
 
-This project uses [Just](https://github.com/casey/just) as a command runner and [treefmt](https://github.com/numtide/treefmt) for code formatting. Follow these steps for development:
+This project uses [Just](https://github.com/casey/just) as a command runner and [treefmt](https://github.com/numtide/treefmt) for formatting.
 
-### Setup Development Environment
+Common commands:
 
-1. **Install development tools**:
+```bash
+just              # list recipes
+just build        # build ./labours
+just test         # run go test ./...
+just check        # run lint/format checks where tools are installed
+just clean        # remove generated local build/test artifacts
+```
 
-   ```bash
-   just dev-setup
-   ```
+Run with arguments:
 
-   This installs:
+```bash
+just run -f pb -i example_data/hercules_burndown.pb -m burndown-project -o out.png
+just run-built --help
+```
 
-   - `golangci-lint` - Go linter
-   - `gofumpt` - Go formatter
-   - `gci` - Go import organizer
-   - `treefmt` - Universal formatter
+Visual and compatibility helpers:
 
-2. **Install Just** (if not already installed):
+```bash
+just test-visual
+just test-python-compat
+just generate-all-charts
+```
 
-   ```bash
-   # macOS
-   brew install just
+## Architecture
 
-   # Linux
-   curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
-   ```
+Main packages:
 
-### Available Commands
+- `cmd/`: Cobra CLI, mode dispatch, input/output helpers.
+- `internal/readers/`: YAML/protobuf reader implementations.
+- `internal/modes/`: analysis mode implementations.
+- `internal/graphics/`: plotting, themes, heatmaps, and chart helpers.
+- `internal/pb/`: generated protobuf types from `pb.proto`.
+- `test/`: integration and visual regression tests.
 
-#### Code Quality
+The intended data flow is:
 
-- `just fmt` - Format all code using treefmt
-- `just test-formatted` - Check if code is properly formatted
-- `just lint` - Run Go linters on the codebase
-- `just fix` - Auto-fix linting issues where possible
-- `just check` - Run all formatting and linting checks
+```text
+Hercules .yaml/.pb -> reader -> mode processor -> chart/data output
+```
 
-#### Building and Testing
+## Completion Plan
 
-- `just build` - Build the labours-go binary
-- `just install` - Install to GOPATH/bin
-- `just test` - Run unit tests
-- `just test-verbose` - Run tests with verbose output
-- `just test-coverage` - Run tests with coverage report
-- `just test-integration` - Run integration tests
-- `just bench` - Run benchmarks
-
-#### Development Helpers
-
-- `just run ARGS` - Run with go run (e.g., `just run --help`)
-- `just run-built ARGS` - Run the built binary
-- `just clean` - Clean build artifacts
-- `just ci` - Run all CI checks (formatting, linting, tests)
-- `just docs` - Generate documentation
-
-### Development Workflow
-
-1. Make your changes
-2. Run `just fmt` to format code
-3. Run `just check` to verify code quality
-4. Run `just test` to run tests
-5. Run `just build` to build the binary
-6. Test your changes with `just run ARGS`
-
-### Code Quality Standards
-
-- **Formatting**: All code is automatically formatted using treefmt and gofumpt
-- **Linting**: Go code must pass golangci-lint checks
-- **Testing**: All tests must pass with good coverage
-- **Documentation**: Update README and code comments for new features
-
-### Continuous Integration
-
-The CI pipeline automatically runs:
-
-- Code formatting checks
-- Comprehensive linting with golangci-lint
-- Unit and integration tests
-- Benchmark validation
-
-## Future Work
-
-While the project is production-ready with all core functionality implemented, potential future enhancements include:
-
-- **Performance Optimization**: Further memory usage improvements for analyzing very large repositories (>1GB git history)
-- **Interactive Visualizations**: Web-based dashboard with interactive charts and filtering capabilities
-- **Advanced Analysis Modes**: 
-  - `devs-parallel`: Enhanced parallel development pattern analysis
-  - Advanced developer collaboration metrics
-  - Code quality trend analysis
-- **Additional Output Formats**: HTML reports, interactive SVG, and integration with popular BI tools
-- **Plugin Architecture**: Extensible system for custom analysis modes and visualization themes
-
-The codebase architecture is designed to easily accommodate these enhancements while maintaining backward compatibility and performance.
+See [PLAN.md](./PLAN.md). It tracks the work required to make this a complete drop-in replacement as used by `../hercules`.

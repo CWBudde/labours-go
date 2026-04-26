@@ -6,7 +6,9 @@
 *.dylib
 
 # Built binary
+labours
 labours-go
+labours.exe
 labours-go.exe
 
 # Test binary, built with `go test -c`
@@ -76,3 +78,6 @@ benchmarks.txt
 
 # Generated protobuf files (uncomment if you regenerate them)
 # *.pb.go
+
+# ai agents
+.codex
