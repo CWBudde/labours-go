@@ -123,11 +123,11 @@ parity-update-python:
     MPLCONFIGDIR=/tmp/labours-mplconfig PYTHONPATH={{python_labours_dir}} python3 -m labours -i $(pwd)/example_data/hercules_devs.yaml -m old-vs-new -o analysis_results/reference/python_old_vs_new.png --backend Agg
 
 # Start parity comparison viewer for Python labours references vs Go outputs
-parity-viewer PORT="8090" FILTER="":
+parity-viewer PORT="8096" FILTER="":
     PORT={{PORT}} GOCACHE=/tmp/labours-parity-gocache go run ./cmd/parityviewer --port {{PORT}} --name-filter "{{FILTER}}"
 
 # Print parity comparison rows for filtered cases without starting a server
-parity-viewer-print PORT="8090" FILTER="" PREFIX="":
+parity-viewer-print PORT="8096" FILTER="" PREFIX="":
     PORT={{PORT}} GOCACHE=/tmp/labours-parity-gocache go run ./cmd/parityviewer --port {{PORT}} --name-filter "{{FILTER}}" --name-prefix "{{PREFIX}}" --print
 
 # Run benchmark tests

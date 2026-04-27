@@ -76,7 +76,7 @@ func GenerateBurndownProjectPython(reader readers.Reader, output string, relativ
 
 	// Phase 4: Generate visualization
 	progEstimator.NextOperation("Generating Python-style visualization")
-	if err := graphics.PlotBurndownPythonStyle(processedData, output, relative); err != nil {
+	if err := graphics.PlotBurndownMatplotlib(processedData, output, relative); err != nil {
 		progEstimator.FinishMultiOperation()
 		return fmt.Errorf("error creating Python-style burndown plot: %v", err)
 	}
@@ -139,7 +139,7 @@ func GenerateBurndownFilePython(reader readers.Reader, output string, relative b
 			fileOutput = filepath.Join(dir, fmt.Sprintf("%s_%s%s", base, sanitizeFilename(file.Filename), ext))
 		}
 
-		if err := graphics.PlotBurndownPythonStyle(processedData, fileOutput, relative); err != nil {
+		if err := graphics.PlotBurndownMatplotlib(processedData, fileOutput, relative); err != nil {
 			if !quiet {
 				fmt.Printf("Warning: failed to create plot for %s: %v\n", file.Filename, err)
 			}
@@ -202,14 +202,14 @@ func GenerateBurndownRepositoryPython(reader readers.Reader, output string, rela
 
 		repoBase := filepath.Join(output, fmt.Sprintf("burndown-repository_%s", sanitizeFilename(repository.Repository)))
 		repoPNG := repoBase + ".png"
-		if err := graphics.PlotBurndownPythonStyle(processedData, repoPNG, relative); err != nil {
+		if err := graphics.PlotBurndownMatplotlib(processedData, repoPNG, relative); err != nil {
 			if !quiet {
 				fmt.Printf("Warning: failed to create plot for repository %s: %v\n", repository.Repository, err)
 			}
 			continue
 		}
 		repoSVG := repoBase + ".svg"
-		if err := graphics.PlotBurndownPythonStyle(processedData, repoSVG, relative); err != nil {
+		if err := graphics.PlotBurndownMatplotlib(processedData, repoSVG, relative); err != nil {
 			if !quiet {
 				fmt.Printf("Warning: failed to create SVG plot for repository %s: %v\n", repository.Repository, err)
 			}
@@ -263,7 +263,7 @@ func GenerateBurndownReposCombinedPython(reader readers.Reader, output string, r
 	if err != nil {
 		return fmt.Errorf("failed to process combined repository burndown data: %v", err)
 	}
-	if err := graphics.PlotBurndownPythonStyle(processedData, output, relative); err != nil {
+	if err := graphics.PlotBurndownMatplotlib(processedData, output, relative); err != nil {
 		return fmt.Errorf("error creating combined repository burndown plot: %v", err)
 	}
 
