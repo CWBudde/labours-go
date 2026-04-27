@@ -7,8 +7,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"gonum.org/v1/plot"
-	"gonum.org/v1/plot/plotter"
 	"labours-go/internal/graphics"
 	"labours-go/internal/readers"
 )
@@ -222,11 +220,6 @@ func convolveSame(series, window []float64) []float64 {
 
 // generateOldVsNewPlot creates an overlaid area chart showing new vs modified code over time.
 func generateOldVsNewPlot(newCodeSeries, modifiedCodeSeries []float64, dates []time.Time, output string) error {
-	// Create a new plot
-	p := plot.New()
-	p.Title.Text = "Additions vs changes"
-
-	// Prepare data points for the stacked areas
 	length := len(newCodeSeries)
 	if len(modifiedCodeSeries) != length {
 		return fmt.Errorf("new code and modified code series must have the same length")
@@ -235,70 +228,56 @@ func generateOldVsNewPlot(newCodeSeries, modifiedCodeSeries []float64, dates []t
 		return fmt.Errorf("dates and series must have the same length")
 	}
 
-	// Create polygon for new code area
-	newCodePoly := make(plotter.XYs, 2*length)
-	for i := 0; i < length; i++ {
-		newCodePoly[i] = plotter.XY{X: float64(dates[i].Unix()), Y: newCodeSeries[i]}
-	}
-	for i := 0; i < length; i++ {
-		newCodePoly[length+i] = plotter.XY{X: float64(dates[length-1-i].Unix()), Y: 0}
-	}
-
-	// Create polygon for existing-code changes area
-	modifiedCodePoly := make(plotter.XYs, 2*length)
-	for i := 0; i < length; i++ {
-		modifiedCodePoly[i] = plotter.XY{X: float64(dates[i].Unix()), Y: modifiedCodeSeries[i]}
-	}
-	for i := 0; i < length; i++ {
-		modifiedCodePoly[length+i] = plotter.XY{X: float64(dates[length-1-i].Unix()), Y: 0}
+	series := []graphics.MatplotlibTimeAreaSeries{
+		{
+			Label:  "Changed new lines",
+			Values: newCodeSeries,
+			Color:  colorRGBA(141, 184, 67, 255),
+		},
+		{
+			Label:  "Changed existing lines",
+			Values: modifiedCodeSeries,
+			Color:  colorRGBA(225, 76, 53, 255),
+		},
 	}
 
-	// Create polygon plots
-	newAreaPlot, err := plotter.NewPolygon(newCodePoly)
-	if err != nil {
-		return fmt.Errorf("failed to create new code area plot: %v", err)
-	}
-	newAreaPlot.Color = color.RGBA{R: 141, G: 184, B: 67, A: 255} // #8DB843
-	newAreaPlot.LineStyle.Width = 0
-
-	modifiedAreaPlot, err := plotter.NewPolygon(modifiedCodePoly)
-	if err != nil {
-		return fmt.Errorf("failed to create modified code area plot: %v", err)
-	}
-	modifiedAreaPlot.Color = color.RGBA{R: 225, G: 76, B: 53, A: 255} // #E14C35
-	modifiedAreaPlot.LineStyle.Width = 0
-
-	// Add areas to plot
-	p.Add(newAreaPlot)
-	p.Add(modifiedAreaPlot)
-
-	// Add legend
-	p.Legend.Add("Changed new lines", newAreaPlot)
-	p.Legend.Add("Changed existing lines", modifiedAreaPlot)
-	p.Legend.Left = true
-	p.Legend.Top = true
-	p.X.Tick.Marker = plot.TimeTicks{Format: "2006-01"}
-	p.X.Min = float64(dates[0].Unix())
-	p.X.Max = float64(dates[len(dates)-1].Unix())
-
-	// Python labours does not apply the shared plot style here, so matplotlib
-	// keeps its default 6.4x4.8 inch figure size.
-	width, height := graphics.GetPythonPlotSize(6.4, 4.8)
 	outputFile := filepath.Join(output, "old_vs_new_analysis.png")
-	if err := graphics.SavePNGWithBackground(p, width, height, outputFile, color.Transparent); err != nil {
+	if err := graphics.PlotTimeAreasMatplotlib(dates, series, graphics.MatplotlibTimeAreaOptions{
+		Title:        "Additions vs changes",
+		Output:       outputFile,
+		WidthInches:  6.4,
+		HeightInches: 4.8,
+		Legend:       true,
+		LegendLeft:   true,
+		LegendTop:    true,
+		Alpha:        1,
+	}); err != nil {
 		return fmt.Errorf("failed to save old-vs-new plot: %v", err)
 	}
 
-	// Also save as SVG
 	svgOutputFile := filepath.Join(output, "old_vs_new_analysis.svg")
-	if err := p.Save(width, height, svgOutputFile); err != nil {
-		fmt.Printf("Warning: failed to save SVG: %v\n", err)
+	svgErr := graphics.PlotTimeAreasMatplotlib(dates, series, graphics.MatplotlibTimeAreaOptions{
+		Title:        "Additions vs changes",
+		Output:       svgOutputFile,
+		WidthInches:  6.4,
+		HeightInches: 4.8,
+		Legend:       true,
+		LegendLeft:   true,
+		LegendTop:    true,
+		Alpha:        1,
+	})
+	if svgErr != nil {
+		fmt.Printf("Warning: failed to save SVG: %v\n", svgErr)
 	}
 
 	fmt.Printf("Old vs New analysis plot saved to %s\n", outputFile)
-	if err == nil {
+	if svgErr == nil {
 		fmt.Printf("SVG version saved to %s\n", svgOutputFile)
 	}
 
 	return nil
+}
+
+func colorRGBA(r, g, b, a uint8) color.Color {
+	return color.RGBA{R: r, G: g, B: b, A: a}
 }

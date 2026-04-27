@@ -2,17 +2,15 @@ package modes
 
 import (
 	"fmt"
-	"image/color"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/spf13/viper"
-	"gonum.org/v1/plot"
-	"gonum.org/v1/plot/plotter"
 	"labours-go/internal/graphics"
 	"labours-go/internal/progress"
 	"labours-go/internal/readers"
+	"matplotlib-go/core"
 )
 
 // Devs generates plots for individual developers' contributions over time.
@@ -95,12 +93,6 @@ func plotDevsPythonStyle(timeSeries *readers.DeveloperTimeSeriesData, startUnix,
 		return fmt.Errorf("no developer time series to plot")
 	}
 
-	p := plot.New()
-	p.HideY()
-	p.X.Tick.Marker = monthlyTicks(dates[0], dates[len(dates)-1])
-	p.X.Min = float64(dates[0].Unix())
-	p.X.Max = float64(dates[len(dates)-1].Unix())
-
 	maxY := 0.0
 	for _, row := range rows {
 		for _, v := range row.Series {
@@ -112,43 +104,62 @@ func plotDevsPythonStyle(timeSeries *readers.DeveloperTimeSeriesData, startUnix,
 	if maxY <= 0 {
 		maxY = 1
 	}
-	p.Y.Min = 0
-	p.Y.Max = maxY * 7
+	rowHeight := maxY * 1.4
 
 	colors := graphics.PythonLaboursColorPalette(len(rows))
+	series := make([]graphics.MatplotlibTimeAreaSeries, len(rows))
+	baselines := make([][]float64, len(rows))
+	labels := make([]graphics.MatplotlibTextLabel, 0, len(rows)*2+1)
 	for i, row := range rows {
-		poly, err := areaPolygon(dates, row.Series)
-		if err != nil {
-			return err
+		offset := float64(len(rows)-1-i) * rowHeight
+		top := make([]float64, len(row.Series))
+		baseline := make([]float64, len(row.Series))
+		for j, value := range row.Series {
+			baseline[j] = offset
+			top[j] = offset + value
 		}
-		rgba := colorToRGBA(colors[i%len(colors)], 255)
-		poly.Color = rgba
-		poly.LineStyle.Width = 0
-		p.Add(poly)
+		series[i] = graphics.MatplotlibTimeAreaSeries{
+			Label:  row.Name,
+			Values: top,
+			Color:  colors[i%len(colors)],
+		}
+		baselines[i] = baseline
+		labelY := offset + rowHeight*0.45
+		labels = append(labels,
+			graphics.MatplotlibTextLabel{
+				X:      float64(dates[0].Unix()),
+				Y:      labelY,
+				Text:   shortenDeveloperName(row.Name),
+				HAlign: core.TextAlignLeft,
+			},
+			graphics.MatplotlibTextLabel{
+				X:      float64(dates[len(dates)-1].Unix()),
+				Y:      labelY,
+				Text:   fmt.Sprintf("%5d %8s %8s", row.Commits, formatNumber(row.LinesAdded-row.LinesRemove), formatNumber(row.LinesChange)),
+				HAlign: core.TextAlignRight,
+			},
+		)
 	}
+	labels = append(labels, graphics.MatplotlibTextLabel{
+		X:      float64(dates[len(dates)-1].Unix()),
+		Y:      float64(len(rows))*rowHeight + rowHeight*0.2,
+		Text:   " cmts    delta  changed",
+		HAlign: core.TextAlignRight,
+	})
 
-	labelY := p.Y.Max * 0.08
-	var leftLabels plotter.XYLabels
-	var rightLabels plotter.XYLabels
-	for _, row := range rows {
-		leftLabels.XYs = append(leftLabels.XYs, plotter.XY{X: p.X.Min, Y: labelY})
-		leftLabels.Labels = append(leftLabels.Labels, shortenDeveloperName(row.Name))
-
-		rightLabels.XYs = append(rightLabels.XYs, plotter.XY{X: p.X.Max, Y: labelY})
-		rightLabels.Labels = append(rightLabels.Labels, fmt.Sprintf("%5d %8s %8s", row.Commits, formatNumber(row.LinesAdded-row.LinesRemove), formatNumber(row.LinesChange)))
-	}
-	rightLabels.XYs = append(rightLabels.XYs, plotter.XY{X: p.X.Max, Y: p.Y.Max * 0.55})
-	rightLabels.Labels = append(rightLabels.Labels, " cmts    delta  changed")
-
-	if labels, err := plotter.NewLabels(leftLabels); err == nil {
-		p.Add(labels)
-	}
-	if labels, err := plotter.NewLabels(rightLabels); err == nil {
-		p.Add(labels)
-	}
-
-	width, height := graphics.GetPythonPlotSize(32, 16)
-	if err := graphics.SavePNGWithBackground(p, width, height, output, color.Transparent); err != nil {
+	if err := graphics.PlotTimeAreasMatplotlib(dates, series, graphics.MatplotlibTimeAreaOptions{
+		Title:        "Developer Contributions Over Time",
+		XLabel:       "Time",
+		Output:       output,
+		WidthInches:  32,
+		HeightInches: 16,
+		HideY:        true,
+		Alpha:        1,
+		YMin:         0,
+		YMax:         float64(len(rows))*rowHeight + rowHeight*0.4,
+		Baselines:    baselines,
+		TextLabels:   labels,
+	}); err != nil {
 		return err
 	}
 
@@ -209,33 +220,6 @@ func buildDeveloperSeriesRows(timeSeries *readers.DeveloperTimeSeriesData, start
 	return rows, dates
 }
 
-func monthlyTicks(start, end time.Time) plot.ConstantTicks {
-	var ticks []plot.Tick
-	current := time.Date(start.Year(), start.Month(), 1, 0, 0, 0, 0, start.Location())
-	if current.Before(start) {
-		current = current.AddDate(0, 1, 0)
-	}
-	for !current.After(end) {
-		ticks = append(ticks, plot.Tick{Value: float64(current.Unix()), Label: current.Format("2006-01")})
-		current = current.AddDate(0, 1, 0)
-	}
-	return plot.ConstantTicks(ticks)
-}
-
-func areaPolygon(dates []time.Time, values []float64) (*plotter.Polygon, error) {
-	if len(dates) != len(values) {
-		return nil, fmt.Errorf("date and value length mismatch")
-	}
-	points := make(plotter.XYs, len(values)*2)
-	for i := range values {
-		points[i] = plotter.XY{X: float64(dates[i].Unix()), Y: values[i]}
-	}
-	for i := range values {
-		points[len(values)+i] = plotter.XY{X: float64(dates[len(values)-1-i].Unix()), Y: 0}
-	}
-	return plotter.NewPolygon(points)
-}
-
 func shortenDeveloperName(name string) string {
 	const maxLen = 36
 	if len(name) <= maxLen {
@@ -261,11 +245,6 @@ func formatNumber(n int) string {
 	default:
 		return fmt.Sprintf("%d", n)
 	}
-}
-
-func colorToRGBA(c color.Color, alpha uint8) color.RGBA {
-	r, g, b, _ := c.RGBA()
-	return color.RGBA{R: uint8(r >> 8), G: uint8(g >> 8), B: uint8(b >> 8), A: alpha}
 }
 
 // selectTopDevelopers selects the top developers by commit count.
@@ -334,34 +313,52 @@ func clusterDevelopers(devSeries map[string][]float64) map[string]int {
 
 // plotDevs generates plots for developers' contributions.
 func plotDevs(developerStats []readers.DeveloperStat, devSeries map[string][]float64, clusters map[string]int, output string) error {
-	// Create a new plot
-	p := plot.New()
-	p.Title.Text = "Developer Contributions Over Time"
-	p.X.Label.Text = "Weeks"
-	p.Y.Label.Text = "Commits"
-
-	// Plot each developer's time series
-	for _, dev := range developerStats {
-		series := devSeries[dev.Name]
-		pts := make(plotter.XYs, len(series))
-		for i, val := range series {
-			pts[i].X = float64(i)
-			pts[i].Y = val
-		}
-
-		line, err := plotter.NewLine(pts)
-		if err != nil {
-			return fmt.Errorf("error creating plot line for developer %s: %v", dev.Name, err)
-		}
-
-		line.Color = graphics.ColorPalette[0] // Use the first color for now
-		p.Add(line)
-		p.Legend.Add(dev.Name, line)
+	if len(developerStats) == 0 {
+		return fmt.Errorf("no developer stats to plot")
 	}
 
-	// Python labours renders devs at pyplot figure size 32x16 inches.
-	width, height := graphics.GetPythonPlotSize(32, 16)
-	if err := graphics.SavePNGWithBackground(p, width, height, output, color.Transparent); err != nil {
+	length := 0
+	for _, dev := range developerStats {
+		if len(devSeries[dev.Name]) > length {
+			length = len(devSeries[dev.Name])
+		}
+	}
+	if length == 0 {
+		return fmt.Errorf("no developer series to plot")
+	}
+
+	dates := make([]time.Time, length)
+	for i := range dates {
+		dates[i] = time.Unix(0, 0).AddDate(0, 0, i*7)
+	}
+	colors := graphics.PythonLaboursColorPalette(len(developerStats))
+	series := make([]graphics.MatplotlibTimeAreaSeries, 0, len(developerStats))
+	for i, dev := range developerStats {
+		values := append([]float64(nil), devSeries[dev.Name]...)
+		if len(values) < length {
+			values = append(values, make([]float64, length-len(values))...)
+		}
+		series = append(series, graphics.MatplotlibTimeAreaSeries{
+			Label:  dev.Name,
+			Values: values,
+			Color:  colors[i%len(colors)],
+		})
+	}
+
+	if err := graphics.PlotTimeAreasMatplotlib(dates, series, graphics.MatplotlibTimeAreaOptions{
+		Title:        "Developer Contributions Over Time",
+		XLabel:       "Time",
+		YLabel:       "Commits",
+		Output:       output,
+		WidthInches:  32,
+		HeightInches: 16,
+		Stacked:      false,
+		Legend:       true,
+		LegendLeft:   true,
+		LegendTop:    true,
+		Alpha:        0.7,
+		ShowGrid:     true,
+	}); err != nil {
 		return err
 	}
 

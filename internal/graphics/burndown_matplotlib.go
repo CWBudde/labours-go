@@ -2,7 +2,10 @@ package graphics
 
 import (
 	"fmt"
+	"image"
 	"image/color"
+	"image/draw"
+	"image/png"
 	"math"
 	"os"
 	"path/filepath"
@@ -84,10 +87,21 @@ func PlotBurndownMatplotlib(data *burndown.ProcessedBurndown, output string, rel
 	fig := core.NewFigure(
 		width,
 		height,
-		style.WithTheme(style.ThemeGGPlot),
 		style.WithFont("DejaVu Sans", 12),
+		style.WithBackground(1, 1, 1, 0),
+		style.WithAxesBackground(render.Color{R: 1, G: 1, B: 1, A: 1}),
+		style.WithAxesEdgeColor(render.Color{R: 0, G: 0, B: 0, A: 1}),
+		style.WithLegendColors(
+			render.Color{R: 1, G: 1, B: 1, A: 0.9},
+			render.Color{R: 1, G: 1, B: 1, A: 1},
+			render.Color{R: 0, G: 0, B: 0, A: 1},
+		),
 	)
-	ax := fig.AddSubplot(1, 1, 1)
+	ax := fig.GridSpec(
+		1,
+		1,
+		core.WithGridSpecPadding(0.036, 0.990, 0.049, 0.968),
+	).Cell(0, 0).AddAxes()
 	if ax == nil {
 		return fmt.Errorf("failed to create burndown axes")
 	}
@@ -95,17 +109,21 @@ func PlotBurndownMatplotlib(data *burndown.ProcessedBurndown, output string, rel
 		data.Name, len(data.Matrix), len(data.DateRange), data.Granularity, data.Sampling))
 	ax.SetXLabel("Time")
 	ax.SetYLabel("Lines of code")
-	ax.SetXLim(timeValues[0], timeValues[len(timeValues)-1])
+	plotMatrix := matrix
 	if relative {
-		ax.SetYLim(0, 1)
+		plotMatrix = clippedStackMatrix(matrix, 0, 1)
 	}
-	configureMatplotlibBurndownTimeAxis(ax, data.DateRange, data.ResampleMode)
-	ax.AddXGrid()
-	ax.AddYGrid()
-	ax.StackPlot(timeValues, matrix, core.StackPlotOptions{
+	ax.StackPlot(timeValues, plotMatrix, core.StackPlotOptions{
 		Colors: renderColors,
 		Labels: labels,
 	})
+	ax.SetXLim(timeValues[0], timeValues[len(timeValues)-1])
+	if relative {
+		ax.SetYLim(0, 1)
+	} else {
+		configureMatplotlibBurndownYAxis(fig, ax, matrix)
+	}
+	configureMatplotlibBurndownTimeAxis(ax, data.DateRange, data.ResampleMode)
 
 	legend := ax.AddLegend()
 	legend.Location = core.LegendUpperLeft
@@ -114,6 +132,88 @@ func PlotBurndownMatplotlib(data *burndown.ProcessedBurndown, output string, rel
 	}
 
 	return saveMatplotlibFigure(fig, output, width, height)
+}
+
+func clippedStackMatrix(matrix [][]float64, minY, maxY float64) [][]float64 {
+	if len(matrix) == 0 {
+		return nil
+	}
+	points := 0
+	for _, row := range matrix {
+		if points == 0 || len(row) < points {
+			points = len(row)
+		}
+	}
+	if points == 0 {
+		return nil
+	}
+
+	clipped := make([][]float64, len(matrix))
+	cumulative := make([]float64, points)
+	for i, row := range matrix {
+		clipped[i] = make([]float64, points)
+		for j := 0; j < points; j++ {
+			lower := cumulative[j]
+			upper := lower + row[j]
+			clippedLower := clampFloat(lower, minY, maxY)
+			clippedUpper := clampFloat(upper, minY, maxY)
+			if clippedUpper > clippedLower {
+				clipped[i][j] = clippedUpper - clippedLower
+			}
+			cumulative[j] = upper
+		}
+	}
+	return clipped
+}
+
+func configureMatplotlibBurndownYAxis(fig *core.Figure, ax *core.Axes, matrix [][]float64) {
+	maxY := maxStackY(matrix)
+	if maxY <= 0 {
+		ax.SetYLim(0, 1)
+		return
+	}
+	ax.SetYLim(0, maxY*1.05)
+
+	if maxY >= 1000 && maxY < 1000000 {
+		top := math.Floor(maxY / 1000)
+		if top < 1 {
+			top = 1
+		}
+		ticks := make([]float64, 0, int(top)+1)
+		labels := make([]string, 0, int(top)+1)
+		for i := 0; i <= int(top); i++ {
+			ticks = append(ticks, float64(i)*1000)
+			labels = append(labels, fmt.Sprintf("%d", i))
+		}
+		ax.YAxis.Locator = core.FixedLocator{TicksList: ticks}
+		ax.YAxis.Formatter = core.FixedFormatter{Labels: labels}
+		clipOff := false
+		fig.Text(0.036, 0.985, "1e3", core.TextOptions{
+			FontSize: 12,
+			Color:    render.Color{R: 0, G: 0, B: 0, A: 1},
+			ClipOn:   &clipOff,
+		})
+	}
+}
+
+func maxStackY(matrix [][]float64) float64 {
+	points := 0
+	for _, row := range matrix {
+		if points == 0 || len(row) < points {
+			points = len(row)
+		}
+	}
+	maxY := 0.0
+	for j := 0; j < points; j++ {
+		total := 0.0
+		for i := range matrix {
+			total += matrix[i][j]
+		}
+		if total > maxY {
+			maxY = total
+		}
+	}
+	return maxY
 }
 
 func configureMatplotlibBurndownTimeAxis(ax *core.Axes, dates []time.Time, resampleMode string) {
@@ -190,14 +290,16 @@ func buildMonthlyTicks(start, end time.Time) ([]float64, []string) {
 func buildYearlyTicks(start, end time.Time) ([]float64, []string) {
 	years := max(1, end.Year()-start.Year()+1)
 	step := max(1, int(math.Ceil(float64(years)/10)))
-	ticks := []time.Time{start}
+	ticks := make([]time.Time, 0, years)
 	for year := start.Year(); year <= end.Year(); year += step {
 		t := time.Date(year, 1, 1, 0, 0, 0, 0, start.Location())
 		if !t.Before(start) && !t.After(end) {
 			ticks = append(ticks, t)
 		}
 	}
-	ticks = append(ticks, end)
+	if len(ticks) == 0 {
+		ticks = append(ticks, start)
+	}
 	return formatDateTicks(ticks, "2006")
 }
 
@@ -239,7 +341,10 @@ func saveMatplotlibFigure(fig *core.Figure, output string, width, height int) er
 		if err != nil {
 			return fmt.Errorf("failed to create AGG renderer: %v", err)
 		}
-		return core.SavePNG(fig, renderer, output)
+		if err := core.SavePNG(fig, renderer, output); err != nil {
+			return err
+		}
+		return whitenTransparentPNG(output)
 	}
 }
 
@@ -272,6 +377,61 @@ func max(a, b int) int {
 		return a
 	}
 	return b
+}
+
+func clampFloat(v, minVal, maxVal float64) float64 {
+	if v < minVal {
+		return minVal
+	}
+	if v > maxVal {
+		return maxVal
+	}
+	return v
+}
+
+func whitenTransparentPNG(path string) error {
+	file, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	img, err := png.Decode(file)
+	closeErr := file.Close()
+	if err != nil {
+		return err
+	}
+	if closeErr != nil {
+		return closeErr
+	}
+
+	bounds := img.Bounds()
+	rgba := imageToRGBA(img)
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			offset := rgba.PixOffset(x, y)
+			if rgba.Pix[offset+3] == 0 {
+				rgba.Pix[offset+0] = 255
+				rgba.Pix[offset+1] = 255
+				rgba.Pix[offset+2] = 255
+			}
+		}
+	}
+
+	file, err = os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	return png.Encode(file, rgba)
+}
+
+func imageToRGBA(img image.Image) *image.RGBA {
+	if rgba, ok := img.(*image.RGBA); ok {
+		return rgba
+	}
+	bounds := img.Bounds()
+	rgba := image.NewRGBA(bounds)
+	draw.Draw(rgba, bounds, img, bounds.Min, draw.Src)
+	return rgba
 }
 
 // PrintSurvivalFunction prints survival ratios to match Python output (placeholder)

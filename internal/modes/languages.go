@@ -2,7 +2,6 @@ package modes
 
 import (
 	"fmt"
-	"image/color"
 	"math"
 	"os"
 	"path/filepath"
@@ -11,9 +10,6 @@ import (
 	"time"
 
 	"github.com/spf13/viper"
-	"gonum.org/v1/plot"
-	"gonum.org/v1/plot/plotter"
-	"gonum.org/v1/plot/vg"
 	"labours-go/internal/graphics"
 	"labours-go/internal/readers"
 )
@@ -66,65 +62,42 @@ func plotLanguageEvolution(timeSeries *readers.DeveloperTimeSeriesData, startUni
 		return err
 	}
 
-	p := plot.New()
-	p.Title.Text = fmt.Sprintf("Language Evolution Over Time\n(Total: %s lines)", formatFloatWithCommas(data.Total))
-	p.X.Label.Text = "Time"
-	p.Y.Label.Text = "Lines of Code"
-
 	colors := graphics.PythonLaboursColorPalette(len(data.Languages))
-	if len(data.Dates) > 1 {
-		cumulative := make([]float64, len(data.Dates))
-		for langIndex, lang := range data.Languages {
-			top := make([]float64, len(data.Dates))
-			bottom := make([]float64, len(data.Dates))
-			for i := range data.Dates {
-				bottom[i] = cumulative[i]
-				cumulative[i] += data.Matrix[i][langIndex]
-				top[i] = cumulative[i]
-			}
-			poly, err := stackedAreaPolygon(data.Dates, top, bottom)
-			if err != nil {
-				return err
-			}
-			poly.Color = colorToRGBA(colors[langIndex%len(colors)], 204)
-			poly.LineStyle.Width = 0
-			p.Add(poly)
-			p.Legend.Add(lang, poly)
+	series := make([]graphics.MatplotlibTimeAreaSeries, len(data.Languages))
+	for langIndex, lang := range data.Languages {
+		values := make([]float64, len(data.Dates))
+		for i := range data.Dates {
+			values[i] = data.Matrix[i][langIndex]
 		}
-	} else {
-		for langIndex, lang := range data.Languages {
-			line, err := plotter.NewLine(plotter.XYs{{X: float64(data.Dates[0].Unix()), Y: 0}, {X: float64(data.Dates[0].Unix()), Y: data.Total}})
-			if err != nil {
-				return err
-			}
-			line.Color = colorToRGBA(colors[langIndex%len(colors)], 204)
-			p.Legend.Add(lang, line)
+		series[langIndex] = graphics.MatplotlibTimeAreaSeries{
+			Label:  lang,
+			Values: values,
+			Color:  colors[langIndex%len(colors)],
 		}
 	}
 
-	p.Legend.Left = true
-	p.Legend.Top = true
-	p.X.Tick.Label.Rotation = math.Pi / 6
-	p.X.Tick.Label.XAlign = -0.5
-	p.X.Tick.Marker = yearlyTicks(data.Dates[0].AddDate(-2, 0, 0), data.Dates[len(data.Dates)-1].AddDate(2, 0, 0))
-	if len(data.Dates) == 1 {
-		p.X.Min = float64(data.Dates[0].AddDate(-2, 0, 0).Unix())
-		p.X.Max = float64(data.Dates[0].AddDate(2, 0, 0).Unix())
-	} else {
-		p.X.Min = float64(data.Dates[0].Unix())
-		p.X.Max = float64(data.Dates[len(data.Dates)-1].Unix())
-	}
-	p.Y.Min = 0
-	p.Y.Max = math.Max(data.Total*1.05, 1)
-
-	width, height := graphics.GetPythonPlotSize(16, 12)
 	outputs, err := languageOutputPaths(output)
 	if err != nil {
 		return err
 	}
 
 	for _, outputPath := range outputs {
-		if err := graphics.SavePNGWithBackground(p, width, height, outputPath, color.Transparent); err != nil {
+		if err := graphics.PlotTimeAreasMatplotlib(data.Dates, series, graphics.MatplotlibTimeAreaOptions{
+			Title:        fmt.Sprintf("Language Evolution Over Time\n(Total: %s lines)", formatFloatWithCommas(data.Total)),
+			XLabel:       "Time",
+			YLabel:       "Lines of Code",
+			Output:       outputPath,
+			WidthInches:  16,
+			HeightInches: 12,
+			Stacked:      true,
+			Legend:       true,
+			LegendLeft:   true,
+			LegendTop:    true,
+			Alpha:        0.8,
+			YMin:         0,
+			YMax:         math.Max(data.Total*1.05, 1),
+			ShowGrid:     true,
+		}); err != nil {
 			return err
 		}
 		fmt.Printf("Language chart saved to %s\n", outputPath)
@@ -232,8 +205,12 @@ func buildLanguageEvolution(timeSeries *readers.DeveloperTimeSeriesData, startUn
 	dates, matrix := resampleLanguageMatrix(daily, start, end, resample)
 	total := 0.0
 	for _, row := range matrix {
+		rowTotal := 0.0
 		for _, value := range row {
-			total += value
+			rowTotal += value
+		}
+		if rowTotal > total {
+			total = rowTotal
 		}
 	}
 	return languageEvolution{Languages: languages, Dates: dates, Matrix: matrix, Total: total}, nil
@@ -300,30 +277,6 @@ func languageMonthEnd(year int, month time.Month, ref time.Time) time.Time {
 	return time.Date(year, month+1, 1, ref.Hour(), ref.Minute(), ref.Second(), ref.Nanosecond(), ref.Location()).AddDate(0, 0, -1)
 }
 
-func stackedAreaPolygon(dates []time.Time, top, bottom []float64) (*plotter.Polygon, error) {
-	if len(dates) != len(top) || len(dates) != len(bottom) {
-		return nil, fmt.Errorf("stacked area length mismatch")
-	}
-	points := make(plotter.XYs, len(dates)*2)
-	for i := range dates {
-		points[i] = plotter.XY{X: float64(dates[i].Unix()), Y: top[i]}
-	}
-	for i := range dates {
-		j := len(dates) - 1 - i
-		points[len(dates)+i] = plotter.XY{X: float64(dates[j].Unix()), Y: bottom[j]}
-	}
-	return plotter.NewPolygon(points)
-}
-
-func yearlyTicks(start, end time.Time) plot.ConstantTicks {
-	var ticks []plot.Tick
-	for year := start.Year(); year <= end.Year(); year++ {
-		dt := time.Date(year, time.January, 1, 0, 0, 0, 0, start.Location())
-		ticks = append(ticks, plot.Tick{Value: float64(dt.Unix()), Label: fmt.Sprintf("%d", year)})
-	}
-	return plot.ConstantTicks(ticks)
-}
-
 func formatFloatWithCommas(v float64) string {
 	s := fmt.Sprintf("%.1f", v)
 	parts := strings.SplitN(s, ".", 2)
@@ -352,53 +305,30 @@ func reverseString(s string) string {
 
 // plotLanguages creates a bar chart showing language distribution by lines of code
 func plotLanguages(languageStats []readers.LanguageStat, output string) error {
-	// Create a new plot
-	p := plot.New()
-	p.Title.Text = "Programming Languages by Lines of Code"
-	p.X.Label.Text = "Languages"
-	p.Y.Label.Text = "Lines of Code"
-
 	// Prepare data for the bar chart
 	names := make([]string, len(languageStats))
-	values := make(plotter.Values, len(languageStats))
+	values := make([]float64, len(languageStats))
 
 	for i, stat := range languageStats {
 		names[i] = stat.Language
 		values[i] = float64(stat.Lines)
 	}
 
-	// Create bar chart
-	bars, err := plotter.NewBarChart(values, vg.Points(50))
-	if err != nil {
-		return fmt.Errorf("failed to create bar chart: %v", err)
-	}
-
-	// Style the bars with different colors
-	for i := range bars.Values {
-		bars.Color = graphics.ColorPalette[i%len(graphics.ColorPalette)]
-	}
-
-	p.Add(bars)
-
-	// Create custom labels for X axis
-	p.NominalX(names...)
-
-	// Rotate x-axis labels if there are many languages
-	if len(languageStats) > 10 {
-		p.X.Tick.Label.Rotation = 0.785398 // 45 degrees in radians
-		p.X.Tick.Label.XAlign = -0.5
-		p.X.Tick.Label.YAlign = -0.5
-	}
-
-	// Python labours applies the shared plot style default of 16x12 inches.
-	width, height := graphics.GetPythonPlotSize(16, 12)
 	outputs, err := languageOutputPaths(output)
 	if err != nil {
 		return err
 	}
 
 	for _, outputPath := range outputs {
-		if err := graphics.SavePNGWithBackground(p, width, height, outputPath, color.Transparent); err != nil {
+		if err := graphics.PlotBarChartMatplotlib(names, values, graphics.MatplotlibBarOptions{
+			Title:        "Programming Languages by Lines of Code",
+			XLabel:       "Languages",
+			YLabel:       "Lines of Code",
+			Output:       outputPath,
+			WidthInches:  16,
+			HeightInches: 12,
+			RotateX:      len(languageStats) > 10,
+		}); err != nil {
 			return err
 		}
 		fmt.Printf("Language chart saved to %s\n", outputPath)
