@@ -252,44 +252,23 @@ func (r *YamlReader) GetShotnessCooccurrence() ([]string, [][]int, error) {
 		return nil, nil, err
 	}
 
-	// Create index using Python format: "file:name"
-	var index []string
-	for _, record := range shotnessRecords {
-		name := fmt.Sprintf("%s:%s", record.File, record.Name)
-		index = append(index, name)
-	}
+	index, matrix := shotnessCounterMatrix(shotnessRecords)
+	return index, matrix, nil
+}
 
-	// Build sparse co-occurrence matrix from counters
-	size := len(shotnessRecords)
-	matrix := make([][]int, size)
-	for i := range matrix {
-		matrix[i] = make([]int, size)
-	}
-
-	// Fill matrix based on counter overlap/similarity
-	for i, recordI := range shotnessRecords {
-		for j, recordJ := range shotnessRecords {
-			if i == j {
-				// Diagonal: sum of all counters for this record
-				var total int32
-				for _, count := range recordI.Counters {
-					total += count
-				}
-				matrix[i][j] = int(total)
-			} else {
-				// Off-diagonal: count of overlapping time periods
-				var overlap int32
-				for timeI, countI := range recordI.Counters {
-					if countJ, exists := recordJ.Counters[timeI]; exists && countI > 0 && countJ > 0 {
-						overlap += min32(countI, countJ)
-					}
-				}
-				matrix[i][j] = int(overlap)
+func shotnessCounterMatrix(records []ShotnessRecord) ([]string, [][]int) {
+	index := make([]string, len(records))
+	matrix := make([][]int, len(records))
+	for i, record := range records {
+		index[i] = fmt.Sprintf("%s:%s", record.File, record.Name)
+		matrix[i] = make([]int, len(records))
+		for tick, count := range record.Counters {
+			if tick >= 0 && int(tick) < len(records) {
+				matrix[i][int(tick)] = int(count)
 			}
 		}
 	}
-
-	return index, matrix, nil
+	return index, matrix
 }
 
 // min32 returns the minimum of two int32 values

@@ -29,6 +29,18 @@ Current checked-in current-Hercules fixtures live in `test/testdata/hercules/`:
 
 - `report_default.pb`: default `hercules report` analysis flag set.
 - `shotness.pb`: `--shotness` payload used by report-all modes.
+- `sentiment.pb`: synthetic `CommentSentimentResults` payload with non-empty
+  sentiment ticks for reader and parity-viewer coverage.
+
+The sentiment fixture is synthetic because the available TensorFlow-enabled
+neighboring Hercules build produced empty `sentiment_by_tick` payloads for the
+small SIVA/local repositories tested on 2026-04-28. Replace it with real
+current-Hercules output once a compact input repository produces non-empty
+sentiment ticks.
+
+`scripts/generate_hercules_fixtures.sh` treats `report_all.pb` as optional so
+local builds can still refresh the default report and shotness fixtures when a
+complete report-all payload is unavailable.
 
 Suggested fixture commands:
 
@@ -37,6 +49,7 @@ Suggested fixture commands:
 ../hercules/hercules --pb --couples <repo> > testdata/hercules/couples.pb
 ../hercules/hercules --pb --devs <repo> > testdata/hercules/devs.pb
 ../hercules/hercules --pb --temporal-activity --bus-factor --ownership-concentration --knowledge-diffusion --hotspot-risk <repo> > testdata/hercules/report-default-extra.pb
+../hercules/hercules --pb --sentiment <repo> > testdata/hercules/sentiment.pb
 ```
 
 See `PLAN.md` for the broader compatibility test strategy.

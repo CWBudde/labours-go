@@ -84,23 +84,29 @@ func PlotBurndownMatplotlib(data *burndown.ProcessedBurndown, output string, rel
 	}
 
 	width, height := pythonPlotPixelSize(16, 12)
+	fontSize := viper.GetInt("font-size")
+	if fontSize <= 0 {
+		fontSize = 12
+	}
+	background, foreground := laboursPlotColors(viper.GetString("background"))
 	fig := core.NewFigure(
 		width,
 		height,
-		style.WithFont("DejaVu Sans", 12),
-		style.WithBackground(1, 1, 1, 0),
-		style.WithAxesBackground(render.Color{R: 1, G: 1, B: 1, A: 1}),
-		style.WithAxesEdgeColor(render.Color{R: 0, G: 0, B: 0, A: 1}),
+		style.WithFont("DejaVu Sans", float64(fontSize)),
+		style.WithBackground(background.R, background.G, background.B, 0),
+		style.WithAxesBackground(render.Color{R: background.R, G: background.G, B: background.B, A: 0}),
+		style.WithAxesEdgeColor(foreground),
+		style.WithTextColor(foreground.R, foreground.G, foreground.B, foreground.A),
 		style.WithLegendColors(
-			render.Color{R: 1, G: 1, B: 1, A: 0.9},
-			render.Color{R: 1, G: 1, B: 1, A: 1},
-			render.Color{R: 0, G: 0, B: 0, A: 1},
+			render.Color{R: background.R, G: background.G, B: background.B, A: 1},
+			background,
+			foreground,
 		),
 	)
 	ax := fig.GridSpec(
 		1,
 		1,
-		core.WithGridSpecPadding(0.036, 0.990, 0.049, 0.968),
+		core.WithGridSpecPadding(pythonBurndownAxesPadding(matrix, relative)),
 	).Cell(0, 0).AddAxes()
 	if ax == nil {
 		return fmt.Errorf("failed to create burndown axes")
@@ -111,6 +117,9 @@ func PlotBurndownMatplotlib(data *burndown.ProcessedBurndown, output string, rel
 	ax.SetYLabel("Lines of code")
 	plotMatrix := matrix
 	if relative {
+		// Python lets matplotlib clip the unnormalized stackplot after ylim(0, 1).
+		// matplotlib-go's AGG backend currently drops those out-of-range fills,
+		// so pre-clip the stacked layers to the same visible result.
 		plotMatrix = clippedStackMatrix(matrix, 0, 1)
 	}
 	ax.StackPlot(timeValues, plotMatrix, core.StackPlotOptions{
@@ -121,7 +130,7 @@ func PlotBurndownMatplotlib(data *burndown.ProcessedBurndown, output string, rel
 	if relative {
 		ax.SetYLim(0, 1)
 	} else {
-		configureMatplotlibBurndownYAxis(fig, ax, matrix)
+		configureMatplotlibBurndownYAxis(fig, ax, matrix, float64(fontSize), foreground)
 	}
 	configureMatplotlibBurndownTimeAxis(ax, data.DateRange, data.ResampleMode)
 
@@ -131,7 +140,17 @@ func PlotBurndownMatplotlib(data *burndown.ProcessedBurndown, output string, rel
 		legend.Location = core.LegendLowerLeft
 	}
 
-	return saveMatplotlibFigure(fig, output, width, height)
+	return saveMatplotlibFigureWithoutTightLayout(fig, output, width, height, background)
+}
+
+func pythonBurndownAxesPadding(matrix [][]float64, relative bool) (left, right, bottom, top float64) {
+	left = 0.036
+	if relative {
+		left = 0.045
+	} else if maxStackY(matrix) < 1000 {
+		left = 0.041
+	}
+	return left, 0.991, 0.049, 0.968
 }
 
 func clippedStackMatrix(matrix [][]float64, minY, maxY float64) [][]float64 {
@@ -166,7 +185,7 @@ func clippedStackMatrix(matrix [][]float64, minY, maxY float64) [][]float64 {
 	return clipped
 }
 
-func configureMatplotlibBurndownYAxis(fig *core.Figure, ax *core.Axes, matrix [][]float64) {
+func configureMatplotlibBurndownYAxis(fig *core.Figure, ax *core.Axes, matrix [][]float64, fontSize float64, foreground render.Color) {
 	maxY := maxStackY(matrix)
 	if maxY <= 0 {
 		ax.SetYLim(0, 1)
@@ -175,7 +194,7 @@ func configureMatplotlibBurndownYAxis(fig *core.Figure, ax *core.Axes, matrix []
 	ax.SetYLim(0, maxY*1.05)
 
 	if maxY >= 1000 && maxY < 1000000 {
-		top := math.Floor(maxY / 1000)
+		top := math.Ceil(maxY / 1000)
 		if top < 1 {
 			top = 1
 		}
@@ -189,8 +208,8 @@ func configureMatplotlibBurndownYAxis(fig *core.Figure, ax *core.Axes, matrix []
 		ax.YAxis.Formatter = core.FixedFormatter{Labels: labels}
 		clipOff := false
 		fig.Text(0.036, 0.985, "1e3", core.TextOptions{
-			FontSize: 12,
-			Color:    render.Color{R: 0, G: 0, B: 0, A: 1},
+			FontSize: fontSize,
+			Color:    foreground,
 			ClipOn:   &clipOff,
 		})
 	}
@@ -214,6 +233,13 @@ func maxStackY(matrix [][]float64) float64 {
 		}
 	}
 	return maxY
+}
+
+func laboursPlotColors(backgroundName string) (background, foreground render.Color) {
+	if strings.EqualFold(backgroundName, "black") {
+		return render.Color{R: 0, G: 0, B: 0, A: 1}, render.Color{R: 1, G: 1, B: 1, A: 1}
+	}
+	return render.Color{R: 1, G: 1, B: 1, A: 1}, render.Color{R: 0, G: 0, B: 0, A: 1}
 }
 
 func configureMatplotlibBurndownTimeAxis(ax *core.Axes, dates []time.Time, resampleMode string) {
@@ -300,6 +326,9 @@ func buildYearlyTicks(start, end time.Time) ([]float64, []string) {
 	if len(ticks) == 0 {
 		ticks = append(ticks, start)
 	}
+	if len(ticks) == 1 {
+		return formatDateTicks(ticks, "2006-01-02")
+	}
 	return formatDateTicks(ticks, "2006")
 }
 
@@ -319,7 +348,15 @@ func formatDateTicks(dates []time.Time, layout string) ([]float64, []string) {
 	return ticks, labels
 }
 
-func saveMatplotlibFigure(fig *core.Figure, output string, width, height int) error {
+func saveMatplotlibFigure(fig *core.Figure, output string, width, height int, backgrounds ...render.Color) error {
+	return saveMatplotlibFigureWithLayout(fig, output, width, height, true, backgrounds...)
+}
+
+func saveMatplotlibFigureWithoutTightLayout(fig *core.Figure, output string, width, height int, backgrounds ...render.Color) error {
+	return saveMatplotlibFigureWithLayout(fig, output, width, height, false, backgrounds...)
+}
+
+func saveMatplotlibFigureWithLayout(fig *core.Figure, output string, width, height int, tight bool, backgrounds ...render.Color) error {
 	if output == "" {
 		output = "burndown_project_python.png"
 	}
@@ -327,8 +364,16 @@ func saveMatplotlibFigure(fig *core.Figure, output string, width, height int) er
 		return fmt.Errorf("failed to create output directory for %s: %v", output, err)
 	}
 
-	background := render.Color{R: 1, G: 1, B: 1, A: 0}
-	config := backends.Config{Width: width, Height: height, Background: background, DPI: 100}
+	if tight {
+		fig.TightLayout()
+	}
+	background := render.Color{R: 1, G: 1, B: 1, A: 1}
+	if len(backgrounds) > 0 {
+		background = backgrounds[0]
+	}
+	transparentBackground := background
+	transparentBackground.A = 0
+	config := backends.Config{Width: width, Height: height, Background: transparentBackground, DPI: 100}
 	switch strings.ToLower(filepath.Ext(output)) {
 	case ".svg":
 		renderer, _, err := backends.NewRenderer("svg", config, nil)
@@ -344,7 +389,7 @@ func saveMatplotlibFigure(fig *core.Figure, output string, width, height int) er
 		if err := core.SavePNG(fig, renderer, output); err != nil {
 			return err
 		}
-		return whitenTransparentPNG(output)
+		return setTransparentPNGRGB(output, background)
 	}
 }
 
@@ -389,7 +434,7 @@ func clampFloat(v, minVal, maxVal float64) float64 {
 	return v
 }
 
-func whitenTransparentPNG(path string) error {
+func setTransparentPNGRGB(path string, background render.Color) error {
 	file, err := os.Open(path)
 	if err != nil {
 		return err
@@ -404,14 +449,14 @@ func whitenTransparentPNG(path string) error {
 	}
 
 	bounds := img.Bounds()
-	rgba := imageToRGBA(img)
+	rgba := imageToNRGBA(img)
 	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
 		for x := bounds.Min.X; x < bounds.Max.X; x++ {
 			offset := rgba.PixOffset(x, y)
 			if rgba.Pix[offset+3] == 0 {
-				rgba.Pix[offset+0] = 255
-				rgba.Pix[offset+1] = 255
-				rgba.Pix[offset+2] = 255
+				rgba.Pix[offset+0] = uint8(math.Round(background.R * 255))
+				rgba.Pix[offset+1] = uint8(math.Round(background.G * 255))
+				rgba.Pix[offset+2] = uint8(math.Round(background.B * 255))
 			}
 		}
 	}
@@ -424,12 +469,12 @@ func whitenTransparentPNG(path string) error {
 	return png.Encode(file, rgba)
 }
 
-func imageToRGBA(img image.Image) *image.RGBA {
-	if rgba, ok := img.(*image.RGBA); ok {
+func imageToNRGBA(img image.Image) *image.NRGBA {
+	if rgba, ok := img.(*image.NRGBA); ok {
 		return rgba
 	}
 	bounds := img.Bounds()
-	rgba := image.NewRGBA(bounds)
+	rgba := image.NewNRGBA(bounds)
 	draw.Draw(rgba, bounds, img, bounds.Min, draw.Src)
 	return rgba
 }
@@ -490,11 +535,7 @@ func PythonLaboursColorPalette(n int) []color.Color {
 
 	colors := make([]color.Color, n)
 	for i := 0; i < n; i++ {
-		if i < len(tab20Colors) {
-			colors[i] = tab20Colors[i]
-		} else {
-			colors[i] = generateHSVColorWithOpacity(i, n, 255)
-		}
+		colors[i] = tab20Colors[i%len(tab20Colors)]
 	}
 
 	return colors

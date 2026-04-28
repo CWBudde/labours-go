@@ -44,9 +44,10 @@ type caseEntry struct {
 }
 
 type loadResult struct {
-	Cases         []caseEntry
-	ComparedCount int
-	SkippedCount  int
+	Cases             []caseEntry
+	ComparedCount     int
+	ArtifactOnlyCount int
+	SkippedCount      int
 }
 
 type viewOptions struct {
@@ -82,6 +83,7 @@ func main() {
 	nameFilter := flag.String("name-filter", "", "Optional case-name substring filter")
 	namePrefix := flag.String("name-prefix", "", "Optional case-name prefix filter")
 	printOnly := flag.Bool("print", false, "Print comparison rows and exit")
+	rerenderAll := flag.Bool("rerender-all", false, "Re-render all built-in Go artifacts and exit unless --print is also set")
 	flag.Parse()
 
 	root, err := detectRepoRoot()
@@ -152,6 +154,18 @@ func main() {
 		}
 		w.WriteHeader(http.StatusNoContent)
 	})
+
+	if *rerenderAll {
+		if err := ensureRerenderSupported(*parityDir != "", root, artDir, *artifactPrefix); err != nil {
+			log.Fatal(err)
+		}
+		if err := rerenderAllArtifacts(root); err != nil {
+			log.Fatalf("rerender all artifacts: %v", err)
+		}
+		if !*printOnly {
+			return
+		}
+	}
 
 	if *printOnly {
 		result, err := loadCases(*parityDir != "", parDir, baseDir, artDir, *baselinePrefix, *artifactPrefix, *nameFilter, *namePrefix)
@@ -277,6 +291,167 @@ func laboursReferenceRecipes() []referenceRecipe {
 			OutputIsDir:   true,
 			GeneratedFile: "old_vs_new_analysis.png",
 		},
+		{
+			Name:          "burndown_file_sample",
+			Input:         filepath.Join("test", "testdata", "hercules", "report_default.pb"),
+			Mode:          "burndown-file",
+			OutputIsDir:   true,
+			GeneratedFile: "burndown-file_CODE_OF_CONDUCT_md.png",
+		},
+		{
+			Name:          "burndown_person_sample",
+			Input:         filepath.Join("test", "testdata", "hercules", "report_default.pb"),
+			Mode:          "burndown-person",
+			OutputIsDir:   true,
+			GeneratedFile: "burndown-person_alexander bezzubov_bzz@apache_org.png",
+		},
+		{
+			Name:  "overwrites_matrix",
+			Input: filepath.Join("test", "testdata", "hercules", "report_default.pb"),
+			Mode:  "overwrites-matrix",
+		},
+		{
+			Name:  "ownership",
+			Input: filepath.Join("test", "testdata", "hercules", "report_default.pb"),
+			Mode:  "ownership",
+		},
+		{
+			Name:          "devs_efforts_scatter",
+			Input:         filepath.Join("test", "testdata", "hercules", "report_default.pb"),
+			Mode:          "devs-efforts",
+			OutputIsDir:   true,
+			GeneratedFile: "devs_efforts_scatter.png",
+		},
+		{
+			Name:          "devs_productivity_ranking",
+			Input:         filepath.Join("test", "testdata", "hercules", "report_default.pb"),
+			Mode:          "devs-efforts",
+			OutputIsDir:   true,
+			GeneratedFile: "devs_productivity_ranking.png",
+		},
+		{
+			Name:  "temporal_activity",
+			Input: filepath.Join("test", "testdata", "hercules", "report_default.pb"),
+			Mode:  "temporal-activity",
+		},
+		{
+			Name:          "bus_factor",
+			Input:         filepath.Join("test", "testdata", "hercules", "report_default.pb"),
+			Mode:          "bus-factor",
+			OutputIsDir:   true,
+			GeneratedFile: "bus-factor.png",
+		},
+		{
+			Name:          "bus_factor_subsystems",
+			Input:         filepath.Join("test", "testdata", "hercules", "report_default.pb"),
+			Mode:          "bus-factor",
+			OutputIsDir:   true,
+			GeneratedFile: "bus-factor_subsystems.png",
+		},
+		{
+			Name:  "ownership_concentration",
+			Input: filepath.Join("test", "testdata", "hercules", "report_default.pb"),
+			Mode:  "ownership-concentration",
+		},
+		{
+			Name:          "knowledge_diffusion",
+			Input:         filepath.Join("test", "testdata", "hercules", "report_default.pb"),
+			Mode:          "knowledge-diffusion",
+			OutputIsDir:   true,
+			GeneratedFile: "knowledge-diffusion.png",
+		},
+		{
+			Name:          "knowledge_diffusion_silos",
+			Input:         filepath.Join("test", "testdata", "hercules", "report_default.pb"),
+			Mode:          "knowledge-diffusion",
+			OutputIsDir:   true,
+			GeneratedFile: "knowledge-diffusion_silos.png",
+		},
+		{
+			Name:          "knowledge_diffusion_trend",
+			Input:         filepath.Join("test", "testdata", "hercules", "report_default.pb"),
+			Mode:          "knowledge-diffusion",
+			OutputIsDir:   true,
+			GeneratedFile: "knowledge-diffusion_trend.png",
+		},
+		{
+			Name:  "hotspot_risk",
+			Input: filepath.Join("test", "testdata", "hercules", "report_default.pb"),
+			Mode:  "hotspot-risk",
+		},
+		{
+			Name:          "devs_parallel_activity",
+			Input:         filepath.Join("test", "testdata", "hercules", "report_default.pb"),
+			Mode:          "devs-parallel",
+			ExtraArgs:     []string{"--devs-parallel-fallback"},
+			OutputIsDir:   true,
+			GeneratedFile: "parallel_activity.png",
+		},
+		{
+			Name:          "devs_parallel_concurrency",
+			Input:         filepath.Join("test", "testdata", "hercules", "report_default.pb"),
+			Mode:          "devs-parallel",
+			ExtraArgs:     []string{"--devs-parallel-fallback"},
+			OutputIsDir:   true,
+			GeneratedFile: "developer_concurrency.png",
+		},
+		{
+			Name:          "runtime_breakdown",
+			Input:         filepath.Join("test", "testdata", "hercules", "report_default.pb"),
+			Mode:          "run-times",
+			OutputIsDir:   true,
+			GeneratedFile: "runtime_breakdown.png",
+		},
+		{
+			Name:          "runtime_percentage",
+			Input:         filepath.Join("test", "testdata", "hercules", "report_default.pb"),
+			Mode:          "run-times",
+			OutputIsDir:   true,
+			GeneratedFile: "runtime_percentage.png",
+		},
+		{
+			Name:          "couples_files_heatmap",
+			Input:         filepath.Join("test", "testdata", "hercules", "report_default.pb"),
+			Mode:          "couples-files",
+			OutputIsDir:   true,
+			GeneratedFile: "file_coupling_heatmap.png",
+		},
+		{
+			Name:          "couples_files_top_pairs",
+			Input:         filepath.Join("test", "testdata", "hercules", "report_default.pb"),
+			Mode:          "couples-files",
+			OutputIsDir:   true,
+			GeneratedFile: "top_file_coupling_pairs.png",
+		},
+		{
+			Name:          "shotness",
+			Input:         filepath.Join("test", "testdata", "hercules", "shotness.pb"),
+			Mode:          "shotness",
+			OutputIsDir:   true,
+			GeneratedFile: "shotness.png",
+		},
+		{
+			Name:          "couples_shotness_heatmap",
+			Input:         filepath.Join("test", "testdata", "hercules", "shotness.pb"),
+			Mode:          "couples-shotness",
+			OutputIsDir:   true,
+			GeneratedFile: "shotness_coupling_heatmap.png",
+		},
+		{
+			Name:          "couples_shotness_top_pairs",
+			Input:         filepath.Join("test", "testdata", "hercules", "shotness.pb"),
+			Mode:          "couples-shotness",
+			OutputIsDir:   true,
+			GeneratedFile: "top_shotness_coupling_pairs.png",
+		},
+		{
+			Name:          "sentiment",
+			Input:         filepath.Join("test", "testdata", "hercules", "sentiment.pb"),
+			Mode:          "sentiment",
+			ExtraArgs:     []string{"-f", "pb"},
+			OutputIsDir:   true,
+			GeneratedFile: "sentiment-overview.png",
+		},
 	}
 }
 
@@ -369,7 +544,7 @@ func loadCases(useParity bool, parityDir, baselineDir, artifactDir, baselineFile
 }
 
 func printCases(w io.Writer, result loadResult) {
-	fmt.Fprintf(w, "found=%d skipped=%d\n", result.ComparedCount, result.SkippedCount)
+	fmt.Fprintf(w, "found=%d artifact_only=%d skipped=%d\n", result.ComparedCount, result.ArtifactOnlyCount, result.SkippedCount)
 	for _, c := range result.Cases {
 		fmt.Fprintf(
 			w,
@@ -420,6 +595,7 @@ func loadCasesFromDirectories(baselineDir, artifactDir, baselineFilePrefix, arti
 	filter := strings.ToLower(strings.TrimSpace(nameFilter))
 	prefix := strings.ToLower(strings.TrimSpace(namePrefix))
 	var result loadResult
+	seen := map[string]struct{}{}
 
 	baselineGlob := "*.png"
 	if baselineFilePrefix != "" {
@@ -440,6 +616,7 @@ func loadCasesFromDirectories(baselineDir, artifactDir, baselineFilePrefix, arti
 		if prefix != "" && !strings.HasPrefix(strings.ToLower(name), prefix) {
 			continue
 		}
+		seen[name] = struct{}{}
 
 		artifactName := artifactFilePrefix + name + filepath.Ext(baselinePath)
 		artifactPath := filepath.Join(artifactDir, artifactName)
@@ -460,6 +637,36 @@ func loadCasesFromDirectories(baselineDir, artifactDir, baselineFilePrefix, arti
 		result.ComparedCount++
 	}
 
+	artifactGlob := "*.png"
+	if artifactFilePrefix != "" {
+		artifactGlob = artifactFilePrefix + "*.png"
+	}
+	artifacts, err := filepath.Glob(filepath.Join(artifactDir, artifactGlob))
+	if err != nil {
+		return loadResult{}, fmt.Errorf("glob artifacts %s: %w", artifactDir, err)
+	}
+	sort.Strings(artifacts)
+	for _, artifactPath := range artifacts {
+		baseName := strings.TrimSuffix(filepath.Base(artifactPath), filepath.Ext(artifactPath))
+		name := strings.TrimPrefix(baseName, artifactFilePrefix)
+		if _, ok := seen[name]; ok {
+			continue
+		}
+		if filter != "" && !strings.Contains(strings.ToLower(name), filter) {
+			continue
+		}
+		if prefix != "" && !strings.HasPrefix(strings.ToLower(name), prefix) {
+			continue
+		}
+
+		entry, err := buildArtifactOnlyEntry("plots", "artifact-only", name, artifactPath)
+		if err != nil {
+			return loadResult{}, fmt.Errorf("build artifact-only entry for %s: %w", name, err)
+		}
+		result.Cases = append(result.Cases, entry)
+		result.ArtifactOnlyCount++
+	}
+
 	sort.Slice(result.Cases, func(i, j int) bool {
 		if result.Cases[i].RMSE == result.Cases[j].RMSE {
 			return result.Cases[i].Name < result.Cases[j].Name
@@ -468,6 +675,41 @@ func loadCasesFromDirectories(baselineDir, artifactDir, baselineFilePrefix, arti
 	})
 
 	return result, nil
+}
+
+func buildArtifactOnlyEntry(suite, baseline, name, artifactPath string) (caseEntry, error) {
+	act, err := readPNGAsRGBA(artifactPath)
+	if err != nil {
+		return caseEntry{}, fmt.Errorf("read artifact: %w", err)
+	}
+	rawDiff := rawDiffImage(act, act)
+	ampDiff := amplifiedDiffImage(act, act)
+	actB64, err := pngToBase64(compositeOverSolid(act, color.RGBA{R: 255, G: 255, B: 255, A: 255}))
+	if err != nil {
+		return caseEntry{}, err
+	}
+	rawDiffB64, err := pngToBase64(rawDiff)
+	if err != nil {
+		return caseEntry{}, err
+	}
+	ampDiffB64, err := pngToBase64(ampDiff)
+	if err != nil {
+		return caseEntry{}, err
+	}
+	return caseEntry{
+		Suite:       suite,
+		Baseline:    baseline,
+		Name:        name,
+		TotalPixels: act.Bounds().Dx() * act.Bounds().Dy(),
+		RefWidth:    act.Bounds().Dx(),
+		RefHeight:   act.Bounds().Dy(),
+		ActWidth:    act.Bounds().Dx(),
+		ActHeight:   act.Bounds().Dy(),
+		RefB64:      actB64,
+		ActB64:      actB64,
+		RawDiffB64:  rawDiffB64,
+		AmpDiffB64:  ampDiffB64,
+	}, nil
 }
 
 func loadCasesFromParityDir(parityDir, nameFilter, namePrefix string) (loadResult, error) {
@@ -826,6 +1068,9 @@ func renderPage(w io.Writer, result loadResult, opts viewOptions) {
 		`<div class="header-meta">%d comparisons loaded`,
 		result.ComparedCount,
 	)
+	if result.ArtifactOnlyCount > 0 {
+		fmt.Fprintf(w, `, %d artifact-only plots loaded`, result.ArtifactOnlyCount)
+	}
 	if result.SkippedCount > 0 {
 		fmt.Fprintf(w, `, %d baselines skipped because no matching artifact exists`, result.SkippedCount)
 	}

@@ -168,8 +168,10 @@ Status as of 2026-04-26:
 - `internal/readers/report_payloads_test.go` verifies unmarshalling, typed missing/malformed errors, and accessor conversion for the current Hercules report payload shapes using synthetic protobuf messages.
 - `test/testdata/hercules/report_default.pb` is a real current-Hercules protobuf fixture for the default report analysis flag set.
 - `test/testdata/hercules/shotness.pb` is a real current-Hercules protobuf fixture for the `shotness` report-all analysis.
+- `test/testdata/hercules/sentiment.pb` is a synthetic non-empty `CommentSentimentResults` fixture for reader and plot parity. A TensorFlow-enabled neighboring Hercules binary is now available locally, but small real fixture runs produced empty `sentiment_by_tick` payloads.
+- Protobuf developer stats now aggregate explicit `Devs` tick commits, line stats, and language stats instead of returning zero-filled synthetic placeholders.
 - `go test ./internal/readers` passes.
-- Current full test baseline after these reader tests: `go test ./...` reports 151 passed, 15 failed, 1 skipped. Remaining failures are the pre-existing language output and visual compatibility failures.
+- Current full test baseline after Phase 1 cleanup: `go test ./...` reports 268 passed in 12 packages.
 
 Tasks:
 
@@ -188,7 +190,7 @@ Tasks:
 - [x] Add tests that unmarshal synthetic current-Hercules-shaped protobufs for report payload accessors.
 - [x] Add tests that unmarshal a current-Hercules default report protobuf fixture.
 - [x] Add tests that unmarshal a current-Hercules `shotness` protobuf fixture.
-- [ ] Add or document a current-Hercules `sentiment` protobuf fixture. This is currently blocked by the neighboring Hercules binary being built without TensorFlow support.
+- [x] Add or document a current-Hercules `sentiment` protobuf fixture. Current coverage uses a synthetic non-empty `CommentSentimentResults` payload until a compact real repository produces non-empty sentiment ticks.
 
 Acceptance criteria:
 
@@ -196,8 +198,8 @@ Acceptance criteria:
 - [x] Reader tests cover all default report payload shapes with synthetic protobuf fixtures.
 - [x] Reader tests cover default report payloads with a real `../hercules` fixture.
 - [x] Reader tests cover `shotness` report-all payloads with a real `../hercules` fixture.
-- [ ] Reader tests cover `sentiment` report-all payloads with a real `../hercules` fixture or document it as unavailable for this build.
-- [ ] No mode needs to guess data that exists explicitly in protobuf.
+- [x] Reader tests cover `sentiment` report-all payloads with synthetic current-Hercules-shaped data and parity coverage exercises the synthetic `sentiment.pb` fixture.
+- [x] No mode needs to guess data that exists explicitly in protobuf.
 
 ## Phase 2: CLI Drop-in Compatibility
 
@@ -311,7 +313,7 @@ Status as of 2026-04-26:
 - `labours -f pb -m all` expands to Python's `all` mode composition and the direct internal `all` handler uses the same list and output planning.
 - `hercules report --all --strict --labours-cmd ./labours` exits 0 on `/tmp/labours-go-hercules.siva` and writes report assets under `/tmp/labours-go-hercules-report-all-phase4`.
 - Current full test baseline after Phase 4 devs-parallel/refactoring-proxy work: `go test ./...` reports 217 passed, 11 failed, 1 skipped. Remaining failures are the pre-existing visual compatibility failures.
-- Remaining Phase 4 work is fixture-gated: a current Hercules binary with TensorFlow support is needed for real sentiment protobuf validation, and a richer report-all fixture is needed for zero-warning repository/people/sentiment coverage. The local `../hercules/hercules --pb --quiet --sentiment ...` check on 2026-04-26 failed with `sentiment analysis is unavailable in this build; rebuild with -tags tensorflow`.
+- Remaining Phase 4 work is fixture-gated: TensorFlow-enabled Hercules is available locally, but compact real runs produced empty sentiment ticks. Real sentiment validation still needs a small repository fixture that emits non-empty `sentiment_by_tick`, and zero-warning report-all coverage still needs a richer report-all fixture with repository burndown, people burndown, and sentiment payloads.
 
 Tasks:
 
@@ -319,7 +321,7 @@ Tasks:
 - [x] Implement `burndown-repos-combined`.
 - [x] Complete `couples-shotness` from real shotness co-occurrence data or define the exact Go equivalent.
 - [x] Prefer real `CommentSentimentResults` in `sentiment` when protobuf data is present.
-- [ ] Validate `sentiment` with a real current-Hercules sentiment protobuf fixture. Blocked locally: `../hercules/hercules` is built without TensorFlow support.
+- [ ] Validate `sentiment` with a real current-Hercules sentiment protobuf fixture. Blocked locally: TensorFlow-enabled Hercules runs on the available compact inputs produced empty sentiment ticks.
 - [x] Remove or explicitly gate heuristic `sentiment` fallback from the strict compatibility path.
 - [x] Guard `sentiment` against NaN bar values on zero-activity fallback data.
 - [x] Guard `devs-parallel` against NaN bar values on zero-activity fallback data.
@@ -333,7 +335,7 @@ Tasks:
 Acceptance criteria:
 
 - [x] `hercules report --all --strict -o /tmp/report <repo>` has zero hard mode errors with Go labours on the copied Hercules SIVA fixture.
-- [ ] `hercules report --all -o /tmp/report <repo>` has zero missing-data warnings with a fixture that includes repository burndown, people burndown, and sentiment payloads. Blocked locally: no such fixture exists under `test/testdata/hercules/`, and sentiment generation requires a TensorFlow-enabled Hercules build.
+- [ ] `hercules report --all -o /tmp/report <repo>` has zero missing-data warnings with a fixture that includes repository burndown, people burndown, and sentiment payloads. Blocked locally: no such real fixture exists under `test/testdata/hercules/`, and compact TensorFlow-enabled sentiment runs produced empty sentiment ticks.
 - [x] `labours -f pb -m all` matches Python `all` mode composition.
 - [x] `labours -f pb -m all` matches Python `all` mode output behavior.
 
@@ -343,7 +345,7 @@ Goal: prevent regressions and quantify differences from Python labours.
 
 Status as of 2026-04-26:
 
-- `scripts/generate_hercules_fixtures.sh` now regenerates protobuf fixtures from a neighboring `../hercules` checkout, with optional TensorFlow-dependent `report_all`/`sentiment` outputs so local non-TensorFlow builds do not block the rest of the fixture set.
+- `scripts/generate_hercules_fixtures.sh` now regenerates protobuf fixtures from a neighboring `../hercules` checkout, with optional `report_all` output so incomplete local fixture sets do not block the rest of the fixture set.
 - `just fixtures` wraps fixture generation and `test/testdata/hercules/README.md` documents the generator, environment overrides, and extraction golden refresh command.
 - Reader extraction goldens now cover the checked-in current-Hercules default report and shotness fixtures via `report_default_summary.golden.json` and `shotness_summary.golden.json`.
 - Visual tests are split so structural image validation runs by default, while golden and Python parity comparisons are opt-in through `LABOURS_GO_VISUAL_PARITY=1` and `LABOURS_GO_PYTHON_PARITY=1`.
@@ -360,7 +362,7 @@ Tasks:
 - [ ] Generate couples-only fixture.
 - [ ] Generate devs-only fixture.
 - [x] Generate shotness-only fixture.
-- [ ] Generate sentiment-only fixture.
+- [x] Generate sentiment-only fixture. Current fixture is synthetic and non-empty; replace it when a compact real Hercules input emits sentiment ticks.
 - [x] Add golden tests for reader extraction, not only rendered pixels.
 - [ ] Compare Go extracted data against Python labours intermediate data where possible for each mode.
 - [x] Split visual tests into structural tests: file exists, decodes, non-empty, sane dimensions.

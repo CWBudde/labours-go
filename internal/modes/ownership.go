@@ -3,25 +3,32 @@ package modes
 import (
 	"encoding/json"
 	"fmt"
+	"image/color"
 	"math"
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/spf13/viper"
-	"gonum.org/v1/plot"
-	"gonum.org/v1/plot/plotter"
 	"labours-go/internal/graphics"
 	"labours-go/internal/progress"
 	"labours-go/internal/readers"
+	"matplotlib-go/backends"
+	_ "matplotlib-go/backends/agg"
+	_ "matplotlib-go/backends/svg"
+	"matplotlib-go/core"
+	"matplotlib-go/render"
+	"matplotlib-go/style"
 )
 
 func OwnershipBurndown(reader readers.Reader, output string) error {
 	// Initialize progress tracking
 	quiet := viper.GetBool("quiet")
 	progEstimator := progress.NewProgressEstimator(!quiet)
-	
+
 	// Start multi-phase operation for ownership analysis
 	totalPhases := 4 // validation, data extraction, processing, visualization
 	progEstimator.StartMultiOperation(totalPhases, "Ownership Burndown Analysis")
@@ -48,11 +55,30 @@ func OwnershipBurndown(reader readers.Reader, output string) error {
 		progEstimator.FinishMultiOperation()
 		return fmt.Errorf("failed to get ownership burndown data: %v", err)
 	}
+	if len(peopleSequence) == 0 {
+		progEstimator.FinishMultiOperation()
+		return fmt.Errorf("no ownership burndown data found")
+	}
 
-	// Metadata for the timeline (hardcoded sampling for simplicity)
-	sampling := 1                // Assume daily sampling
-	startTime := time.Unix(0, 0) // Placeholder for start time; replace with actual value if needed
-	lastTime := startTime.Add(time.Duration(len(ownershipData[peopleSequence[0]][0])*sampling) * 24 * time.Hour)
+	params, err := reader.GetBurndownParameters()
+	if err != nil {
+		progEstimator.FinishMultiOperation()
+		return fmt.Errorf("failed to get burndown parameters: %v", err)
+	}
+	startUnix, lastUnix := reader.GetHeader()
+	tickSize := params.TickSize
+	if tickSize <= 0 {
+		tickSize = 24 * 60 * 60
+	}
+	sampling := params.Sampling
+	if sampling <= 0 {
+		sampling = 1
+	}
+	startTime := floorTimeBySeconds(time.Unix(startUnix, 0), tickSize).Add(time.Duration(float64(sampling)*tickSize) * time.Second)
+	lastTime := time.Unix(lastUnix, 0)
+	if lastUnix == 0 {
+		lastTime = startTime
+	}
 
 	// Phase 3: Process the data
 	progEstimator.NextOperation("Processing ownership data")
@@ -63,7 +89,7 @@ func OwnershipBurndown(reader readers.Reader, output string) error {
 
 	// Phase 4: Generate output
 	progEstimator.NextOperation("Generating visualization")
-	
+
 	// Check if JSON output is required
 	if filepath.Ext(output) == ".json" {
 		progEstimator.FinishMultiOperation()
@@ -92,10 +118,13 @@ func processOwnershipBurndown(
 	people := make([][]float64, len(sequence))
 	for i, name := range sequence {
 		rows := data[name]
-		total := make([]float64, len(rows[0]))
-		for _, row := range rows {
-			for j, val := range row {
-				total[j] += float64(val)
+		if len(rows) == 0 {
+			continue
+		}
+		total := make([]float64, len(rows))
+		for rowIndex, row := range rows {
+			for _, val := range row {
+				total[rowIndex] += float64(val)
 			}
 		}
 		people[i] = total
@@ -176,16 +205,19 @@ func processOwnershipBurndownWithProgress(
 	// Start detailed progress for data processing
 	totalSteps := len(sequence) + 2 // aggregation steps + sorting + date range creation
 	progEstimator.StartOperation("Aggregating ownership data", totalSteps)
-	
+
 	// Aggregate the ownership data
 	people := make([][]float64, len(sequence))
 	for i, name := range sequence {
 		progEstimator.UpdateProgress(1)
 		rows := data[name]
-		total := make([]float64, len(rows[0]))
-		for _, row := range rows {
-			for j, val := range row {
-				total[j] += float64(val)
+		if len(rows) == 0 {
+			continue
+		}
+		total := make([]float64, len(rows))
+		for rowIndex, row := range rows {
+			for _, val := range row {
+				total[rowIndex] += float64(val)
 			}
 		}
 		people[i] = total
@@ -260,41 +292,229 @@ func processOwnershipBurndownWithProgress(
 }
 
 func plotOwnershipBurndown(names []string, people [][]float64, dateRange []time.Time, lastTime time.Time, output string) error {
-	// Create a plot
-	p := plot.New()
-	p.Title.Text = "Ownership Burndown"
-	p.X.Label.Text = "Time"
-	p.Y.Label.Text = "Ownership"
-
-	// Convert people data into plotter.XYs
-	stackData := make([]plotter.XYs, len(people))
+	if len(people) == 0 || len(dateRange) == 0 {
+		return fmt.Errorf("no ownership burndown data to plot")
+	}
+	if lastTime.Before(dateRange[len(dateRange)-1]) {
+		lastTime = dateRange[len(dateRange)-1]
+	}
+	x := make([]float64, len(dateRange))
+	for i, date := range dateRange {
+		x[i] = float64(date.Unix())
+	}
+	matrix := make([][]float64, 0, len(people))
+	labels := make([]string, 0, len(people))
 	for i, row := range people {
-		points := make(plotter.XYs, len(row))
-		for j, val := range row {
-			points[j].X = float64(dateRange[j].Unix())
-			points[j].Y = val
+		if len(row) == 0 {
+			continue
 		}
-		stackData[i] = points
+		values := make([]float64, len(dateRange))
+		for j := range values {
+			if j < len(row) {
+				values[j] = row[j]
+			}
+		}
+		label := fmt.Sprintf("Developer %d", i+1)
+		if i < len(names) {
+			label = names[i]
+		}
+		matrix = append(matrix, values)
+		labels = append(labels, label)
+	}
+	if len(matrix) == 0 {
+		return fmt.Errorf("no ownership burndown data to plot")
 	}
 
-	// Add stackplot layers
-	for i, points := range stackData {
-		line, err := plotter.NewLine(points)
+	width, height := ownershipPlotPixelSize(16, 12)
+	fontSize := viper.GetInt("font-size")
+	if fontSize <= 0 {
+		fontSize = 12
+	}
+	background, foreground := ownershipPlotColors(viper.GetString("background"))
+	fig := core.NewFigure(
+		width,
+		height,
+		style.WithFont("DejaVu Sans", float64(fontSize)),
+		style.WithBackground(background.R, background.G, background.B, 0),
+		style.WithAxesBackground(render.Color{R: background.R, G: background.G, B: background.B, A: 0}),
+		style.WithAxesEdgeColor(foreground),
+		style.WithTextColor(foreground.R, foreground.G, foreground.B, foreground.A),
+		style.WithLegendColors(
+			render.Color{R: background.R, G: background.G, B: background.B, A: 1},
+			background,
+			foreground,
+		),
+	)
+	ax := fig.AddSubplot(1, 1, 1)
+	if ax == nil {
+		return fmt.Errorf("failed to create ownership axes")
+	}
+	ax.SetTitle("Ownership Burndown")
+	ax.SetXLabel("Time")
+	ax.SetYLabel("Ownership")
+	colors := graphics.PythonLaboursColorPalette(len(matrix))
+	renderColors := make([]render.Color, len(colors))
+	for i, color := range colors {
+		renderColors[i] = ownershipRenderColor(color)
+	}
+	ax.StackPlot(x, matrix, core.StackPlotOptions{
+		Colors: renderColors,
+		Labels: labels,
+	})
+	xMin := float64(dateRange[0].Unix())
+	xMax := float64(lastTime.Unix())
+	if xMin == xMax {
+		xMin = float64(dateRange[0].AddDate(-2, 0, 0).Unix())
+		xMax = float64(dateRange[0].AddDate(2, 0, 0).Unix())
+	}
+	ax.SetXLim(xMin, xMax)
+	if viper.GetBool("relative") {
+		ax.SetYLim(0, 1)
+	} else {
+		ax.SetYLim(0, math.Max(maxOwnershipStackY(matrix)*1.05, 1))
+	}
+	configureOwnershipTimeAxis(ax, dateRange)
+	ax.AddXGrid()
+	ax.AddYGrid()
+	legend := ax.AddLegend()
+	legend.Location = core.LegendUpperLeft
+	if viper.GetBool("relative") {
+		legend.Location = core.LegendLowerLeft
+	}
+
+	return saveOwnershipMatplotlibFigure(fig, output, width, height, background)
+}
+
+func floorTimeBySeconds(t time.Time, seconds float64) time.Time {
+	if seconds <= 0 {
+		return t
+	}
+	step := int64(seconds)
+	if step <= 0 {
+		return t
+	}
+	return time.Unix((t.Unix()/step)*step, 0)
+}
+
+func configureOwnershipTimeAxis(ax *core.Axes, dates []time.Time) {
+	if len(dates) == 0 {
+		return
+	}
+	limit := 8
+	step := int(math.Ceil(float64(len(dates)) / float64(limit)))
+	if step < 1 {
+		step = 1
+	}
+	ticks := make([]float64, 0, limit+1)
+	labels := make([]string, 0, limit+1)
+	for i := 0; i < len(dates); i += step {
+		ticks = append(ticks, float64(dates[i].Unix()))
+		labels = append(labels, dates[i].Format("2006-01-02"))
+	}
+	lastTick := float64(dates[len(dates)-1].Unix())
+	if len(ticks) == 0 || ticks[len(ticks)-1] != lastTick {
+		ticks = append(ticks, lastTick)
+		labels = append(labels, dates[len(dates)-1].Format("2006-01-02"))
+	}
+	ax.XAxis.Locator = core.FixedLocator{TicksList: ticks}
+	ax.XAxis.Formatter = core.FixedFormatter{Labels: labels}
+	if len(labels) > 6 {
+		ax.XAxis.MajorLabelStyle = core.TickLabelStyle{Rotation: 30, AutoAlign: true}
+	}
+}
+
+func maxOwnershipStackY(matrix [][]float64) float64 {
+	if len(matrix) == 0 {
+		return 0
+	}
+	points := len(matrix[0])
+	maxY := 0.0
+	for i := 0; i < points; i++ {
+		total := 0.0
+		for _, row := range matrix {
+			if i < len(row) {
+				total += row[i]
+			}
+		}
+		if total > maxY {
+			maxY = total
+		}
+	}
+	return maxY
+}
+
+func ownershipPlotColors(backgroundName string) (background, foreground render.Color) {
+	if strings.EqualFold(backgroundName, "black") {
+		return render.Color{R: 0, G: 0, B: 0, A: 1}, render.Color{R: 1, G: 1, B: 1, A: 1}
+	}
+	return render.Color{R: 1, G: 1, B: 1, A: 1}, render.Color{R: 0, G: 0, B: 0, A: 1}
+}
+
+func ownershipRenderColor(c color.Color) render.Color {
+	r, g, b, a := c.RGBA()
+	return render.Color{
+		R: float64(r) / 0xffff,
+		G: float64(g) / 0xffff,
+		B: float64(b) / 0xffff,
+		A: float64(a) / 0xffff,
+	}
+}
+
+func ownershipPlotPixelSize(defaultWidth, defaultHeight float64) (int, int) {
+	width := defaultWidth
+	height := defaultHeight
+	if sizeStr := viper.GetString("size"); sizeStr != "" {
+		if parsedWidth, parsedHeight, err := parseOwnershipPlotSize(sizeStr); err == nil {
+			width, height = parsedWidth, parsedHeight
+		} else {
+			fmt.Printf("Warning: %v, using default size\n", err)
+		}
+	}
+	return max(1, int(math.Round(width*100))), max(1, int(math.Round(height*100)))
+}
+
+func parseOwnershipPlotSize(sizeStr string) (float64, float64, error) {
+	parts := strings.Split(sizeStr, ",")
+	if len(parts) != 2 {
+		return 0, 0, fmt.Errorf("invalid size %q: expected width,height", sizeStr)
+	}
+	width, err := strconv.ParseFloat(strings.TrimSpace(parts[0]), 64)
+	if err != nil || width <= 0 {
+		return 0, 0, fmt.Errorf("invalid plot width %q", parts[0])
+	}
+	height, err := strconv.ParseFloat(strings.TrimSpace(parts[1]), 64)
+	if err != nil || height <= 0 {
+		return 0, 0, fmt.Errorf("invalid plot height %q", parts[1])
+	}
+	return width, height, nil
+}
+
+func saveOwnershipMatplotlibFigure(fig *core.Figure, output string, width, height int, background render.Color) error {
+	if output == "" {
+		output = "ownership.png"
+	}
+	if err := os.MkdirAll(filepath.Dir(output), 0o755); err != nil {
+		return fmt.Errorf("failed to create output directory for %s: %v", output, err)
+	}
+
+	fig.TightLayout()
+	transparentBackground := background
+	transparentBackground.A = 0
+	config := backends.Config{Width: width, Height: height, Background: transparentBackground, DPI: 100}
+	switch strings.ToLower(filepath.Ext(output)) {
+	case ".svg":
+		renderer, _, err := backends.NewRenderer("svg", config, nil)
 		if err != nil {
-			return fmt.Errorf("failed to create line plot: %v", err)
+			return fmt.Errorf("failed to create SVG renderer: %v", err)
 		}
-		line.Color = graphics.ColorPalette[i%len(graphics.ColorPalette)]
-		p.Add(line)
-		p.Legend.Add(names[i], line)
+		return core.SaveSVG(fig, renderer, output)
+	default:
+		renderer, _, err := backends.NewRenderer("agg", config, backends.TextCapabilities)
+		if err != nil {
+			return fmt.Errorf("failed to create AGG renderer: %v", err)
+		}
+		return core.SavePNG(fig, renderer, output)
 	}
-
-	// Save the plot
-	width, height := graphics.GetPlotSize(graphics.ChartTypeCompact)
-	if err := p.Save(width, height, output); err != nil {
-		return fmt.Errorf("failed to save plot: %v", err)
-	}
-
-	return nil
 }
 
 func saveOwnershipBurndownAsJSON(output string, names []string, people [][]float64, dateRange []time.Time, lastTime time.Time) error {

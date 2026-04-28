@@ -107,6 +107,24 @@ The `just parity-update` recipe regenerates all Go-side references currently
 supported by the viewer. The `just parity-update-python` recipe regenerates the
 Python-side references when `../hercules/python` is available.
 
+`just parity-update-python` writes two kinds of Python references:
+
+- Direct upstream Python labours plots, where the neighboring Python checkout
+  has a matching plotting mode and output shape.
+- Derived Python-reader baselines, where Python labours exposes the underlying
+  protobuf data but only prints text, writes projector assets, or emits a
+  differently shaped artifact. These derived baselines are intentionally best
+  effort visual comparisons for the Go plot shape, not claims that upstream
+  Python generated the exact same chart.
+
+All current parity-viewer rows have both Go and Python-side references after
+running `just parity-update` and `just parity-update-python`; the viewer should
+report `artifact_only=0`. The `sentiment` row uses a synthetic non-empty
+`CommentSentimentResults` fixture because the available TensorFlow-enabled
+Hercules runs on compact local fixtures produced empty `sentiment_by_tick`
+payloads. Replace that fixture with real current-Hercules output when a small
+repository reproducer is available.
+
 ## 🎉 **Validation Results**
 
 The side-by-side comparison demonstrates that:

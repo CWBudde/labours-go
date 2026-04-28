@@ -74,3 +74,36 @@ func TestCalculateParallelDeveloperDataUsesPythonInputs(t *testing.T) {
 		t.Fatalf("Expected commit co-occurrence order by shared active days, got %#v", data)
 	}
 }
+
+func TestCalculateParallelismMetricsFromTimeSeries(t *testing.T) {
+	data := []ParallelDeveloperData{
+		{Name: "Alice"},
+		{Name: "Bob"},
+		{Name: "Carol"},
+	}
+	timeSeries := &readers.DeveloperTimeSeriesData{
+		People: []string{"Alice", "Bob", "Carol"},
+		Days: map[int]map[int]readers.DevDay{
+			0: {0: {Commits: 1}},
+			1: {0: {Commits: 1}, 1: {Commits: 1}},
+			4: {2: {LinesModified: 3}},
+		},
+	}
+
+	metrics := calculateParallelismMetricsFromParallelData(data, timeSeries)
+	if metrics.TotalPeriods != 3 {
+		t.Fatalf("TotalPeriods = %d, want 3 active days", metrics.TotalPeriods)
+	}
+	wantConcurrency := []int{1, 2, 1}
+	for i, want := range wantConcurrency {
+		if metrics.PeriodConcurrency[i] != want {
+			t.Fatalf("PeriodConcurrency[%d] = %d, want %d", i, metrics.PeriodConcurrency[i], want)
+		}
+	}
+	if metrics.PeakConcurrency != 2 {
+		t.Fatalf("PeakConcurrency = %d, want 2", metrics.PeakConcurrency)
+	}
+	if metrics.ParallelPeriods != 1 {
+		t.Fatalf("ParallelPeriods = %d, want 1", metrics.ParallelPeriods)
+	}
+}

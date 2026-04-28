@@ -2,6 +2,7 @@ package modes
 
 import (
 	"fmt"
+	"image/color"
 	"path/filepath"
 	"sort"
 
@@ -14,14 +15,15 @@ import (
 
 // ShotnessResult represents a processed shotness record with aggregated statistics
 type ShotnessResult struct {
-	Type            string
-	Name            string
-	File            string
-	TotalHits       int32   // Total number of modifications
-	AvgHitsPerTime  float64 // Average modifications per time period
-	TimeSpan        int32   // Number of different time periods with modifications
-	FirstHit        int32   // First time period with modifications
-	LastHit         int32   // Last time period with modifications
+	Type           string
+	Name           string
+	File           string
+	TotalHits      int32   // Total number of modifications
+	AvgHitsPerTime float64 // Average modifications per time period
+	TimeSpan       int32   // Number of different time periods with modifications
+	FirstHit       int32   // First time period with modifications
+	LastHit        int32   // Last time period with modifications
+	OriginalIndex  int
 }
 
 // Shotness generates code hotspot analysis showing which structural
@@ -63,15 +65,15 @@ func Shotness(reader readers.Reader, output string) error {
 // processShotnessRecords processes raw shotness records and calculates aggregate statistics
 func processShotnessRecords(records []readers.ShotnessRecord) []ShotnessResult {
 	results := make([]ShotnessResult, len(records))
-	
+
 	for i, record := range records {
 		var totalHits int32
 		var firstHit, lastHit int32 = -1, -1
-		
+
 		// Calculate statistics from counters
 		for timePoint, count := range record.Counters {
 			totalHits += count
-			
+
 			if firstHit == -1 || timePoint < firstHit {
 				firstHit = timePoint
 			}
@@ -79,30 +81,34 @@ func processShotnessRecords(records []readers.ShotnessRecord) []ShotnessResult {
 				lastHit = timePoint
 			}
 		}
-		
+
 		timeSpan := int32(len(record.Counters))
 		var avgHits float64
 		if timeSpan > 0 {
 			avgHits = float64(totalHits) / float64(timeSpan)
 		}
-		
+
 		results[i] = ShotnessResult{
-			Type:            record.Type,
-			Name:            record.Name,
-			File:            record.File,
-			TotalHits:       totalHits,
-			AvgHitsPerTime:  avgHits,
-			TimeSpan:        timeSpan,
-			FirstHit:        firstHit,
-			LastHit:         lastHit,
+			Type:           record.Type,
+			Name:           record.Name,
+			File:           record.File,
+			TotalHits:      totalHits,
+			AvgHitsPerTime: avgHits,
+			TimeSpan:       timeSpan,
+			FirstHit:       firstHit,
+			LastHit:        lastHit,
+			OriginalIndex:  i,
 		}
 	}
-	
+
 	// Sort by total hits (descending) to identify the hottest spots
 	sort.Slice(results, func(i, j int) bool {
+		if results[i].TotalHits == results[j].TotalHits {
+			return results[i].OriginalIndex > results[j].OriginalIndex
+		}
 		return results[i].TotalHits > results[j].TotalHits
 	})
-	
+
 	return results
 }
 
@@ -113,79 +119,53 @@ func plotShotness(results []ShotnessResult, output string) error {
 	if len(results) > maxItems {
 		results = results[:maxItems]
 	}
-	
-	// Create a new plot
+
+	labels := make([]string, len(results))
+	values := make(plotter.Values, len(results))
+	for i, result := range results {
+		labels[i] = compactPlotLabel(fmt.Sprintf("%s:%s", result.Type, result.Name), 24)
+		values[i] = float64(result.TotalHits)
+	}
+
 	p := plot.New()
 	p.Title.Text = "Code Hotspots (Most Frequently Modified Structural Units)"
 	p.X.Label.Text = "Structural Units"
 	p.Y.Label.Text = "Total Modifications"
-	
-	// Prepare data for the bar chart
-	names := make([]string, len(results))
-	values := make(plotter.Values, len(results))
-	
-	for i, result := range results {
-		// Create a short label combining type, name, and file
-		shortFile := filepath.Base(result.File)
-		if len(shortFile) > 15 {
-			shortFile = shortFile[:12] + "..."
-		}
-		
-		label := fmt.Sprintf("%s:%s\n(%s)", result.Type, result.Name, shortFile)
-		if len(label) > 30 {
-			label = label[:27] + "..."
-		}
-		
-		names[i] = label
-		values[i] = float64(result.TotalHits)
-	}
-	
-	// Create bar chart
+
 	bars, err := plotter.NewBarChart(values, vg.Points(40))
 	if err != nil {
 		return fmt.Errorf("failed to create bar chart: %v", err)
 	}
-	
-	// Style the bars with gradient coloring (hottest = red, cooler = blue)
-	for i := range bars.Values {
-		if len(results) > 1 {
-			// Create a heat gradient from red (hottest) to blue (coolest)
-			ratio := float64(i) / float64(len(results)-1)
-			bars.Color = graphics.HeatColor(1.0 - ratio) // Invert so first (hottest) gets 1.0
-		} else {
-			bars.Color = graphics.ColorPalette[0]
-		}
-	}
-	
+	bars.Color = color.RGBA{R: 228, G: 87, B: 86, A: 255}
 	p.Add(bars)
-	
-	// Create custom labels for X axis
-	p.NominalX(names...)
-	
-	// Always rotate labels for shotness charts as names tend to be long
+
+	p.NominalX(labels...)
 	p.X.Tick.Label.Rotation = 0.785398 // 45 degrees in radians
 	p.X.Tick.Label.XAlign = -0.5
 	p.X.Tick.Label.YAlign = -0.5
-	
-	// Save the plot with dynamic sizing
+
 	width, height := graphics.GetPlotSize(graphics.ChartTypeWide)
 	outputFile := filepath.Join(output, "shotness.png")
 	if err := p.Save(width, height, outputFile); err != nil {
 		return fmt.Errorf("failed to save shotness plot: %v", err)
 	}
-	
-	// Also create an SVG version
-	svgFile := filepath.Join(output, "shotness.svg")
-	if err := p.Save(width, height, svgFile); err != nil {
-		return fmt.Errorf("failed to save shotness SVG: %v", err)
-	}
-	
-	fmt.Printf("Shotness charts saved to %s and %s\n", outputFile, svgFile)
-	
+
+	fmt.Printf("Shotness chart saved to %s\n", outputFile)
+
 	// Print text summary
 	printShotnessSummary(results)
-	
+
 	return nil
+}
+
+func compactPlotLabel(label string, limit int) string {
+	if len(label) <= limit {
+		return label
+	}
+	if limit <= 3 {
+		return label[:limit]
+	}
+	return "..." + label[len(label)-limit+3:]
 }
 
 // printShotnessStats prints shotness statistics in Python-compatible format
@@ -193,7 +173,7 @@ func plotShotness(results []ShotnessResult, output string) error {
 // "%8d  %s:%s [%s]" % (count, r.file, r.name, r.internal_role)
 func printShotnessStats(results []ShotnessResult) {
 	fmt.Println("Shotness Analysis - Code Hotspots:")
-	
+
 	if len(results) == 0 {
 		fmt.Println("No hotspots found.")
 		return
@@ -201,13 +181,13 @@ func printShotnessStats(results []ShotnessResult) {
 
 	// Print in Python-compatible format: count  file:name [type]
 	for _, result := range results {
-		fmt.Printf("%8d  %s:%s [%s]\n", 
-			result.TotalHits, 
-			result.File, 
-			result.Name, 
+		fmt.Printf("%8d  %s:%s [%s]\n",
+			result.TotalHits,
+			result.File,
+			result.Name,
 			result.Type)
 	}
-	
+
 	fmt.Printf("\nTotal: %d hotspots analyzed\n", len(results))
 }
 
@@ -215,50 +195,50 @@ func printShotnessStats(results []ShotnessResult) {
 func printShotnessSummary(results []ShotnessResult) {
 	fmt.Println("\nCode Hotspot Analysis (Shotness):")
 	fmt.Println("==================================")
-	
+
 	if len(results) == 0 {
 		fmt.Println("No hotspots found.")
 		return
 	}
-	
+
 	totalModifications := int32(0)
 	typeCount := make(map[string]int)
-	
+
 	for _, result := range results {
 		totalModifications += result.TotalHits
 		typeCount[result.Type]++
 	}
-	
+
 	fmt.Printf("Total structural units analyzed: %d\n", len(results))
 	fmt.Printf("Total modifications tracked: %d\n", totalModifications)
 	fmt.Println("\nStructural unit types:")
 	for unitType, count := range typeCount {
 		fmt.Printf("  %-12s: %d units\n", unitType, count)
 	}
-	
+
 	fmt.Println("\nTop Hotspots:")
 	fmt.Println("Rank | Type       | Name                    | File                     | Hits | Avg/Time | Span")
 	fmt.Println("-----|------------|-------------------------|--------------------------|------|----------|-----")
-	
+
 	maxDisplay := 15
 	if len(results) < maxDisplay {
 		maxDisplay = len(results)
 	}
-	
+
 	for i := 0; i < maxDisplay; i++ {
 		result := results[i]
-		
+
 		// Truncate long names and file paths for display
 		name := result.Name
 		if len(name) > 23 {
 			name = name[:20] + "..."
 		}
-		
+
 		file := filepath.Base(result.File)
 		if len(file) > 24 {
 			file = file[:21] + "..."
 		}
-		
+
 		fmt.Printf("%4d | %-10s | %-23s | %-24s | %4d | %8.1f | %4d\n",
 			i+1,
 			result.Type,
@@ -269,17 +249,17 @@ func printShotnessSummary(results []ShotnessResult) {
 			result.TimeSpan,
 		)
 	}
-	
+
 	if len(results) > maxDisplay {
 		fmt.Printf("\n... and %d more hotspots\n", len(results)-maxDisplay)
 	}
-	
+
 	// Summary statistics
 	if len(results) > 0 {
 		hottest := results[0]
 		fmt.Printf("\nHottest spot: %s '%s' in %s (%d modifications)\n",
 			hottest.Type, hottest.Name, filepath.Base(hottest.File), hottest.TotalHits)
-			
+
 		avgModifications := float64(totalModifications) / float64(len(results))
 		fmt.Printf("Average modifications per unit: %.1f\n", avgModifications)
 	}

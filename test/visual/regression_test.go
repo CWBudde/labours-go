@@ -74,7 +74,7 @@ func TestPythonCompatibility(t *testing.T) {
 		},
 		{
 			Name:            "BurndownRelativePythonCompatibility",
-			Mode:            "burndown-project",
+			Mode:            "burndown-project-relative",
 			InputFile:       "../../example_data/hercules_burndown.yaml",
 			ExpectedPath:    "../../analysis_results/reference/python_burndown_relative.png",
 			ValidationLevel: ValidationLenient,

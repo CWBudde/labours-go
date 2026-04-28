@@ -62,6 +62,41 @@ func TestProtobufReader_CurrentHerculesReportPayloads(t *testing.T) {
 			},
 			TickSize: 86400,
 		}),
+		"Devs": marshalProto(t, &pb.DevsAnalysisResults{
+			DevIndex: []string{"dev-a", "dev-b"},
+			TickSize: int64(86400 * 1_000_000_000),
+			Ticks: map[int32]*pb.TickDevs{
+				0: {
+					Devs: map[int32]*pb.DevTick{
+						0: {
+							Commits: 2,
+							Stats:   &pb.LineStats{Added: 10, Removed: 1, Changed: 3},
+							Languages: map[string]*pb.LineStats{
+								"Go": {Added: 10, Removed: 1, Changed: 3},
+							},
+						},
+					},
+				},
+				1: {
+					Devs: map[int32]*pb.DevTick{
+						0: {
+							Commits: 1,
+							Stats:   &pb.LineStats{Added: 4, Removed: 2, Changed: 1},
+							Languages: map[string]*pb.LineStats{
+								"Go": {Added: 4, Removed: 2, Changed: 1},
+							},
+						},
+						1: {
+							Commits: 3,
+							Stats:   &pb.LineStats{Added: 7, Removed: 0, Changed: 2},
+							Languages: map[string]*pb.LineStats{
+								"Python": {Added: 7, Removed: 0, Changed: 2},
+							},
+						},
+					},
+				},
+			},
+		}),
 		"BusFactor": marshalProto(t, &pb.BusFactorAnalysisResults{
 			Snapshots: map[int32]*pb.BusFactorTickSnapshot{
 				1: {BusFactor: 2, TotalLines: 100, AuthorLines: map[int32]int64{0: 60, 1: 40}},
@@ -173,6 +208,20 @@ func TestProtobufReader_CurrentHerculesReportPayloads(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []string{"dev-a"}, temporal.People)
 	require.Equal(t, 2, temporal.Ticks[1][0].Commits)
+
+	developerStats, err := reader.GetDeveloperStats()
+	require.NoError(t, err)
+	require.Len(t, developerStats, 2)
+	require.Equal(t, "dev-a", developerStats[0].Name)
+	require.Equal(t, 3, developerStats[0].Commits)
+	require.Equal(t, 14, developerStats[0].LinesAdded)
+	require.Equal(t, 3, developerStats[0].LinesRemoved)
+	require.Equal(t, 4, developerStats[0].LinesModified)
+	require.Equal(t, map[string]int{"Go": 21}, developerStats[0].Languages)
+	require.Equal(t, "dev-b", developerStats[1].Name)
+	require.Equal(t, 3, developerStats[1].Commits)
+	require.Equal(t, 7, developerStats[1].LinesAdded)
+	require.Equal(t, map[string]int{"Python": 9}, developerStats[1].Languages)
 
 	busFactor, err := reader.GetBusFactor()
 	require.NoError(t, err)
@@ -334,10 +383,10 @@ func TestProtobufReader_CurrentHerculesShotnessFixture(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, index, len(records))
 	require.Len(t, cooccurrence, len(records))
-	requireShotnessCooccurrenceMatchesCounterOverlap(t, records, cooccurrence)
+	requireShotnessCooccurrenceMatchesPythonCounterMatrix(t, records, cooccurrence)
 }
 
-func TestProtobufReader_ShotnessCooccurrenceUsesCounterOverlap(t *testing.T) {
+func TestProtobufReader_ShotnessCooccurrenceUsesPythonCounterMatrix(t *testing.T) {
 	payload := &pb.AnalysisResults{
 		Contents: map[string][]byte{
 			"Shotness": marshalProto(t, &pb.ShotnessAnalysisResults{
@@ -346,19 +395,19 @@ func TestProtobufReader_ShotnessCooccurrenceUsesCounterOverlap(t *testing.T) {
 						Type:     "function",
 						Name:     "alpha",
 						File:     "a.go",
-						Counters: map[int32]int32{10: 3, 20: 1},
+						Counters: map[int32]int32{0: 3, 2: 1},
 					},
 					{
 						Type:     "function",
 						Name:     "beta",
 						File:     "b.go",
-						Counters: map[int32]int32{10: 2, 30: 5},
+						Counters: map[int32]int32{0: 2, 1: 5},
 					},
 					{
 						Type:     "function",
 						Name:     "gamma",
 						File:     "c.go",
-						Counters: map[int32]int32{20: 4, 30: 1},
+						Counters: map[int32]int32{1: 4, 2: 1},
 					},
 				},
 			}),
@@ -373,9 +422,9 @@ func TestProtobufReader_ShotnessCooccurrenceUsesCounterOverlap(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []string{"a.go:alpha", "b.go:beta", "c.go:gamma"}, index)
 	require.Equal(t, [][]int{
-		{4, 2, 1},
-		{2, 7, 1},
-		{1, 1, 5},
+		{3, 0, 1},
+		{2, 5, 0},
+		{0, 4, 1},
 	}, cooccurrence)
 }
 
@@ -386,25 +435,16 @@ func marshalProto(t *testing.T, message proto.Message) []byte {
 	return data
 }
 
-func requireShotnessCooccurrenceMatchesCounterOverlap(t *testing.T, records []ShotnessRecord, matrix [][]int) {
+func requireShotnessCooccurrenceMatchesPythonCounterMatrix(t *testing.T, records []ShotnessRecord, matrix [][]int) {
 	t.Helper()
 	for i, record := range records {
 		require.Len(t, matrix[i], len(records))
-		for j, other := range records {
-			expected := 0
-			if i == j {
-				for _, count := range record.Counters {
-					expected += int(count)
-				}
-			} else {
-				for tick, count := range record.Counters {
-					if otherCount, exists := other.Counters[tick]; exists && count > 0 && otherCount > 0 {
-						expected += int(min32(count, otherCount))
-					}
-				}
+		for j := range records {
+			expected := int32(0)
+			if count, ok := record.Counters[int32(j)]; ok {
+				expected = count
 			}
-			require.Equalf(t, expected, matrix[i][j], "cooccurrence[%d][%d]", i, j)
-			require.Equalf(t, matrix[i][j], matrix[j][i], "cooccurrence matrix must be symmetric at [%d][%d]", i, j)
+			require.Equalf(t, int(expected), matrix[i][j], "cooccurrence[%d][%d]", i, j)
 		}
 	}
 }

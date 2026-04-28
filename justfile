@@ -103,24 +103,13 @@ test-visual:
 # Generate Go-side PNGs used by the Python-vs-Go parity viewer
 parity-update:
     @echo "Generating Go parity reference images"
-    GOCACHE=/tmp/labours-parity-gocache go run . -i example_data/hercules_burndown.yaml -m burndown-project -o analysis_results/reference/go_burndown_absolute.png --quiet
-    GOCACHE=/tmp/labours-parity-gocache go run . -i example_data/hercules_burndown.yaml -m burndown-project -o analysis_results/reference/go_burndown_relative.png --relative --quiet
-    GOCACHE=/tmp/labours-parity-gocache go run . -i example_data/hercules_devs.yaml -m devs -o analysis_results/reference/go_devs.png --quiet
-    GOCACHE=/tmp/labours-parity-gocache go run . -i example_data/hercules_devs.yaml -m languages -o analysis_results/reference/go_languages.png --quiet
-    mkdir -p /tmp/labours-parity-old-vs-new
-    GOCACHE=/tmp/labours-parity-gocache go run . -i example_data/hercules_devs.yaml -m old-vs-new -o /tmp/labours-parity-old-vs-new --quiet
-    cp /tmp/labours-parity-old-vs-new/old_vs_new_analysis.png analysis_results/reference/go_old_vs_new.png
+    GOCACHE=/tmp/labours-parity-gocache go run ./cmd/parityviewer --rerender-all
 
 # Generate Python-side PNG references used by the parity viewer
 parity-update-python:
     @test -f "{{python_labours_dir}}/labours/__main__.py" || (echo "Python labours not found at {{python_labours_dir}}" && exit 1)
     @echo "Generating Python parity reference images"
-    mkdir -p /tmp/labours-mplconfig
-    MPLCONFIGDIR=/tmp/labours-mplconfig PYTHONPATH={{python_labours_dir}} python3 -m labours -i $(pwd)/example_data/hercules_burndown.yaml -m burndown-project -o analysis_results/reference/python_burndown_absolute.png --backend Agg
-    MPLCONFIGDIR=/tmp/labours-mplconfig PYTHONPATH={{python_labours_dir}} python3 -m labours -i $(pwd)/example_data/hercules_burndown.yaml -m burndown-project -o analysis_results/reference/python_burndown_relative.png --relative --backend Agg
-    MPLCONFIGDIR=/tmp/labours-mplconfig PYTHONPATH={{python_labours_dir}} python3 -m labours -i $(pwd)/example_data/hercules_devs.yaml -m devs -o analysis_results/reference/python_devs.png --backend Agg
-    MPLCONFIGDIR=/tmp/labours-mplconfig PYTHONPATH={{python_labours_dir}} python3 -m labours -i $(pwd)/example_data/hercules_devs.yaml -m languages -o analysis_results/reference/python_languages.png --backend Agg
-    MPLCONFIGDIR=/tmp/labours-mplconfig PYTHONPATH={{python_labours_dir}} python3 -m labours -i $(pwd)/example_data/hercules_devs.yaml -m old-vs-new -o analysis_results/reference/python_old_vs_new.png --backend Agg
+    PYTHON_LABOURS_DIR={{python_labours_dir}} bash scripts/generate_python_parity_baselines.sh
 
 # Start parity comparison viewer for Python labours references vs Go outputs
 parity-viewer PORT="8096" FILTER="":

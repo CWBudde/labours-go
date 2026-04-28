@@ -44,7 +44,7 @@ type ParallelDeveloperData struct {
 func DevsParallel(reader readers.Reader, output string, maxPeople int, allowSyntheticFallback bool) error {
 	fmt.Println("Analyzing parallel development patterns...")
 
-	parallelData, err := loadDevsParallelData(reader, maxPeople)
+	parallelData, timeSeries, err := loadDevsParallelData(reader, maxPeople)
 	if err != nil {
 		if allowSyntheticFallback {
 			fmt.Printf("Warning: could not load devs-parallel data: %v\n", err)
@@ -57,7 +57,7 @@ func DevsParallel(reader readers.Reader, output string, maxPeople int, allowSynt
 		return fmt.Errorf("%w: devs-parallel", readers.ErrAnalysisMissing)
 	}
 
-	metrics := calculateParallelismMetricsFromParallelData(parallelData)
+	metrics := calculateParallelismMetricsFromParallelData(parallelData, timeSeries)
 
 	// Generate visualizations
 	if err := plotParallelActivity(metrics, output); err != nil {
@@ -75,23 +75,23 @@ func DevsParallel(reader readers.Reader, output string, maxPeople int, allowSynt
 	return nil
 }
 
-func loadDevsParallelData(reader readers.Reader, maxPeople int) ([]ParallelDeveloperData, error) {
+func loadDevsParallelData(reader readers.Reader, maxPeople int) ([]ParallelDeveloperData, *readers.DeveloperTimeSeriesData, error) {
 	people, ownership, err := reader.GetOwnershipBurndown()
 	if err != nil {
-		return nil, fmt.Errorf("%w: devs-parallel ownership burndown: %v", readers.ErrAnalysisMissing, err)
+		return nil, nil, fmt.Errorf("%w: devs-parallel ownership burndown: %v", readers.ErrAnalysisMissing, err)
 	}
 
 	couplingPeople, couplingMatrix, err := reader.GetPeopleCooccurrence()
 	if err != nil {
-		return nil, fmt.Errorf("%w: devs-parallel people cooccurrence: %v", readers.ErrAnalysisMissing, err)
+		return nil, nil, fmt.Errorf("%w: devs-parallel people cooccurrence: %v", readers.ErrAnalysisMissing, err)
 	}
 
 	timeSeries, err := reader.GetDeveloperTimeSeriesData()
 	if err != nil {
-		return nil, fmt.Errorf("%w: devs-parallel devs time series: %v", readers.ErrAnalysisMissing, err)
+		return nil, nil, fmt.Errorf("%w: devs-parallel devs time series: %v", readers.ErrAnalysisMissing, err)
 	}
 
-	return calculateParallelDeveloperData(people, ownership, couplingPeople, couplingMatrix, timeSeries, maxPeople), nil
+	return calculateParallelDeveloperData(people, ownership, couplingPeople, couplingMatrix, timeSeries, maxPeople), timeSeries, nil
 }
 
 func calculateParallelDeveloperData(
@@ -322,20 +322,42 @@ func activeDayJaccard(left, right map[int]bool) float64 {
 	return float64(intersection) / float64(union)
 }
 
-func calculateParallelismMetricsFromParallelData(data []ParallelDeveloperData) ParallelismMetrics {
+func calculateParallelismMetricsFromParallelData(data []ParallelDeveloperData, timeSeries *readers.DeveloperTimeSeriesData) ParallelismMetrics {
+	activeDaysByName := activeDaysForParallelDevelopers(data, timeSeries)
+	allDays := sortedActiveDays(data, activeDaysByName)
+	if len(allDays) == 0 {
+		allDays = []int{0}
+	}
+
 	metrics := ParallelismMetrics{
-		TotalPeriods:       5,
-		ParallelPeriods:    len(data),
-		ParallelismIndex:   100,
-		PeakConcurrency:    len(data),
-		AverageConcurrency: float64(len(data)),
-		DeveloperOverlaps:  make(map[string]map[string]float64, len(data)),
-		PeriodConcurrency:  make([]int, 5),
-		ActiveDevelopers:   make([]string, 0, len(data)),
+		TotalPeriods:      len(allDays),
+		DeveloperOverlaps: make(map[string]map[string]float64, len(data)),
+		PeriodConcurrency: make([]int, len(allDays)),
+		ActiveDevelopers:  make([]string, 0, len(data)),
 	}
-	for i := range metrics.PeriodConcurrency {
-		metrics.PeriodConcurrency[i] = len(data)
+
+	totalConcurrency := 0
+	for i, day := range allDays {
+		concurrent := 0
+		for _, dev := range data {
+			if activeDaysByName[dev.Name][day] {
+				concurrent++
+			}
+		}
+		metrics.PeriodConcurrency[i] = concurrent
+		totalConcurrency += concurrent
+		if concurrent > 1 {
+			metrics.ParallelPeriods++
+		}
+		if concurrent > metrics.PeakConcurrency {
+			metrics.PeakConcurrency = concurrent
+		}
 	}
+	if len(metrics.PeriodConcurrency) > 0 {
+		metrics.AverageConcurrency = float64(totalConcurrency) / float64(len(metrics.PeriodConcurrency))
+		metrics.ParallelismIndex = float64(metrics.ParallelPeriods) / float64(len(metrics.PeriodConcurrency)) * 100
+	}
+
 	for _, dev := range data {
 		metrics.ActiveDevelopers = append(metrics.ActiveDevelopers, dev.Name)
 		metrics.DeveloperOverlaps[dev.Name] = make(map[string]float64, len(data))
@@ -343,11 +365,52 @@ func calculateParallelismMetricsFromParallelData(data []ParallelDeveloperData) P
 			if dev.Name == other.Name {
 				metrics.DeveloperOverlaps[dev.Name][other.Name] = 1
 			} else {
-				metrics.DeveloperOverlaps[dev.Name][other.Name] = dev.AverageOverlapScore
+				metrics.DeveloperOverlaps[dev.Name][other.Name] = activeDayJaccard(activeDaysByName[dev.Name], activeDaysByName[other.Name])
 			}
 		}
 	}
 	return metrics
+}
+
+func activeDaysForParallelDevelopers(data []ParallelDeveloperData, timeSeries *readers.DeveloperTimeSeriesData) map[string]map[int]bool {
+	active := make(map[string]map[int]bool, len(data))
+	for _, dev := range data {
+		active[dev.Name] = make(map[int]bool)
+	}
+	if timeSeries == nil {
+		return active
+	}
+	for day, devs := range timeSeries.Days {
+		for devIndex, stats := range devs {
+			if devIndex < 0 || devIndex >= len(timeSeries.People) {
+				continue
+			}
+			name := timeSeries.People[devIndex]
+			days, ok := active[name]
+			if !ok {
+				continue
+			}
+			if stats.Commits > 0 || stats.LinesAdded > 0 || stats.LinesRemoved > 0 || stats.LinesModified > 0 {
+				days[day] = true
+			}
+		}
+	}
+	return active
+}
+
+func sortedActiveDays(data []ParallelDeveloperData, activeDaysByName map[string]map[int]bool) []int {
+	seen := make(map[int]bool)
+	for _, dev := range data {
+		for day := range activeDaysByName[dev.Name] {
+			seen[day] = true
+		}
+	}
+	days := make([]int, 0, len(seen))
+	for day := range seen {
+		days = append(days, day)
+	}
+	sort.Ints(days)
+	return days
 }
 
 // calculateParallelismMetrics analyzes the temporal activity data to find parallel development patterns
@@ -499,7 +562,7 @@ func plotParallelActivity(metrics ParallelismMetrics, output string) error {
 	if err != nil {
 		return fmt.Errorf("error creating line plot: %v", err)
 	}
-	line.Color = graphics.ColorPalette[0]
+	line.Color = color.RGBA{R: 76, G: 120, B: 168, A: 255}
 	line.Width = vg.Points(2)
 
 	// Add a filled polygon area under the line
@@ -514,23 +577,23 @@ func plotParallelActivity(metrics ParallelismMetrics, output string) error {
 	polygon, err := plotter.NewPolygon(areaPoints)
 	if err == nil {
 		// Create a semi-transparent version of the color
-		baseColor := graphics.ColorPalette[0].(color.RGBA)
-		polygon.Color = color.RGBA{R: baseColor.R, G: baseColor.G, B: baseColor.B, A: 100}
+		polygon.Color = color.RGBA{R: 211, G: 225, B: 241, A: 255}
 		p.Add(polygon)
 	}
 
 	p.Add(line)
-	p.Legend.Add("Concurrent Developers", line)
 
 	// Add horizontal line for average concurrency
 	if metrics.AverageConcurrency > 0 {
 		avgLine := plotter.NewFunction(func(x float64) float64 {
 			return metrics.AverageConcurrency
 		})
-		avgLine.Color = graphics.ColorPalette[1]
+		avgLine.Color = color.RGBA{R: 245, G: 133, B: 24, A: 255}
 		avgLine.Dashes = []vg.Length{vg.Points(5), vg.Points(5)}
 		p.Add(avgLine)
 		p.Legend.Add(fmt.Sprintf("Average (%.1f)", metrics.AverageConcurrency), avgLine)
+		p.Legend.Top = true
+		p.Legend.Left = true
 	}
 
 	// Save PNG with dynamic sizing

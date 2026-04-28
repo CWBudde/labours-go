@@ -48,6 +48,7 @@ Thumbs.db
 *.svg
 *.png
 *.pdf
+analysis_results/reference/*_table.tsv
 
 # Test and build output directories
 test_output/

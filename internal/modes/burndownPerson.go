@@ -5,6 +5,9 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/spf13/viper"
+	"labours-go/internal/burndown"
+	"labours-go/internal/graphics"
 	"labours-go/internal/readers"
 )
 
@@ -13,6 +16,15 @@ func BurndownPerson(reader readers.Reader, output string, relative bool, startDa
 	peopleBurndowns, err := reader.GetPeopleBurndown()
 	if err != nil {
 		return fmt.Errorf("failed to get people burndown data: %v", err)
+	}
+
+	header, _, _, headerErr := reader.GetProjectBurndownWithHeader()
+	usePythonRenderer := headerErr == nil
+	if !usePythonRenderer && !viper.GetBool("quiet") {
+		fmt.Printf("Warning: falling back to legacy person burndown renderer: %v\n", headerErr)
+	}
+	if resample == "" {
+		resample = "year"
 	}
 
 	// Generate a chart for each person
@@ -29,7 +41,15 @@ func BurndownPerson(reader readers.Reader, output string, relative bool, startDa
 			outputFile = filepath.Join(dir, fmt.Sprintf("%s_%s%s", base, sanitizeFilename(person.Person), ext))
 		}
 
-		if err := generateBurndownPlot(person.Person, person.Matrix, outputFile, relative, startDate, endDate, resample); err != nil {
+		if usePythonRenderer {
+			processedData, err := burndown.LoadBurndown(header, person.Person, person.Matrix, resample, false, false)
+			if err != nil {
+				return fmt.Errorf("failed to process burndown for person %s: %v", person.Person, err)
+			}
+			if err := graphics.PlotBurndownMatplotlib(processedData, outputFile, relative); err != nil {
+				return fmt.Errorf("failed to generate burndown for person %s: %v", person.Person, err)
+			}
+		} else if err := generateBurndownPlot(person.Person, person.Matrix, outputFile, relative, startDate, endDate, resample); err != nil {
 			return fmt.Errorf("failed to generate burndown for person %s: %v", person.Person, err)
 		}
 	}

@@ -53,6 +53,41 @@ type MatplotlibBarOptions struct {
 	WidthInches  float64
 	HeightInches float64
 	RotateX      bool
+	Color        color.Color
+}
+
+type MatplotlibGroupedBarSeries struct {
+	Name   string
+	Values []float64
+}
+
+type MatplotlibGroupedBarOptions struct {
+	Title        string
+	XLabel       string
+	YLabel       string
+	Output       string
+	WidthInches  float64
+	HeightInches float64
+	RotateX      bool
+}
+
+type MatplotlibLineSeries struct {
+	Name   string
+	X      []float64
+	Y      []float64
+	Color  color.Color
+	Marker bool
+}
+
+type MatplotlibLineOptions struct {
+	Title        string
+	XLabel       string
+	YLabel       string
+	Output       string
+	WidthInches  float64
+	HeightInches float64
+	ShowGrid     bool
+	Legend       bool
 }
 
 func PlotTimeAreasMatplotlib(dates []time.Time, series []MatplotlibTimeAreaSeries, opts MatplotlibTimeAreaOptions) error {
@@ -72,8 +107,7 @@ func PlotTimeAreasMatplotlib(dates []time.Time, series []MatplotlibTimeAreaSerie
 	fig := core.NewFigure(
 		width,
 		height,
-		style.WithTheme(style.ThemeGGPlot),
-		style.WithFont("DejaVu Sans", 12),
+		pythonTransparentFigureOptions()...,
 	)
 	ax := fig.AddSubplot(1, 1, 1)
 	if ax == nil {
@@ -155,6 +189,64 @@ func PlotTimeAreasMatplotlib(dates []time.Time, series []MatplotlibTimeAreaSerie
 	return saveMatplotlibFigure(fig, opts.Output, width, height)
 }
 
+func PlotLineChartMatplotlib(series []MatplotlibLineSeries, opts MatplotlibLineOptions) error {
+	if len(series) == 0 {
+		return fmt.Errorf("no line data to plot")
+	}
+
+	width, height := pythonPlotPixelSize(defaultPlotWidth(opts.WidthInches), defaultPlotHeight(opts.HeightInches))
+	fig := core.NewFigure(
+		width,
+		height,
+		pythonTransparentFigureOptions()...,
+	)
+	ax := fig.AddSubplot(1, 1, 1)
+	if ax == nil {
+		return fmt.Errorf("failed to create axes")
+	}
+	ax.SetTitle(opts.Title)
+	ax.SetXLabel(opts.XLabel)
+	ax.SetYLabel(opts.YLabel)
+	if opts.ShowGrid {
+		ax.AddXGrid()
+		ax.AddYGrid()
+	}
+
+	palette := PythonLaboursColorPalette(len(series))
+	for i, item := range series {
+		if len(item.X) == 0 || len(item.Y) == 0 {
+			continue
+		}
+		if len(item.X) != len(item.Y) {
+			return fmt.Errorf("line series %q x/y length mismatch", item.Name)
+		}
+		c := item.Color
+		if c == nil {
+			c = palette[i%len(palette)]
+		}
+		color := renderColor(c)
+		lineWidth := 2.0
+		ax.Plot(item.X, item.Y, core.PlotOptions{
+			Color:     &color,
+			LineWidth: &lineWidth,
+			Label:     item.Name,
+		})
+		if item.Marker {
+			size := 24.0
+			ax.Scatter(item.X, item.Y, core.ScatterOptions{
+				Color: &color,
+				Size:  &size,
+				Label: "",
+			})
+		}
+	}
+	if opts.Legend {
+		ax.AddLegend()
+	}
+
+	return saveMatplotlibFigure(fig, opts.Output, width, height)
+}
+
 func PlotBarChartMatplotlib(labels []string, values []float64, opts MatplotlibBarOptions) error {
 	if len(labels) == 0 || len(values) == 0 {
 		return fmt.Errorf("no bar data to plot")
@@ -167,8 +259,7 @@ func PlotBarChartMatplotlib(labels []string, values []float64, opts MatplotlibBa
 	fig := core.NewFigure(
 		width,
 		height,
-		style.WithTheme(style.ThemeGGPlot),
-		style.WithFont("DejaVu Sans", 12),
+		pythonTransparentFigureOptions()...,
 	)
 	ax := fig.AddSubplot(1, 1, 1)
 	if ax == nil {
@@ -185,8 +276,12 @@ func PlotBarChartMatplotlib(labels []string, values []float64, opts MatplotlibBa
 		x[i] = float64(i)
 		ticks[i] = float64(i)
 	}
-	color := renderColor(PythonLaboursColorPalette(1)[0])
-	ax.Bar(x, values, core.BarOptions{Color: &color})
+	barColor := opts.Color
+	if barColor == nil {
+		barColor = PythonLaboursColorPalette(1)[0]
+	}
+	renderedColor := renderColor(barColor)
+	ax.Bar(x, values, core.BarOptions{Color: &renderedColor})
 	ax.SetXLim(-0.5, float64(len(values))-0.5)
 	ax.SetYLim(0, math.Max(maxFloat64(values)*1.05, 1))
 	ax.XAxis.Locator = core.FixedLocator{TicksList: ticks}
@@ -196,6 +291,76 @@ func PlotBarChartMatplotlib(labels []string, values []float64, opts MatplotlibBa
 	}
 
 	return saveMatplotlibFigure(fig, opts.Output, width, height)
+}
+
+func PlotGroupedBarChartMatplotlib(labels []string, series []MatplotlibGroupedBarSeries, opts MatplotlibGroupedBarOptions) error {
+	if len(labels) == 0 || len(series) == 0 {
+		return fmt.Errorf("no grouped bar data to plot")
+	}
+
+	width, height := pythonPlotPixelSize(defaultPlotWidth(opts.WidthInches), defaultPlotHeight(opts.HeightInches))
+	fig := core.NewFigure(
+		width,
+		height,
+		pythonTransparentFigureOptions()...,
+	)
+	ax := fig.AddSubplot(1, 1, 1)
+	if ax == nil {
+		return fmt.Errorf("failed to create axes")
+	}
+	ax.SetTitle(opts.Title)
+	ax.SetXLabel(opts.XLabel)
+	ax.SetYLabel(opts.YLabel)
+	ax.AddYGrid()
+
+	barWidth := 0.8 / float64(len(series))
+	palette := PythonLaboursColorPalette(len(series))
+	maxValue := 0.0
+	for i, item := range series {
+		if len(item.Values) != len(labels) {
+			return fmt.Errorf("bar series %q has %d values for %d labels", item.Name, len(item.Values), len(labels))
+		}
+		x := make([]float64, len(labels))
+		offset := (float64(i) - float64(len(series)-1)/2) * barWidth
+		for j, value := range item.Values {
+			x[j] = float64(j) + offset
+			if value > maxValue {
+				maxValue = value
+			}
+		}
+		color := renderColor(palette[i%len(palette)])
+		ax.Bar(x, item.Values, core.BarOptions{
+			Color: &color,
+			Width: &barWidth,
+			Label: item.Name,
+		})
+	}
+	ticks := make([]float64, len(labels))
+	for i := range labels {
+		ticks[i] = float64(i)
+	}
+	ax.SetXLim(-0.5, float64(len(labels))-0.5)
+	ax.SetYLim(0, math.Max(maxValue*1.05, 1))
+	ax.XAxis.Locator = core.FixedLocator{TicksList: ticks}
+	ax.XAxis.Formatter = core.FixedFormatter{Labels: append([]string(nil), labels...)}
+	if opts.RotateX {
+		ax.XAxis.MajorLabelStyle = core.TickLabelStyle{Rotation: 45, AutoAlign: true}
+	}
+	ax.AddLegend()
+
+	return saveMatplotlibFigure(fig, opts.Output, width, height)
+}
+
+func pythonTransparentFigureOptions() []style.Option {
+	transparent := render.Color{R: 1, G: 1, B: 1, A: 0}
+	text := render.Color{R: 0, G: 0, B: 0, A: 1}
+	return []style.Option{
+		style.WithTheme(style.ThemeGGPlot),
+		style.WithFont("DejaVu Sans", 12),
+		style.WithBackground(1, 1, 1, 0),
+		style.WithAxesBackground(transparent),
+		style.WithLegendColors(render.Color{R: 1, G: 1, B: 1, A: 0.8}, transparent, text),
+	}
 }
 
 func configureTimeAreaAxes(ax *core.Axes, dates []time.Time, opts MatplotlibTimeAreaOptions) {

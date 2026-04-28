@@ -1,13 +1,37 @@
 package graphics
 
 import (
+	"fmt"
 	"image/color"
 	"math"
+	"sync"
 
 	"gonum.org/v1/plot"
 	"gonum.org/v1/plot/vg"
 	"gonum.org/v1/plot/vg/draw"
+	matcolor "matplotlib-go/color"
+	"matplotlib-go/render"
 )
+
+var registerHeatmapColormapsOnce sync.Once
+
+// RegisterPythonLaboursHeatmapColormaps registers colormaps used by Python labours
+// but not provided by matplotlib-go's default registry.
+func RegisterPythonLaboursHeatmapColormaps() {
+	registerHeatmapColormapsOnce.Do(func() {
+		matcolor.RegisterColormap("OrRd", matcolor.NewColormap("OrRd", []matcolor.ColorStop{
+			{Pos: 0.000, Color: render.Color{R: 1.000, G: 0.969, B: 0.925, A: 1}},
+			{Pos: 0.125, Color: render.Color{R: 0.996, G: 0.910, B: 0.784, A: 1}},
+			{Pos: 0.250, Color: render.Color{R: 0.992, G: 0.831, B: 0.620, A: 1}},
+			{Pos: 0.375, Color: render.Color{R: 0.992, G: 0.733, B: 0.518, A: 1}},
+			{Pos: 0.500, Color: render.Color{R: 0.988, G: 0.553, B: 0.349, A: 1}},
+			{Pos: 0.625, Color: render.Color{R: 0.937, G: 0.396, B: 0.282, A: 1}},
+			{Pos: 0.750, Color: render.Color{R: 0.843, G: 0.188, B: 0.122, A: 1}},
+			{Pos: 0.875, Color: render.Color{R: 0.702, G: 0.000, B: 0.000, A: 1}},
+			{Pos: 1.000, Color: render.Color{R: 0.498, G: 0.000, B: 0.000, A: 1}},
+		}))
+	})
+}
 
 // CustomPalette represents a mapping of values to a predefined set of colors.
 type CustomPalette struct {
@@ -18,8 +42,18 @@ type CustomPalette struct {
 
 // At maps a value to a corresponding color in the palette.
 func (p *CustomPalette) At(value float64) color.Color {
+	if len(p.Colors) == 0 {
+		return color.Black
+	}
+	if p.Max == p.Min {
+		return p.Colors[len(p.Colors)/2]
+	}
+
 	// Normalize the value to the range [0, 1].
 	normalized := (value - p.Min) / (p.Max - p.Min)
+	if math.IsNaN(normalized) {
+		normalized = 0
+	}
 	if normalized < 0 {
 		normalized = 0
 	} else if normalized > 1 {
@@ -47,6 +81,18 @@ func NewHeatMap(matrix [][]float64, rows, cols []string, palette *CustomPalette)
 		Cols:    cols,
 		Palette: palette,
 	}
+}
+
+func ValidateHeatMap(matrix [][]float64, rows, cols []string) error {
+	if len(matrix) != len(rows) {
+		return fmt.Errorf("heatmap row count mismatch: matrix has %d rows, labels have %d", len(matrix), len(rows))
+	}
+	for i, row := range matrix {
+		if len(row) != len(cols) {
+			return fmt.Errorf("heatmap column count mismatch on row %d: matrix has %d columns, labels have %d", i, len(row), len(cols))
+		}
+	}
+	return nil
 }
 
 // Plot draws the heatmap onto the plot canvas.
@@ -87,8 +133,8 @@ func (hm *HeatMap) Plot(c draw.Canvas, p *plot.Plot) {
 
 // DataRange returns the minimum and maximum data range of the heatmap.
 func (hm *HeatMap) DataRange() (xmin, xmax, ymin, ymax float64) {
-	xmin, ymin = 0, 0
-	xmax = float64(len(hm.Cols))
-	ymax = float64(len(hm.Rows))
+	xmin, ymin = -0.5, -0.5
+	xmax = float64(len(hm.Cols)) - 0.5
+	ymax = float64(len(hm.Rows)) - 0.5
 	return
 }

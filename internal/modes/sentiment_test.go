@@ -138,6 +138,49 @@ func TestSentimentUsesCollectedSentimentWithoutFallback(t *testing.T) {
 	}
 }
 
+func TestSentimentResultsFromTicksUsesPythonConvention(t *testing.T) {
+	results := sentimentResultsFromTicks(map[int]readers.SentimentTick{
+		20: {Value: 0.80},
+		10: {Value: 0.20},
+		30: {Value: 0.50},
+	})
+
+	if len(results) != 3 {
+		t.Fatalf("expected 3 sentiment results, got %d", len(results))
+	}
+
+	assertSentimentResult(t, results[0], "tick 10", 0.60, 0.60, 0.40, 0.00)
+	assertSentimentResult(t, results[1], "tick 20", -0.60, 0.00, 0.40, 0.60)
+	assertSentimentResult(t, results[2], "tick 30", 0.00, 0.00, 1.00, 0.00)
+}
+
+func assertSentimentResult(t *testing.T, got SentimentResult, entity string, score, positive, neutral, negative float64) {
+	t.Helper()
+	if got.Entity != entity {
+		t.Fatalf("expected entity %q, got %q", entity, got.Entity)
+	}
+	if !closeEnough(got.Score, score) {
+		t.Errorf("%s score: expected %.2f, got %.2f", entity, score, got.Score)
+	}
+	if !closeEnough(got.Positive, positive) {
+		t.Errorf("%s positive: expected %.2f, got %.2f", entity, positive, got.Positive)
+	}
+	if !closeEnough(got.Neutral, neutral) {
+		t.Errorf("%s neutral: expected %.2f, got %.2f", entity, neutral, got.Neutral)
+	}
+	if !closeEnough(got.Negative, negative) {
+		t.Errorf("%s negative: expected %.2f, got %.2f", entity, negative, got.Negative)
+	}
+}
+
+func closeEnough(a, b float64) bool {
+	const epsilon = 1e-6
+	if a > b {
+		return a-b < epsilon
+	}
+	return b-a < epsilon
+}
+
 // NoDataReader implements readers.Reader but returns no data
 type NoDataReader struct{}
 

@@ -3,13 +3,21 @@ package modes
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
 	"gonum.org/v1/plot"
+	"gonum.org/v1/plot/vg"
+	"gonum.org/v1/plot/vg/draw"
 	"labours-go/internal/graphics"
 	"labours-go/internal/readers"
+	"matplotlib-go/backends"
+	"matplotlib-go/core"
+	"matplotlib-go/render"
+	"matplotlib-go/style"
 )
 
 func OverwritesMatrix(reader readers.Reader, output string) error {
@@ -23,7 +31,7 @@ func OverwritesMatrix(reader readers.Reader, output string) error {
 
 	// Step 2: Process the matrix
 	maxPeople := 20 // This can be passed as a parameter or read from configuration
-	people, normalizedMatrix := processOverwritesMatrix(people, matrix, maxPeople, true)
+	people, colLabels, normalizedMatrix := processOverwritesMatrix(people, matrix, maxPeople, true)
 
 	// Step 3: Check if JSON output is required
 	if strings.HasSuffix(output, ".json") {
@@ -31,7 +39,7 @@ func OverwritesMatrix(reader readers.Reader, output string) error {
 	}
 
 	// Step 4: Visualize the matrix
-	if err := plotOverwritesMatrix(people, normalizedMatrix, output); err != nil {
+	if err := plotOverwritesMatrix(people, colLabels, normalizedMatrix, output); err != nil {
 		return fmt.Errorf("failed to plot overwrites matrix: %v", err)
 	}
 
@@ -39,85 +47,248 @@ func OverwritesMatrix(reader readers.Reader, output string) error {
 	return nil
 }
 
-func processOverwritesMatrix(people []string, matrix [][]int, maxPeople int, normalize bool) ([]string, [][]float64) {
-	// Step 1: Truncate the matrix to the top `maxPeople` developers
+func processOverwritesMatrix(people []string, matrix [][]int, maxPeople int, normalize bool) ([]string, []string, [][]float64) {
+	// Python labours stores column 0 as row total, column 1 as "Unidentified",
+	// and developer overwrite columns at 2 + developer index.
 	if len(people) > maxPeople {
 		order := argsort(matrix)
-		matrix = truncateMatrix(matrix, order[:maxPeople])
+		matrix = truncateOverwritesMatrix(matrix, order[:maxPeople])
 		people = truncatePeople(people, order[:maxPeople])
 		fmt.Printf("Warning: truncated people to most productive %d\n", maxPeople)
 	}
 
-	// Step 2: Normalize the matrix to float64
 	var normalizedMatrix [][]float64
 	if normalize {
 		normalizedMatrix = make([][]float64, len(matrix))
 		for i := range matrix {
-			sum := sumRow(matrix[i])
-			normalizedMatrix[i] = make([]float64, len(matrix[i]))
-			for j := range matrix[i] {
-				if sum != 0 {
-					normalizedMatrix[i][j] = float64(matrix[i][j]) / float64(sum)
+			total := 0
+			if len(matrix[i]) > 0 {
+				total = matrix[i][0]
+			}
+			valueCols := max(len(matrix[i])-1, 0)
+			normalizedMatrix[i] = make([]float64, valueCols)
+			for j := 1; j < len(matrix[i]); j++ {
+				if total != 0 {
+					normalizedMatrix[i][j-1] = -float64(matrix[i][j]) / float64(total)
 				}
 			}
 		}
 	} else {
-		// Convert to float64 without normalization
 		normalizedMatrix = make([][]float64, len(matrix))
 		for i := range matrix {
-			normalizedMatrix[i] = make([]float64, len(matrix[i]))
-			for j := range matrix[i] {
-				normalizedMatrix[i][j] = float64(matrix[i][j])
+			valueCols := max(len(matrix[i])-1, 0)
+			normalizedMatrix[i] = make([]float64, valueCols)
+			for j := 1; j < len(matrix[i]); j++ {
+				normalizedMatrix[i][j-1] = -float64(matrix[i][j])
 			}
 		}
 	}
 
-	// Step 3: Invert the matrix (make values negative as in Python)
-	for i := range normalizedMatrix {
-		for j := range normalizedMatrix[i] {
-			normalizedMatrix[i][j] = -normalizedMatrix[i][j]
-		}
-	}
-
-	// Step 4: Truncate long names
 	for i, name := range people {
 		if len(name) > 40 {
 			people[i] = name[:37] + "..."
 		}
 	}
 
-	return people, normalizedMatrix
+	colLabels := append([]string{"Unidentified"}, people...)
+	return people, colLabels, normalizedMatrix
 }
 
-func plotOverwritesMatrix(people []string, matrix [][]float64, output string) error {
-	// Create and configure the plot
-	p := plot.New()
-	p.Title.Text = "Overwrites Matrix"
-	p.X.Label.Text = "Developers"
-	p.Y.Label.Text = "Developers"
-
-	// Ensure the X and Y axis have proper labels
-	p.X.Tick.Label.Rotation = -45 // Rotate X-axis labels for readability
-	p.NominalX(people...)         // Use `people` as X-axis labels
-	p.NominalY(people...)         // Use `people` as Y-axis labels
-
-	// Create the heatmap with your custom palette
-	palette := &graphics.CustomPalette{
-		Colors: graphics.ColorPalette, // Use your predefined palette
-		Min:    -1.0,                  // Adjust Min and Max to align with normalized matrix values
-		Max:    0.0,
+func plotOverwritesMatrix(people, colLabels []string, matrix [][]float64, output string) error {
+	if err := graphics.ValidateHeatMap(matrix, people, colLabels); err != nil {
+		return err
 	}
-	heatmap := graphics.NewHeatMap(matrix, people, people, palette)
 
-	// Add the heatmap to the plot
-	p.Add(heatmap)
+	minValue, maxValue := matrixRange(matrix)
 
-	// Save the plot
-	width, height := graphics.GetPlotSize(graphics.ChartTypeSquare)
-	if err := p.Save(width, height, output); err != nil {
+	width, height := ownershipPlotPixelSize(16, 12)
+	background, foreground := ownershipPlotColors("")
+	graphics.RegisterPythonLaboursHeatmapColormaps()
+	fig := core.NewFigure(
+		width,
+		height,
+		style.WithFont("DejaVu Sans", 12),
+		style.WithBackground(background.R, background.G, background.B, 0),
+		style.WithAxesBackground(render.Color{R: background.R, G: background.G, B: background.B, A: 0}),
+		style.WithAxesEdgeColor(foreground),
+		style.WithTextColor(foreground.R, foreground.G, foreground.B, foreground.A),
+	)
+	ax := fig.GridSpec(
+		1,
+		1,
+		core.WithGridSpecPadding(0.255, 0.916, 0.017, 0.748),
+	).Cell(0, 0).AddAxes()
+	if ax == nil {
+		return fmt.Errorf("failed to create overwrites axes")
+	}
+
+	cmap := "OrRd"
+	if img := ax.MatShow(matrix, core.MatShowOptions{
+		Colormap: &cmap,
+		VMin:     &minValue,
+		VMax:     &maxValue,
+	}); img == nil {
+		return fmt.Errorf("failed to create overwrites matrix image")
+	}
+	configureOverwritesMatrixAxes(ax, people, colLabels, foreground)
+
+	if err := saveOverwritesMatplotlibFigure(fig, output, width, height, background); err != nil {
 		return fmt.Errorf("failed to save plot: %v", err)
 	}
 	return nil
+}
+
+func configureOverwritesMatrixAxes(ax *core.Axes, people, colLabels []string, foreground render.Color) {
+	xTicks := integerTicks(len(colLabels))
+	yTicks := integerTicks(len(people))
+	xMinorTicks := halfOffsetTicks(len(colLabels))
+	yMinorTicks := halfOffsetTicks(len(people))
+
+	if ax.XAxis != nil {
+		ax.XAxis.ShowTicks = false
+		ax.XAxis.ShowLabels = false
+		ax.XAxis.Locator = core.FixedLocator{TicksList: xTicks}
+		ax.XAxis.Formatter = core.FixedFormatter{Labels: colLabels}
+		ax.XAxis.MinorLocator = core.FixedLocator{TicksList: xMinorTicks}
+	}
+	top := ax.TopAxis()
+	top.Locator = core.FixedLocator{TicksList: xTicks}
+	top.Formatter = core.FixedFormatter{Labels: colLabels}
+	top.MinorLocator = core.FixedLocator{TicksList: xMinorTicks}
+	top.MajorLabelStyle = core.TickLabelStyle{
+		Rotation:  45,
+		HAlign:    core.TextAlignLeft,
+		VAlign:    core.TextVAlignBottom,
+		AutoAlign: false,
+	}
+	top.ShowTicks = true
+	top.ShowLabels = true
+
+	if ax.YAxis != nil {
+		ax.YAxis.Locator = core.FixedLocator{TicksList: yTicks}
+		ax.YAxis.Formatter = core.FixedFormatter{Labels: people}
+		ax.YAxis.MinorLocator = core.FixedLocator{TicksList: yMinorTicks}
+		ax.YAxis.MajorLabelStyle = core.TickLabelStyle{
+			HAlign:    core.TextAlignRight,
+			VAlign:    core.TextVAlignMiddle,
+			AutoAlign: false,
+		}
+	}
+
+	gridColor := foreground
+	gridColor.A = 0.15
+	xGrid := core.NewGrid(core.AxisTop)
+	xGrid.Major = false
+	xGrid.Minor = true
+	xGrid.MinorLocator = core.FixedLocator{TicksList: xMinorTicks}
+	xGrid.MinorColor = gridColor
+	xGrid.MinorLineWidth = 1
+	yGrid := core.NewGrid(core.AxisLeft)
+	yGrid.Major = false
+	yGrid.Minor = true
+	yGrid.MinorLocator = core.FixedLocator{TicksList: yMinorTicks}
+	yGrid.MinorColor = gridColor
+	yGrid.MinorLineWidth = 1
+	ax.Add(xGrid)
+	ax.Add(yGrid)
+}
+
+func integerTicks(count int) []float64 {
+	ticks := make([]float64, count)
+	for i := range ticks {
+		ticks[i] = float64(i)
+	}
+	return ticks
+}
+
+func halfOffsetTicks(count int) []float64 {
+	ticks := make([]float64, count)
+	for i := range ticks {
+		ticks[i] = float64(i) + 0.5
+	}
+	return ticks
+}
+
+func saveOverwritesMatplotlibFigure(fig *core.Figure, output string, width, height int, background render.Color) error {
+	if output == "" {
+		output = "overwrites.png"
+	}
+	if err := os.MkdirAll(filepath.Dir(output), 0o755); err != nil {
+		return fmt.Errorf("failed to create output directory for %s: %v", output, err)
+	}
+
+	transparentBackground := background
+	transparentBackground.A = 0
+	config := backends.Config{Width: width, Height: height, Background: transparentBackground, DPI: 100}
+	switch strings.ToLower(filepath.Ext(output)) {
+	case ".svg":
+		renderer, _, err := backends.NewRenderer("svg", config, nil)
+		if err != nil {
+			return fmt.Errorf("failed to create SVG renderer: %v", err)
+		}
+		return core.SaveSVG(fig, renderer, output)
+	default:
+		renderer, _, err := backends.NewRenderer("agg", config, backends.TextCapabilities)
+		if err != nil {
+			return fmt.Errorf("failed to create AGG renderer: %v", err)
+		}
+		return core.SavePNG(fig, renderer, output)
+	}
+}
+
+func matrixRange(matrix [][]float64) (minValue, maxValue float64) {
+	minValue = math.Inf(1)
+	maxValue = math.Inf(-1)
+	for _, row := range matrix {
+		for _, value := range row {
+			minValue = math.Min(minValue, value)
+			maxValue = math.Max(maxValue, value)
+		}
+	}
+	if math.IsInf(minValue, 0) {
+		return 0, 1
+	}
+	if minValue == maxValue {
+		return minValue - 0.5, maxValue + 0.5
+	}
+	return minValue, maxValue
+}
+
+type topTickLabels struct {
+	Labels []string
+	Style  draw.TextStyle
+	Pad    vg.Length
+}
+
+func newTopTickLabels(labels []string, style draw.TextStyle) *topTickLabels {
+	style.Rotation = math.Pi / 4
+	style.XAlign = draw.XLeft
+	style.YAlign = draw.YBottom
+	return &topTickLabels{
+		Labels: labels,
+		Style:  style,
+		Pad:    vg.Points(2),
+	}
+}
+
+func (t *topTickLabels) Plot(c draw.Canvas, p *plot.Plot) {
+	trX, _ := p.Transforms(&c)
+	y := c.Max.Y + t.Pad
+	for i, label := range t.Labels {
+		c.FillText(t.Style, vg.Point{X: trX(float64(i)), Y: y}, label)
+	}
+}
+
+func (t *topTickLabels) GlyphBoxes(p *plot.Plot) []plot.GlyphBox {
+	boxes := make([]plot.GlyphBox, 0, len(t.Labels))
+	for i, label := range t.Labels {
+		boxes = append(boxes, plot.GlyphBox{
+			X:         p.X.Norm(float64(i)),
+			Y:         1,
+			Rectangle: t.Style.Rectangle(label).Add(vg.Point{Y: t.Pad}),
+		})
+	}
+	return boxes
 }
 
 func saveMatrixAsJSON(output string, people []string, matrix [][]float64) error {
@@ -158,6 +329,31 @@ func truncateMatrix(matrix [][]int, indices []int) [][]int {
 	return truncated
 }
 
+func truncateOverwritesMatrix(matrix [][]int, indices []int) [][]int {
+	truncated := make([][]int, len(indices))
+	for i, idx := range indices {
+		if idx >= len(matrix) {
+			continue
+		}
+		cols := append([]int{0, 1}, addOffset(indices, 2)...)
+		truncated[i] = make([]int, len(cols))
+		for j, col := range cols {
+			if col >= 0 && col < len(matrix[idx]) {
+				truncated[i][j] = matrix[idx][col]
+			}
+		}
+	}
+	return truncated
+}
+
+func addOffset(values []int, offset int) []int {
+	result := make([]int, len(values))
+	for i, value := range values {
+		result[i] = value + offset
+	}
+	return result
+}
+
 func truncatePeople(people []string, indices []int) []string {
 	truncated := make([]string, len(indices))
 	for i, idx := range indices {
@@ -177,7 +373,9 @@ func sumRow(row []int) int {
 func argsort(matrix [][]int) []int {
 	scores := make([]int, len(matrix))
 	for i, row := range matrix {
-		scores[i] = row[0]
+		if len(row) > 0 {
+			scores[i] = row[0]
+		}
 	}
 
 	indices := make([]int, len(scores))
@@ -190,4 +388,12 @@ func argsort(matrix [][]int) []int {
 	})
 
 	return indices
+}
+
+func reverseStrings(values []string) []string {
+	result := make([]string, len(values))
+	for i, value := range values {
+		result[len(values)-1-i] = value
+	}
+	return result
 }

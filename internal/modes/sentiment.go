@@ -3,9 +3,13 @@ package modes
 import (
 	"errors"
 	"fmt"
+	"image/color"
 	"math"
+	"os"
 	"path/filepath"
 	"sort"
+	"strings"
+	"time"
 
 	"gonum.org/v1/plot"
 	"gonum.org/v1/plot/plotter"
@@ -31,9 +35,11 @@ func Sentiment(reader readers.Reader, output string, allowHeuristicFallback bool
 	fmt.Println("Analyzing repository sentiment patterns...")
 
 	var sentimentResults []SentimentResult
+	var collectedTicks map[int]readers.SentimentTick
 	if sentimentReader, ok := reader.(readers.SentimentReader); ok {
 		ticks, err := sentimentReader.GetSentimentByTick()
 		if err == nil && len(ticks) > 0 {
+			collectedTicks = ticks
 			sentimentResults = append(sentimentResults, sentimentResultsFromTicks(ticks)...)
 		} else if err != nil && !errors.Is(err, readers.ErrAnalysisMissing) {
 			return fmt.Errorf("could not read collected sentiment data: %w", err)
@@ -65,13 +71,19 @@ func Sentiment(reader readers.Reader, output string, allowHeuristicFallback bool
 		return fmt.Errorf("no sentiment data available - ensure the input contains developer stats or language stats")
 	}
 
-	// Generate visualizations
-	if err := plotSentimentOverview(sentimentResults, output); err != nil {
-		return fmt.Errorf("failed to generate sentiment overview: %v", err)
-	}
+	if len(collectedTicks) > 0 {
+		start, _ := reader.GetHeader()
+		if err := plotCollectedSentimentTimeline(reader.GetName(), start, collectedTicks, output); err != nil {
+			return fmt.Errorf("failed to generate collected sentiment timeline: %v", err)
+		}
+	} else {
+		if err := plotSentimentOverview(sentimentResults, output); err != nil {
+			return fmt.Errorf("failed to generate sentiment overview: %v", err)
+		}
 
-	if err := plotSentimentByType(sentimentResults, output); err != nil {
-		return fmt.Errorf("failed to generate sentiment by type: %v", err)
+		if err := plotSentimentByType(sentimentResults, output); err != nil {
+			return fmt.Errorf("failed to plot sentiment by type: %v", err)
+		}
 	}
 
 	// Print summary
@@ -94,7 +106,9 @@ func sentimentResultsFromTicks(ticks map[int]readers.SentimentTick) []SentimentR
 		if !isFinite(value) {
 			continue
 		}
-		score := clamp(value, -1, 1)
+		// Hercules stores the raw BiDiSentiment value in the historical Python
+		// convention: values below 0.5 are positive, values above 0.5 are negative.
+		score := clamp((0.5-value)*2, -1, 1)
 		positive := 0.0
 		negative := 0.0
 		if score > 0 {
@@ -112,6 +126,114 @@ func sentimentResultsFromTicks(ticks map[int]readers.SentimentTick) []SentimentR
 		}))
 	}
 	return results
+}
+
+func plotCollectedSentimentTimeline(name string, startUnix int64, ticks map[int]readers.SentimentTick, output string) error {
+	if len(ticks) == 0 {
+		return fmt.Errorf("no collected sentiment ticks")
+	}
+	if output == "" {
+		output = "."
+	}
+	if err := os.MkdirAll(output, 0755); err != nil {
+		return fmt.Errorf("failed to create output directory %s: %v", output, err)
+	}
+
+	maxTick := 0
+	for tick := range ticks {
+		if tick > maxTick {
+			maxTick = tick
+		}
+	}
+	start := time.Unix(startUnix, 0)
+	if startUnix == 0 {
+		start = time.Unix(0, 0)
+	}
+	dates := make([]time.Time, maxTick+1)
+	mood := make([]float64, maxTick+1)
+	for i := range dates {
+		dates[i] = start.AddDate(0, 0, i)
+	}
+	for tick, value := range ticks {
+		if tick >= 0 && tick < len(mood) {
+			mood[tick] = clamp((0.5-float64(value.Value))*2, -1, 1)
+		}
+	}
+
+	smoothed := movingAverage(mood, max(1, len(mood)/32))
+	positive := make([]float64, len(smoothed))
+	negative := make([]float64, len(smoothed))
+	for i, value := range smoothed {
+		if value > 0 {
+			positive[i] = value
+		} else {
+			negative[i] = value
+		}
+	}
+
+	titleName := strings.TrimSpace(name)
+	if titleName == "" {
+		titleName = "Repository"
+	}
+	series := []graphics.MatplotlibTimeAreaSeries{
+		{Label: "Positive", Values: positive, Color: sentimentColor(0x8d, 0xb8, 0x43)},
+		{Label: "Negative", Values: negative, Color: sentimentColor(0xe1, 0x4c, 0x35)},
+	}
+	opts := graphics.MatplotlibTimeAreaOptions{
+		Title:        titleName + " sentiment",
+		XLabel:       "Time",
+		YLabel:       "Comment sentiment",
+		WidthInches:  16,
+		HeightInches: 12,
+		Stacked:      false,
+		ShowGrid:     true,
+		Legend:       true,
+		LegendTop:    true,
+		Alpha:        1,
+		YMin:         -1,
+		YMax:         1,
+	}
+
+	pngFile := filepath.Join(output, "sentiment-overview.png")
+	opts.Output = pngFile
+	if err := graphics.PlotTimeAreasMatplotlib(dates, series, opts); err != nil {
+		return err
+	}
+	svgFile := filepath.Join(output, "sentiment-overview.svg")
+	opts.Output = svgFile
+	if err := graphics.PlotTimeAreasMatplotlib(dates, series, opts); err != nil {
+		return err
+	}
+	fmt.Printf("Sentiment overview charts saved to %s and %s\n", pngFile, svgFile)
+	return nil
+}
+
+func movingAverage(values []float64, window int) []float64 {
+	if window <= 1 || len(values) == 0 {
+		return append([]float64(nil), values...)
+	}
+	result := make([]float64, len(values))
+	half := window / 2
+	for i := range values {
+		start := i - half
+		if start < 0 {
+			start = 0
+		}
+		end := i + half + 1
+		if end > len(values) {
+			end = len(values)
+		}
+		sum := 0.0
+		for _, value := range values[start:end] {
+			sum += value
+		}
+		result[i] = sum / float64(end-start)
+	}
+	return result
+}
+
+func sentimentColor(r, g, b uint8) color.Color {
+	return color.RGBA{R: r, G: g, B: b, A: 255}
 }
 
 // analyzeDeveloperSentiment analyzes sentiment based on developer activity patterns
@@ -372,13 +494,14 @@ func plotSentimentOverview(results []SentimentResult, output string) error {
 	p.Legend.Top = true
 
 	// Save plots
+	width, height := graphics.GetPythonPlotSize(16, 12)
 	outputFile := filepath.Join(output, "sentiment-overview.png")
-	if err := p.Save(16*vg.Inch, 8*vg.Inch, outputFile); err != nil {
+	if err := p.Save(width, height, outputFile); err != nil {
 		return fmt.Errorf("failed to save sentiment overview: %v", err)
 	}
 
 	svgFile := filepath.Join(output, "sentiment-overview.svg")
-	if err := p.Save(16*vg.Inch, 8*vg.Inch, svgFile); err != nil {
+	if err := p.Save(width, height, svgFile); err != nil {
 		return fmt.Errorf("failed to save sentiment overview SVG: %v", err)
 	}
 
@@ -465,13 +588,14 @@ func plotSentimentForType(results []SentimentResult, title, output, filename str
 	p.Add(line)
 
 	// Save plots
+	width, height := graphics.GetPythonPlotSize(14, 8)
 	outputFile := filepath.Join(output, filename+".png")
-	if err := p.Save(14*vg.Inch, 8*vg.Inch, outputFile); err != nil {
+	if err := p.Save(width, height, outputFile); err != nil {
 		return fmt.Errorf("failed to save %s: %v", filename, err)
 	}
 
 	svgFile := filepath.Join(output, filename+".svg")
-	if err := p.Save(14*vg.Inch, 8*vg.Inch, svgFile); err != nil {
+	if err := p.Save(width, height, svgFile); err != nil {
 		return fmt.Errorf("failed to save %s SVG: %v", filename, err)
 	}
 

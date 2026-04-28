@@ -3,6 +3,7 @@ package readers
 import (
 	"fmt"
 	"io"
+	"sort"
 
 	"github.com/spf13/viper"
 	"google.golang.org/protobuf/proto"
@@ -209,35 +210,7 @@ func (r *ProtobufReader) GetShotnessCooccurrence() ([]string, [][]int, error) {
 		return nil, nil, err
 	}
 
-	index := make([]string, 0, len(shotnessRecords))
-	size := len(shotnessRecords)
-	matrix := make([][]int, size)
-	for i := range matrix {
-		matrix[i] = make([]int, size)
-	}
-
-	for i, record := range shotnessRecords {
-		index = append(index, fmt.Sprintf("%s:%s", record.File, record.Name))
-		for j, other := range shotnessRecords {
-			if i == j {
-				total := int32(0)
-				for _, count := range record.Counters {
-					total += count
-				}
-				matrix[i][j] = int(total)
-				continue
-			}
-
-			overlap := int32(0)
-			for tick, count := range record.Counters {
-				otherCount, exists := other.Counters[tick]
-				if exists && count > 0 && otherCount > 0 {
-					overlap += min32(count, otherCount)
-				}
-			}
-			matrix[i][j] = int(overlap)
-		}
-	}
+	index, matrix := shotnessCounterMatrix(shotnessRecords)
 	return index, matrix, nil
 }
 
@@ -264,26 +237,11 @@ func (r *ProtobufReader) GetShotnessRecords() ([]ShotnessRecord, error) {
 
 // GetDeveloperStats retrieves developer statistics
 func (r *ProtobufReader) GetDeveloperStats() ([]DeveloperStat, error) {
-	devsData := r.parseDevsAnalysisResults()
-	if devsData == nil || len(devsData.DevIndex) == 0 {
-		return nil, fmt.Errorf("no developer stats found")
+	timeSeries, err := r.GetDeveloperTimeSeriesData()
+	if err != nil {
+		return nil, err
 	}
-
-	// Create synthetic developer stats from the available data
-	stats := make([]DeveloperStat, len(devsData.DevIndex))
-	for i, devName := range devsData.DevIndex {
-		stats[i] = DeveloperStat{
-			Name:          devName,
-			Commits:       0, // Would need to aggregate from time series
-			LinesAdded:    0,
-			LinesRemoved:  0,
-			LinesModified: 0,
-			FilesTouched:  0,
-			Languages:     make(map[string]int),
-		}
-	}
-
-	return stats, nil
+	return aggregateDeveloperStats(timeSeries), nil
 }
 
 // GetLanguageStats retrieves language statistics
@@ -683,6 +641,50 @@ func (r *ProtobufReader) GetDeveloperTimeSeriesData() (*DeveloperTimeSeriesData,
 		People: people,
 		Days:   days,
 	}, nil
+}
+
+func aggregateDeveloperStats(timeSeries *DeveloperTimeSeriesData) []DeveloperStat {
+	statsByDev := make(map[int]*DeveloperStat)
+	for devIndex, devName := range timeSeries.People {
+		statsByDev[devIndex] = &DeveloperStat{
+			Name:      devName,
+			Languages: make(map[string]int),
+		}
+	}
+
+	for _, dayStats := range timeSeries.Days {
+		for devIndex, day := range dayStats {
+			stat, ok := statsByDev[devIndex]
+			if !ok {
+				stat = &DeveloperStat{
+					Name:      fmt.Sprintf("developer-%d", devIndex),
+					Languages: make(map[string]int),
+				}
+				statsByDev[devIndex] = stat
+			}
+			stat.Commits += day.Commits
+			stat.LinesAdded += day.LinesAdded
+			stat.LinesRemoved += day.LinesRemoved
+			stat.LinesModified += day.LinesModified
+			for language, values := range day.Languages {
+				for _, value := range values {
+					stat.Languages[language] += value
+				}
+			}
+		}
+	}
+
+	indexes := make([]int, 0, len(statsByDev))
+	for devIndex := range statsByDev {
+		indexes = append(indexes, devIndex)
+	}
+	sort.Ints(indexes)
+
+	stats := make([]DeveloperStat, 0, len(indexes))
+	for _, devIndex := range indexes {
+		stats = append(stats, *statsByDev[devIndex])
+	}
+	return stats
 }
 
 // parseBurndownSparseMatrix converts protobuf BurndownSparseMatrix to dense matrix

@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestGenerateOwnershipPlot(t *testing.T) {
@@ -106,6 +107,40 @@ func TestCalculateFileOwnershipPercentages(t *testing.T) {
 	// Alice should have 60% at first time point
 	if percentages[0][0] != 60.0 {
 		t.Errorf("Expected Alice to have 60%% ownership at first point, got %f", percentages[0][0])
+	}
+}
+
+func TestProcessOwnershipBurndownSumsRowsAsTimePoints(t *testing.T) {
+	names, people, dates := processOwnershipBurndown(
+		time.Unix(0, 0),
+		time.Unix(0, 0),
+		1,
+		[]string{"Alice", "Bob"},
+		map[string][][]int{
+			"Alice": {
+				{1, 2, 3},
+				{4, 5, 6},
+			},
+			"Bob": {
+				{10, 20, 30},
+				{40, 50, 60},
+			},
+		},
+		20,
+		false,
+	)
+
+	if len(dates) != 2 {
+		t.Fatalf("expected 2 time points, got %d", len(dates))
+	}
+	if len(names) != 2 || names[0] != "Bob" || names[1] != "Alice" {
+		t.Fatalf("unexpected ownership order: %v", names)
+	}
+	if got := people[0]; len(got) != 2 || got[0] != 60 || got[1] != 150 {
+		t.Fatalf("Bob ownership = %v, want [60 150]", got)
+	}
+	if got := people[1]; len(got) != 2 || got[0] != 6 || got[1] != 15 {
+		t.Fatalf("Alice ownership = %v, want [6 15]", got)
 	}
 }
 

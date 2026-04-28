@@ -6,7 +6,7 @@
     "matrix": {
       "rows": 764,
       "cols": 764,
-      "total": 4032931
+      "total": 50281
     }
   },
   "firstRecord": "diff.go:BlobToString"
