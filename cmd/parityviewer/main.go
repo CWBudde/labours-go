@@ -23,6 +23,8 @@ import (
 
 const rerenderAllButtonPlaceholder = "__RERENDER_ALL_BUTTON__"
 
+var parityDisplayBackground = color.RGBA{R: 255, G: 255, B: 255, A: 255}
+
 type caseEntry struct {
 	Suite       string
 	Baseline    string
@@ -273,6 +275,11 @@ func laboursReferenceRecipes() []referenceRecipe {
 			Input:     filepath.Join("example_data", "hercules_burndown.yaml"),
 			Mode:      "burndown-project",
 			ExtraArgs: []string{"--relative"},
+		},
+		{
+			Name:  "burndown_project",
+			Input: filepath.Join("test", "testdata", "hercules", "report_default.pb"),
+			Mode:  "burndown-project",
 		},
 		{
 			Name:  "devs",
@@ -684,7 +691,7 @@ func buildArtifactOnlyEntry(suite, baseline, name, artifactPath string) (caseEnt
 	}
 	rawDiff := rawDiffImage(act, act)
 	ampDiff := amplifiedDiffImage(act, act)
-	actB64, err := pngToBase64(compositeOverSolid(act, color.RGBA{R: 255, G: 255, B: 255, A: 255}))
+	actB64, err := pngToBase64(compositeOverSolid(act, parityDisplayBackground))
 	if err != nil {
 		return caseEntry{}, err
 	}
@@ -802,15 +809,17 @@ func buildEntry(suite, baseline, name, baselinePath, artifactPath string) (caseE
 		return caseEntry{}, fmt.Errorf("read artifact: %w", err)
 	}
 
-	rawDiff := rawDiffImage(ref, act)
-	ampDiff := amplifiedDiffImage(ref, act)
-	stats := compareImages(ref, act)
+	refVisible := compositeOverSolid(ref, parityDisplayBackground)
+	actVisible := compositeOverSolid(act, parityDisplayBackground)
+	rawDiff := rawDiffImage(refVisible, actVisible)
+	ampDiff := amplifiedDiffImage(refVisible, actVisible)
+	stats := compareImages(refVisible, actVisible)
 
-	refB64, err := pngToBase64(compositeOverSolid(ref, color.RGBA{R: 255, G: 255, B: 255, A: 255}))
+	refB64, err := pngToBase64(refVisible)
 	if err != nil {
 		return caseEntry{}, err
 	}
-	actB64, err := pngToBase64(compositeOverSolid(act, color.RGBA{R: 255, G: 255, B: 255, A: 255}))
+	actB64, err := pngToBase64(actVisible)
 	if err != nil {
 		return caseEntry{}, err
 	}

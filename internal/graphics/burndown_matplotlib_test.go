@@ -100,8 +100,8 @@ func TestPlotBurndownMatplotlibUsesBackends(t *testing.T) {
 	if err != nil {
 		t.Fatalf("decode png: %v", err)
 	}
-	if _, _, _, alpha := img.At(0, 0).RGBA(); alpha != 0xffff {
-		t.Fatalf("corner alpha = %d, want opaque", alpha)
+	if _, _, _, alpha := img.At(0, 0).RGBA(); alpha != 0 {
+		t.Fatalf("corner alpha = %d, want transparent", alpha)
 	}
 
 	svgPath := filepath.Join(dir, "burndown.svg")
@@ -145,5 +145,17 @@ func TestBurndownYAxisTicksUseScientificScale(t *testing.T) {
 	}
 	if got, want := labels[len(labels)-1], "7"; got != want {
 		t.Fatalf("last label = %q, want %q", got, want)
+	}
+}
+
+func TestBurndownDateTicksUseEndpointDatesForShortYearlySpan(t *testing.T) {
+	dates := []time.Time{
+		time.Date(2017, 1, 1, 0, 0, 0, 0, time.UTC),
+		time.Date(2018, 1, 1, 0, 0, 0, 0, time.UTC),
+	}
+	_, labels := burndownDateTicks(dates, "year")
+	want := []string{"2017-01-01", "2018-01-01"}
+	if strings.Join(labels, ",") != strings.Join(want, ",") {
+		t.Fatalf("labels = %v, want %v", labels, want)
 	}
 }

@@ -349,18 +349,22 @@ func plotOwnershipBurndown(names []string, people [][]float64, dateRange []time.
 		fontSize = 12
 	}
 	background, foreground := ownershipPlotColors(viper.GetString("background"))
+	transparentBackground := background
+	transparentBackground.A = 0
+	legendBackground := background
+	legendBackground.A = 0.8
 	fig := core.NewFigure(
 		width,
 		height,
 		style.WithTheme(style.ThemeGGPlot),
 		style.WithFont("DejaVu Sans", float64(fontSize)),
-		style.WithBackground(background.R, background.G, background.B, background.A),
-		style.WithAxesBackground(background),
+		style.WithBackground(background.R, background.G, background.B, 0),
+		style.WithAxesBackground(transparentBackground),
 		style.WithAxesEdgeColor(foreground),
 		style.WithTextColor(foreground.R, foreground.G, foreground.B, foreground.A),
 		style.WithLegendColors(
-			render.Color{R: background.R, G: background.G, B: background.B, A: 1},
-			background,
+			legendBackground,
+			legendBackground,
 			foreground,
 		),
 	)
@@ -393,19 +397,13 @@ func plotOwnershipBurndown(names []string, people [][]float64, dateRange []time.
 		ax.SetYLim(0, math.Max(maxOwnershipStackY(matrix)*1.05, 1))
 	}
 	configureOwnershipTimeAxis(ax, dateRange)
-	xGrid := ax.AddXGrid()
-	yGrid := ax.AddYGrid()
-	xGrid.Color = fig.RC.GridColor
-	xGrid.LineWidth = fig.RC.GridLineWidth
-	yGrid.Color = fig.RC.GridColor
-	yGrid.LineWidth = fig.RC.GridLineWidth
 	legend := ax.AddLegend()
 	legend.Location = core.LegendUpperLeft
 	if viper.GetBool("relative") {
 		legend.Location = core.LegendLowerLeft
 	}
 
-	return saveOwnershipMatplotlibFigure(fig, output, width, height, background)
+	return saveOwnershipMatplotlibFigure(fig, output, width, height, transparentBackground)
 }
 
 func ownershipSamplingDuration(sampling int, tickSize float64) time.Duration {

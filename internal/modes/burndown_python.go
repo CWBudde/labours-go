@@ -58,7 +58,7 @@ func GenerateBurndownProjectPython(reader readers.Reader, output string, relativ
 		resample = "year" // Default to yearly like Python
 	}
 
-	processedData, err := burndown.LoadBurndown(header, name, matrix, resample, true, true)
+	processedData, err := burndown.LoadBurndown(header, "project", matrix, resample, true, true)
 	if err != nil {
 		progEstimator.FinishMultiOperation()
 		return fmt.Errorf("failed to process burndown data: %v", err)

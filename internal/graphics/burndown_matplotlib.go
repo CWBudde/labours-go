@@ -89,18 +89,22 @@ func PlotBurndownMatplotlib(data *burndown.ProcessedBurndown, output string, rel
 		fontSize = 12
 	}
 	background, foreground := laboursPlotColors(viper.GetString("background"))
+	transparentBackground := background
+	transparentBackground.A = 0
+	legendBackground := background
+	legendBackground.A = 0.8
 	fig := core.NewFigure(
 		width,
 		height,
 		style.WithTheme(style.ThemeGGPlot),
 		style.WithFont("DejaVu Sans", float64(fontSize)),
-		style.WithBackground(background.R, background.G, background.B, background.A),
-		style.WithAxesBackground(background),
+		style.WithBackground(background.R, background.G, background.B, 0),
+		style.WithAxesBackground(transparentBackground),
 		style.WithAxesEdgeColor(foreground),
 		style.WithTextColor(foreground.R, foreground.G, foreground.B, foreground.A),
 		style.WithLegendColors(
-			render.Color{R: background.R, G: background.G, B: background.B, A: 1},
-			background,
+			legendBackground,
+			legendBackground,
 			foreground,
 		),
 	)
@@ -141,7 +145,7 @@ func PlotBurndownMatplotlib(data *burndown.ProcessedBurndown, output string, rel
 		legend.Location = core.LegendLowerLeft
 	}
 
-	return saveMatplotlibFigureWithoutTightLayout(fig, output, width, height, background)
+	return saveMatplotlibFigureWithoutTightLayout(fig, output, width, height, transparentBackground)
 }
 
 func pythonBurndownAxesPadding(matrix [][]float64, relative bool) (left, right, bottom, top float64) {
@@ -370,7 +374,7 @@ func buildYearlyTicks(start, end time.Time) ([]float64, []string) {
 	if len(ticks) == 0 {
 		ticks = append(ticks, start)
 	}
-	if len(ticks) == 1 {
+	if len(ticks) <= 2 {
 		return formatDateTicks(ticks, "2006-01-02")
 	}
 	return formatDateTicks(ticks, "2006")

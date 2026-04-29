@@ -2,10 +2,15 @@ package modes
 
 import (
 	"fmt"
+	"image/png"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"matplotlib-go/core"
+	"matplotlib-go/render"
+	"matplotlib-go/style"
 )
 
 func TestGenerateOwnershipPlot(t *testing.T) {
@@ -76,6 +81,34 @@ func TestGenerateOwnershipPlotSingleFile(t *testing.T) {
 
 	if _, err := os.Stat(outputPath); os.IsNotExist(err) {
 		t.Errorf("Output file was not created: %s", outputPath)
+	}
+}
+
+func TestSaveOwnershipMatplotlibFigurePreservesTransparency(t *testing.T) {
+	outputPath := filepath.Join(t.TempDir(), "ownership.png")
+	background := render.Color{R: 1, G: 1, B: 1, A: 0}
+	fig := core.NewFigure(
+		100,
+		100,
+		style.WithBackground(1, 1, 1, 0),
+		style.WithAxesBackground(background),
+	)
+
+	if err := saveOwnershipMatplotlibFigure(fig, outputPath, 100, 100, background); err != nil {
+		t.Fatalf("save ownership figure: %v", err)
+	}
+
+	file, err := os.Open(outputPath)
+	if err != nil {
+		t.Fatalf("open ownership png: %v", err)
+	}
+	defer file.Close()
+	img, err := png.Decode(file)
+	if err != nil {
+		t.Fatalf("decode ownership png: %v", err)
+	}
+	if _, _, _, alpha := img.At(0, 0).RGBA(); alpha != 0 {
+		t.Fatalf("corner alpha = %d, want transparent", alpha)
 	}
 }
 
