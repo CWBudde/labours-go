@@ -962,7 +962,7 @@ func reportPlotPixels(defaultOutput string) (int, int) {
 }
 
 func newReportFigure(width, height int) *core.Figure {
-	background := render.Color{R: 1, G: 1, B: 1, A: 1}
+	background := render.Color{R: 1, G: 1, B: 1, A: 0}
 	text := render.Color{R: 0, G: 0, B: 0, A: 1}
 	return core.NewFigure(
 		width,
@@ -970,7 +970,7 @@ func newReportFigure(width, height int) *core.Figure {
 		style.WithTheme(style.ThemeGGPlot),
 		style.WithFont("DejaVu Sans", 12),
 		style.WithTextColor(0, 0, 0, 1),
-		style.WithBackground(1, 1, 1, 1),
+		style.WithBackground(1, 1, 1, 0),
 		style.WithAxesBackground(background),
 		style.WithAxesEdgeColor(text),
 		style.WithLegendColors(render.Color{R: 1, G: 1, B: 1, A: 0.8}, background, text),
@@ -978,7 +978,7 @@ func newReportFigure(width, height int) *core.Figure {
 }
 
 func newKnowledgeSilosFigure(width, height int) *core.Figure {
-	background := render.Color{R: 1, G: 1, B: 1, A: 1}
+	background := render.Color{R: 1, G: 1, B: 1, A: 0}
 	text := render.Color{R: 0, G: 0, B: 0, A: 1}
 	return core.NewFigure(
 		width,
@@ -986,7 +986,7 @@ func newKnowledgeSilosFigure(width, height int) *core.Figure {
 		style.WithTheme(style.ThemeGGPlot),
 		style.WithFont("DejaVu Sans", 12),
 		style.WithTextColor(0, 0, 0, 1),
-		style.WithBackground(1, 1, 1, 1),
+		style.WithBackground(1, 1, 1, 0),
 		style.WithAxesBackground(background),
 		style.WithAxesEdgeColor(text),
 		style.WithLegendColors(render.Color{R: 1, G: 1, B: 1, A: 0.8}, background, text),
@@ -1010,7 +1010,7 @@ func saveReportFigureDirect(fig *core.Figure, output string, width, height int) 
 	config := backends.Config{
 		Width:      width,
 		Height:     height,
-		Background: render.Color{R: 1, G: 1, B: 1, A: 1},
+		Background: render.Color{R: 1, G: 1, B: 1, A: 0},
 		DPI:        100,
 	}
 	switch strings.ToLower(filepath.Ext(output)) {

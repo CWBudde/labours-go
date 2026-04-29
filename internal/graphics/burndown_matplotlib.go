@@ -419,7 +419,7 @@ func saveMatplotlibFigureWithLayout(fig *core.Figure, output string, width, heig
 	if len(backgrounds) > 0 {
 		background = backgrounds[0]
 	}
-	config := backends.Config{Width: width, Height: height, Background: background, DPI: 100}
+	config := backends.Config{Width: width, Height: height, Background: background, DPI: 100, Transparent: background.A == 0}
 	switch strings.ToLower(filepath.Ext(output)) {
 	case ".svg":
 		renderer, _, err := backends.NewRenderer("svg", config, nil)
