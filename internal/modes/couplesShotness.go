@@ -10,6 +10,7 @@ import (
 	"gonum.org/v1/plot"
 	"gonum.org/v1/plot/plotter"
 	"gonum.org/v1/plot/vg"
+	"gonum.org/v1/plot/vg/draw"
 	"labours-go/internal/graphics"
 	"labours-go/internal/progress"
 	"labours-go/internal/readers"
@@ -249,6 +250,7 @@ func plotTopShotnessCouplingPairs(analysis ShotnessCouplingAnalysis, output stri
 	}
 
 	bars.Color = color.RGBA{R: 76, G: 120, B: 168, A: 255}
+	bars.LineStyle = draw.LineStyle{Color: color.RGBA{}, Width: 0}
 	p.Add(bars)
 
 	labels := make([]string, maxPairs)

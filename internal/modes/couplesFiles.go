@@ -255,6 +255,7 @@ func plotTopCouplingPairs(analysis FileCouplingAnalysis, output string) error {
 	}
 
 	bars.Color = color.RGBA{R: 76, G: 120, B: 168, A: 255}
+	bars.LineStyle = draw.LineStyle{Color: color.RGBA{}, Width: 0}
 	p.Add(bars)
 
 	labels := make([]string, maxPairs)
@@ -409,16 +410,30 @@ func couplingScoreTicks(maxValue, step float64, decimals int) []plot.Tick {
 type plotAxesRectangle struct{}
 
 func (plotAxesRectangle) Plot(c draw.Canvas, _ *plot.Plot) {
-	style := draw.LineStyle{
-		Color: color.Black,
-		Width: vg.Points(0.8),
-	}
-	c.StrokeLines(style, []vg.Point{
-		{X: c.Min.X, Y: c.Min.Y},
-		{X: c.Max.X, Y: c.Min.Y},
+	spineWidth := vg.Points(0.75)
+	c.FillPolygon(color.Black, []vg.Point{
+		{X: c.Max.X, Y: c.Min.Y + spineWidth},
+		{X: c.Min.X, Y: c.Min.Y + spineWidth},
+		{X: c.Min.X, Y: c.Min.Y + 2*spineWidth},
+		{X: c.Max.X, Y: c.Min.Y + 2*spineWidth},
+	})
+	c.FillPolygon(color.Black, []vg.Point{
+		{X: c.Min.X, Y: c.Max.Y - spineWidth},
+		{X: c.Max.X, Y: c.Max.Y - spineWidth},
 		{X: c.Max.X, Y: c.Max.Y},
 		{X: c.Min.X, Y: c.Max.Y},
+	})
+	c.FillPolygon(color.Black, []vg.Point{
 		{X: c.Min.X, Y: c.Min.Y},
+		{X: c.Min.X + spineWidth, Y: c.Min.Y},
+		{X: c.Min.X + spineWidth, Y: c.Max.Y},
+		{X: c.Min.X, Y: c.Max.Y},
+	})
+	c.FillPolygon(color.Black, []vg.Point{
+		{X: c.Max.X - spineWidth, Y: c.Min.Y},
+		{X: c.Max.X, Y: c.Min.Y},
+		{X: c.Max.X, Y: c.Max.Y},
+		{X: c.Max.X - spineWidth, Y: c.Max.Y},
 	})
 }
 
