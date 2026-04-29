@@ -417,10 +417,11 @@ func plotBusFactorSubsystemsMatplotlib(repoName string, labels []string, values 
 	}
 	width, height := reportPlotPixels("bus-factor-subsystems.png")
 	fig := newReportFigure(width, height)
-	ax := fig.AddSubplot(1, 1, 1)
-	if ax == nil {
+	grid := fig.Subplots(1, 1, core.WithSubplotPadding(0.24, 0.945, 0.105, 0.93))
+	if len(grid) == 0 || len(grid[0]) == 0 || grid[0][0] == nil {
 		return fmt.Errorf("failed to create bus factor subsystem axes")
 	}
+	ax := grid[0][0]
 	if repoName != "" {
 		ax.SetTitle(fmt.Sprintf("%s - Bus Factor Subsystems", repoName))
 	} else {
@@ -961,7 +962,7 @@ func reportPlotPixels(defaultOutput string) (int, int) {
 }
 
 func newReportFigure(width, height int) *core.Figure {
-	background := render.Color{R: 1, G: 1, B: 1, A: 0}
+	background := render.Color{R: 1, G: 1, B: 1, A: 1}
 	text := render.Color{R: 0, G: 0, B: 0, A: 1}
 	return core.NewFigure(
 		width,
@@ -969,7 +970,7 @@ func newReportFigure(width, height int) *core.Figure {
 		style.WithTheme(style.ThemeGGPlot),
 		style.WithFont("DejaVu Sans", 12),
 		style.WithTextColor(0, 0, 0, 1),
-		style.WithBackground(1, 1, 1, 0),
+		style.WithBackground(1, 1, 1, 1),
 		style.WithAxesBackground(background),
 		style.WithAxesEdgeColor(text),
 		style.WithLegendColors(render.Color{R: 1, G: 1, B: 1, A: 0.8}, background, text),
@@ -977,7 +978,7 @@ func newReportFigure(width, height int) *core.Figure {
 }
 
 func newKnowledgeSilosFigure(width, height int) *core.Figure {
-	background := render.Color{R: 1, G: 1, B: 1, A: 0}
+	background := render.Color{R: 1, G: 1, B: 1, A: 1}
 	text := render.Color{R: 0, G: 0, B: 0, A: 1}
 	return core.NewFigure(
 		width,
@@ -985,7 +986,7 @@ func newKnowledgeSilosFigure(width, height int) *core.Figure {
 		style.WithTheme(style.ThemeGGPlot),
 		style.WithFont("DejaVu Sans", 12),
 		style.WithTextColor(0, 0, 0, 1),
-		style.WithBackground(1, 1, 1, 0),
+		style.WithBackground(1, 1, 1, 1),
 		style.WithAxesBackground(background),
 		style.WithAxesEdgeColor(text),
 		style.WithLegendColors(render.Color{R: 1, G: 1, B: 1, A: 0.8}, background, text),
@@ -1009,7 +1010,7 @@ func saveReportFigureDirect(fig *core.Figure, output string, width, height int) 
 	config := backends.Config{
 		Width:      width,
 		Height:     height,
-		Background: render.Color{R: 1, G: 1, B: 1, A: 0},
+		Background: render.Color{R: 1, G: 1, B: 1, A: 1},
 		DPI:        100,
 	}
 	switch strings.ToLower(filepath.Ext(output)) {
@@ -1118,7 +1119,7 @@ func topStringIntPairs(values map[string]int, limit int, descending bool) ([]str
 	labels := make([]string, len(pairs))
 	resultValues := make([]int, len(pairs))
 	for i, pair := range pairs {
-		labels[i] = compactPathLabel(pair.Key)
+		labels[i] = pair.Key
 		resultValues[i] = pair.Value
 	}
 	return labels, resultValues

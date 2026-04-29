@@ -352,7 +352,6 @@ func plotOwnershipBurndown(names []string, people [][]float64, dateRange []time.
 	transparentBackground := background
 	transparentBackground.A = 0
 	legendBackground := background
-	legendBackground.A = 0.8
 	fig := core.NewFigure(
 		width,
 		height,

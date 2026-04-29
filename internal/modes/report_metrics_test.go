@@ -188,6 +188,28 @@ func TestDirectoryChartModesCreatePNGAndSVGAssets(t *testing.T) {
 	}
 }
 
+func TestTopStringIntPairsPreservesPathLabels(t *testing.T) {
+	labels, values := topStringIntPairs(map[string]int{
+		"/":                               1,
+		"cmd/hercules":                    1,
+		"vendor/github.com/jeffail/tunny": 2,
+	}, 0, false)
+
+	expectedLabels := []string{"/", "cmd/hercules", "vendor/github.com/jeffail/tunny"}
+	expectedValues := []int{1, 1, 2}
+	if len(labels) != len(expectedLabels) {
+		t.Fatalf("got %d labels, want %d: %v", len(labels), len(expectedLabels), labels)
+	}
+	for i := range expectedLabels {
+		if labels[i] != expectedLabels[i] {
+			t.Fatalf("label %d = %q, want %q", i, labels[i], expectedLabels[i])
+		}
+		if values[i] != expectedValues[i] {
+			t.Fatalf("value %d = %d, want %d", i, values[i], expectedValues[i])
+		}
+	}
+}
+
 func assertNonEmptyFile(t *testing.T, path string) {
 	t.Helper()
 
