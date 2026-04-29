@@ -92,9 +92,10 @@ func PlotBurndownMatplotlib(data *burndown.ProcessedBurndown, output string, rel
 	fig := core.NewFigure(
 		width,
 		height,
+		style.WithTheme(style.ThemeGGPlot),
 		style.WithFont("DejaVu Sans", float64(fontSize)),
-		style.WithBackground(background.R, background.G, background.B, 0),
-		style.WithAxesBackground(render.Color{R: background.R, G: background.G, B: background.B, A: 0}),
+		style.WithBackground(background.R, background.G, background.B, background.A),
+		style.WithAxesBackground(background),
 		style.WithAxesEdgeColor(foreground),
 		style.WithTextColor(foreground.R, foreground.G, foreground.B, foreground.A),
 		style.WithLegendColors(
@@ -193,26 +194,69 @@ func configureMatplotlibBurndownYAxis(fig *core.Figure, ax *core.Axes, matrix []
 	}
 	ax.SetYLim(0, maxY*1.05)
 
-	if maxY >= 1000 && maxY < 1000000 {
-		top := math.Ceil(maxY / 1000)
-		if top < 1 {
-			top = 1
-		}
-		ticks := make([]float64, 0, int(top)+1)
-		labels := make([]string, 0, int(top)+1)
-		for i := 0; i <= int(top); i++ {
-			ticks = append(ticks, float64(i)*1000)
-			labels = append(labels, fmt.Sprintf("%d", i))
-		}
-		ax.YAxis.Locator = core.FixedLocator{TicksList: ticks}
-		ax.YAxis.Formatter = core.FixedFormatter{Labels: labels}
-		clipOff := false
-		fig.Text(0.036, 0.985, "1e3", core.TextOptions{
-			FontSize: fontSize,
-			Color:    foreground,
-			ClipOn:   &clipOff,
-		})
+	ticks, labels, offset := burndownYAxisTicks(maxY)
+	if len(ticks) == 0 {
+		return
 	}
+	ax.YAxis.Locator = core.FixedLocator{TicksList: ticks}
+	ax.YAxis.Formatter = core.FixedFormatter{Labels: labels}
+	clipOff := false
+	fig.Text(0.036, 0.985, offset, core.TextOptions{
+		FontSize: fontSize,
+		Color:    foreground,
+		ClipOn:   &clipOff,
+	})
+}
+
+func burndownYAxisTicks(maxY float64) ([]float64, []string, string) {
+	if maxY < 1000 {
+		return nil, nil, ""
+	}
+
+	exponent := int(math.Floor(math.Log10(maxY)))
+	scale := math.Pow10(exponent)
+	scaledTop := maxY * 1.05 / scale
+	step := niceBurndownTickStep(scaledTop)
+	if step <= 0 {
+		return nil, nil, ""
+	}
+	count := int(math.Floor(scaledTop/step + 1e-9))
+	if count < 1 {
+		count = 1
+	}
+
+	ticks := make([]float64, 0, count+1)
+	labels := make([]string, 0, count+1)
+	for i := 0; i <= count; i++ {
+		scaled := float64(i) * step
+		ticks = append(ticks, scaled*scale)
+		labels = append(labels, formatBurndownScaledTick(scaled))
+	}
+	return ticks, labels, fmt.Sprintf("1e%d", exponent)
+}
+
+func niceBurndownTickStep(scaledTop float64) float64 {
+	if scaledTop <= 0 {
+		return 0
+	}
+	raw := scaledTop / 8
+	base := math.Pow10(int(math.Floor(math.Log10(raw))))
+	for _, multiplier := range []float64{1, 2, 2.5, 5, 10} {
+		step := multiplier * base
+		if raw <= step {
+			return step
+		}
+	}
+	return 10 * base
+}
+
+func formatBurndownScaledTick(value float64) string {
+	if math.Abs(value-math.Round(value)) < 1e-9 {
+		return fmt.Sprintf("%.0f", math.Round(value))
+	}
+	label := fmt.Sprintf("%.3f", value)
+	label = strings.TrimRight(label, "0")
+	return strings.TrimRight(label, ".")
 }
 
 func maxStackY(matrix [][]float64) float64 {
@@ -367,13 +411,11 @@ func saveMatplotlibFigureWithLayout(fig *core.Figure, output string, width, heig
 	if tight {
 		fig.TightLayout()
 	}
-	background := render.Color{R: 1, G: 1, B: 1, A: 1}
+	background := render.Color{R: 1, G: 1, B: 1, A: 0}
 	if len(backgrounds) > 0 {
 		background = backgrounds[0]
 	}
-	transparentBackground := background
-	transparentBackground.A = 0
-	config := backends.Config{Width: width, Height: height, Background: transparentBackground, DPI: 100}
+	config := backends.Config{Width: width, Height: height, Background: background, DPI: 100}
 	switch strings.ToLower(filepath.Ext(output)) {
 	case ".svg":
 		renderer, _, err := backends.NewRenderer("svg", config, nil)
@@ -389,7 +431,10 @@ func saveMatplotlibFigureWithLayout(fig *core.Figure, output string, width, heig
 		if err := core.SavePNG(fig, renderer, output); err != nil {
 			return err
 		}
-		return setTransparentPNGRGB(output, background)
+		if background.A == 0 {
+			return setTransparentPNGRGB(output, background)
+		}
+		return nil
 	}
 }
 

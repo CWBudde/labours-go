@@ -778,39 +778,24 @@ func (r *ProtobufReader) GetBurndownParameters() (burndown.BurndownParameters, e
 		return burndown.BurndownParameters{}, fmt.Errorf("no burndown data found")
 	}
 
-	// Calculate appropriate tick size based on time span and matrix dimensions
-	tickSize := float64(burndownData.TickSize) / 1e9 // Convert nanoseconds to seconds
-
-	if r.data.Header != nil {
-		// Calculate tick size from actual time span and expected data points
-		timeSpan := float64(r.data.Header.EndUnixTime - r.data.Header.BeginUnixTime)
-
-		// Get matrix dimensions to calculate appropriate tick size
-		if burndownData.Project != nil {
-			matrixCols := burndownData.Project.NumberOfColumns
-			if matrixCols > 1 && timeSpan > 0 {
-				// Calculate tick size as time span divided by number of time points
-				calculatedTick := timeSpan / float64(matrixCols-1)
-
-				// Use calculated tick size if it's reasonable, otherwise use original or fallback
-				if calculatedTick > 0 && calculatedTick < timeSpan {
-					tickSize = calculatedTick
-				}
-			}
-		}
+	sampling := int(burndownData.Sampling)
+	if sampling <= 0 {
+		sampling = 1
+	}
+	granularity := int(burndownData.Granularity)
+	if granularity <= 0 {
+		granularity = 1
 	}
 
-	// Fallback if we still don't have a reasonable tick size
-	if tickSize <= 0 || tickSize > 365*24*3600 { // More than a year per tick seems wrong
-		tickSize = 86400 // Default to 1 day in seconds
+	tickSize := float64(burndownData.TickSize) / 1e9 // Hercules stores time.Duration in nanoseconds.
+	if tickSize <= 0 {
+		tickSize = 86400
 	}
-
-	// Debug output removed - tick size calculation working correctly
 
 	return burndown.BurndownParameters{
-		Sampling:    1,        // Daily sampling (1 day)
-		Granularity: 1,        // 1 day granularity
-		TickSize:    tickSize, // Calculated or fallback tick size
+		Sampling:    sampling,
+		Granularity: granularity,
+		TickSize:    tickSize,
 	}, nil
 }
 

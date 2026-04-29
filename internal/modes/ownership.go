@@ -74,7 +74,7 @@ func OwnershipBurndown(reader readers.Reader, output string) error {
 	if sampling <= 0 {
 		sampling = 1
 	}
-	startTime := floorTimeBySeconds(time.Unix(startUnix, 0), tickSize).Add(time.Duration(float64(sampling)*tickSize) * time.Second)
+	startTime := floorTimeBySeconds(time.Unix(startUnix, 0), tickSize).Add(secondsDuration(float64(sampling) * tickSize))
 	lastTime := time.Unix(lastUnix, 0)
 	if lastUnix == 0 {
 		lastTime = startTime
@@ -82,10 +82,13 @@ func OwnershipBurndown(reader readers.Reader, output string) error {
 
 	// Phase 3: Process the data
 	progEstimator.NextOperation("Processing ownership data")
-	maxPeople := 20      // Maximum number of people to display
-	orderByTime := false // Sort developers by their first appearance
+	maxPeople := viper.GetInt("max-people")
+	if maxPeople <= 0 {
+		maxPeople = 20
+	}
+	orderByTime := viper.GetBool("order-ownership-by-time")
 	names, peopleMatrix, dateRange := processOwnershipBurndownWithProgress(
-		startTime, lastTime, sampling, peopleSequence, ownershipData, maxPeople, orderByTime, progEstimator)
+		startTime, lastTime, sampling, tickSize, peopleSequence, ownershipData, maxPeople, orderByTime, progEstimator)
 
 	// Phase 4: Generate output
 	progEstimator.NextOperation("Generating visualization")
@@ -110,7 +113,7 @@ func OwnershipBurndown(reader readers.Reader, output string) error {
 }
 
 func processOwnershipBurndown(
-	start, last time.Time, sampling int,
+	start, last time.Time, sampling int, tickSize float64,
 	sequence []string, data map[string][][]int,
 	maxPeople int, orderByTime bool,
 ) ([]string, [][]float64, []time.Time) {
@@ -129,11 +132,16 @@ func processOwnershipBurndown(
 		}
 		people[i] = total
 	}
+	pointCount := ownershipPointCount(people)
+	if pointCount == 0 {
+		return sequence, people, nil
+	}
 
 	// Create a date range based on sampling
-	dateRange := make([]time.Time, len(people[0]))
+	dateRange := make([]time.Time, pointCount)
+	step := ownershipSamplingDuration(sampling, tickSize)
 	for i := 0; i < len(dateRange); i++ {
-		dateRange[i] = start.Add(time.Duration(i*sampling) * time.Hour * 24)
+		dateRange[i] = start.Add(time.Duration(i) * step)
 	}
 
 	// Truncate to maxPeople
@@ -197,7 +205,7 @@ func processOwnershipBurndown(
 
 // processOwnershipBurndownWithProgress processes ownership data with progress tracking
 func processOwnershipBurndownWithProgress(
-	start, last time.Time, sampling int,
+	start, last time.Time, sampling int, tickSize float64,
 	sequence []string, data map[string][][]int,
 	maxPeople int, orderByTime bool,
 	progEstimator *progress.ProgressEstimator,
@@ -222,12 +230,18 @@ func processOwnershipBurndownWithProgress(
 		}
 		people[i] = total
 	}
+	pointCount := ownershipPointCount(people)
+	if pointCount == 0 {
+		progEstimator.FinishOperation()
+		return sequence, people, nil
+	}
 
 	// Create a date range based on sampling
 	progEstimator.UpdateProgress(1)
-	dateRange := make([]time.Time, len(people[0]))
+	dateRange := make([]time.Time, pointCount)
+	step := ownershipSamplingDuration(sampling, tickSize)
 	for i := 0; i < len(dateRange); i++ {
-		dateRange[i] = start.Add(time.Duration(i*sampling) * time.Hour * 24)
+		dateRange[i] = start.Add(time.Duration(i) * step)
 	}
 
 	// Truncate to maxPeople
@@ -318,11 +332,15 @@ func plotOwnershipBurndown(names []string, people [][]float64, dateRange []time.
 		if i < len(names) {
 			label = names[i]
 		}
+		label = truncateOwnershipLabel(label)
 		matrix = append(matrix, values)
 		labels = append(labels, label)
 	}
 	if len(matrix) == 0 {
 		return fmt.Errorf("no ownership burndown data to plot")
+	}
+	if viper.GetBool("relative") {
+		normalizeOwnershipColumns(matrix)
 	}
 
 	width, height := ownershipPlotPixelSize(16, 12)
@@ -334,9 +352,10 @@ func plotOwnershipBurndown(names []string, people [][]float64, dateRange []time.
 	fig := core.NewFigure(
 		width,
 		height,
+		style.WithTheme(style.ThemeGGPlot),
 		style.WithFont("DejaVu Sans", float64(fontSize)),
-		style.WithBackground(background.R, background.G, background.B, 0),
-		style.WithAxesBackground(render.Color{R: background.R, G: background.G, B: background.B, A: 0}),
+		style.WithBackground(background.R, background.G, background.B, background.A),
+		style.WithAxesBackground(background),
 		style.WithAxesEdgeColor(foreground),
 		style.WithTextColor(foreground.R, foreground.G, foreground.B, foreground.A),
 		style.WithLegendColors(
@@ -374,8 +393,12 @@ func plotOwnershipBurndown(names []string, people [][]float64, dateRange []time.
 		ax.SetYLim(0, math.Max(maxOwnershipStackY(matrix)*1.05, 1))
 	}
 	configureOwnershipTimeAxis(ax, dateRange)
-	ax.AddXGrid()
-	ax.AddYGrid()
+	xGrid := ax.AddXGrid()
+	yGrid := ax.AddYGrid()
+	xGrid.Color = fig.RC.GridColor
+	xGrid.LineWidth = fig.RC.GridLineWidth
+	yGrid.Color = fig.RC.GridColor
+	yGrid.LineWidth = fig.RC.GridLineWidth
 	legend := ax.AddLegend()
 	legend.Location = core.LegendUpperLeft
 	if viper.GetBool("relative") {
@@ -383,6 +406,60 @@ func plotOwnershipBurndown(names []string, people [][]float64, dateRange []time.
 	}
 
 	return saveOwnershipMatplotlibFigure(fig, output, width, height, background)
+}
+
+func ownershipSamplingDuration(sampling int, tickSize float64) time.Duration {
+	if sampling <= 0 {
+		sampling = 1
+	}
+	if tickSize <= 0 {
+		tickSize = 86400
+	}
+	return secondsDuration(float64(sampling) * tickSize)
+}
+
+func secondsDuration(seconds float64) time.Duration {
+	return time.Duration(seconds * float64(time.Second))
+}
+
+func ownershipPointCount(people [][]float64) int {
+	for _, row := range people {
+		if len(row) > 0 {
+			return len(row)
+		}
+	}
+	return 0
+}
+
+func truncateOwnershipLabel(label string) string {
+	const maxLabelLength = 40
+	if len(label) <= maxLabelLength {
+		return label
+	}
+	return label[:maxLabelLength-3] + "..."
+}
+
+func normalizeOwnershipColumns(matrix [][]float64) {
+	if len(matrix) == 0 {
+		return
+	}
+	points := len(matrix[0])
+	for col := 0; col < points; col++ {
+		total := 0.0
+		for _, row := range matrix {
+			if col < len(row) {
+				total += row[col]
+			}
+		}
+		if total == 0 {
+			continue
+		}
+		for _, row := range matrix {
+			if col < len(row) {
+				row[col] /= total
+			}
+		}
+	}
 }
 
 func floorTimeBySeconds(t time.Time, seconds float64) time.Time {
@@ -498,9 +575,7 @@ func saveOwnershipMatplotlibFigure(fig *core.Figure, output string, width, heigh
 	}
 
 	fig.TightLayout()
-	transparentBackground := background
-	transparentBackground.A = 0
-	config := backends.Config{Width: width, Height: height, Background: transparentBackground, DPI: 100}
+	config := backends.Config{Width: width, Height: height, Background: background, DPI: 100}
 	switch strings.ToLower(filepath.Ext(output)) {
 	case ".svg":
 		renderer, _, err := backends.NewRenderer("svg", config, nil)

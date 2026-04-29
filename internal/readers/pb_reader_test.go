@@ -115,7 +115,7 @@ func TestProtobufReader_GetProjectBurndown(t *testing.T) {
 	if matrix[0][0] != 100 {
 		t.Errorf("Expected first value to be 100, got %d", matrix[0][0])
 	}
-	
+
 	// Check that transposition worked correctly
 	if matrix[0][1] != 120 {
 		t.Errorf("Expected matrix[0][1] to be 120 (from original row 1, col 0), got %d", matrix[0][1])
@@ -173,6 +173,56 @@ func TestProtobufReader_GetHeader(t *testing.T) {
 
 	if startTime >= endTime {
 		t.Error("Expected start time to be before end time")
+	}
+}
+
+func TestProtobufReaderGetBurndownParametersPreservesHerculesTiming(t *testing.T) {
+	burndownData := &pb.BurndownAnalysisResults{
+		Granularity: 15,
+		Sampling:    30,
+		TickSize:    int64(24 * 60 * 60 * 1_000_000_000),
+		Project: &pb.BurndownSparseMatrix{
+			Name:            "test-project",
+			NumberOfRows:    2,
+			NumberOfColumns: 3,
+			Rows: []*pb.BurndownSparseMatrixRow{
+				{Columns: []uint32{100, 90, 80}},
+				{Columns: []uint32{120, 100, 85}},
+			},
+		},
+	}
+	burndownBytes, err := proto.Marshal(burndownData)
+	if err != nil {
+		t.Fatalf("Failed to marshal burndown data: %v", err)
+	}
+	data, err := proto.Marshal(&pb.AnalysisResults{
+		Header: &pb.Metadata{
+			Repository:    "test-repo",
+			BeginUnixTime: 1640995200,
+			EndUnixTime:   1672531200,
+		},
+		Contents: map[string][]byte{"Burndown": burndownBytes},
+	})
+	if err != nil {
+		t.Fatalf("Failed to marshal analysis results: %v", err)
+	}
+	reader := &ProtobufReader{}
+	if err := reader.Read(bytes.NewReader(data)); err != nil {
+		t.Fatalf("Read() error = %v", err)
+	}
+
+	params, err := reader.GetBurndownParameters()
+	if err != nil {
+		t.Fatalf("GetBurndownParameters() error = %v", err)
+	}
+	if params.Sampling != 30 {
+		t.Fatalf("sampling = %d, want 30", params.Sampling)
+	}
+	if params.Granularity != 15 {
+		t.Fatalf("granularity = %d, want 15", params.Granularity)
+	}
+	if params.TickSize != 86400 {
+		t.Fatalf("tick size = %v, want 86400 seconds", params.TickSize)
 	}
 }
 

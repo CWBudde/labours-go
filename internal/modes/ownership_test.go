@@ -115,6 +115,7 @@ func TestProcessOwnershipBurndownSumsRowsAsTimePoints(t *testing.T) {
 		time.Unix(0, 0),
 		time.Unix(0, 0),
 		1,
+		86400,
 		[]string{"Alice", "Bob"},
 		map[string][][]int{
 			"Alice": {
@@ -141,6 +142,35 @@ func TestProcessOwnershipBurndownSumsRowsAsTimePoints(t *testing.T) {
 	}
 	if got := people[1]; len(got) != 2 || got[0] != 6 || got[1] != 15 {
 		t.Fatalf("Alice ownership = %v, want [6 15]", got)
+	}
+}
+
+func TestProcessOwnershipBurndownUsesSamplingTickSize(t *testing.T) {
+	_, _, dates := processOwnershipBurndown(
+		time.Unix(0, 0),
+		time.Unix(0, 0),
+		30,
+		86400,
+		[]string{"Alice"},
+		map[string][][]int{
+			"Alice": {
+				{1},
+				{2},
+				{3},
+			},
+		},
+		20,
+		false,
+	)
+
+	if len(dates) != 3 {
+		t.Fatalf("expected 3 time points, got %d", len(dates))
+	}
+	if got, want := dates[1].Sub(dates[0]), 30*24*time.Hour; got != want {
+		t.Fatalf("date spacing = %v, want %v", got, want)
+	}
+	if got, want := dates[2].Sub(dates[0]), 60*24*time.Hour; got != want {
+		t.Fatalf("date span = %v, want %v", got, want)
 	}
 }
 

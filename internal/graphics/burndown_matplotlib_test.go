@@ -59,11 +59,14 @@ func TestSavePNGWithBackgroundPreservesTransparency(t *testing.T) {
 func TestPlotBurndownMatplotlibUsesBackends(t *testing.T) {
 	oldQuiet := viper.GetBool("quiet")
 	oldSize := viper.GetString("size")
+	oldBackground := viper.GetString("background")
 	viper.Set("quiet", true)
 	viper.Set("size", "2,1.5")
+	viper.Set("background", "white")
 	defer func() {
 		viper.Set("quiet", oldQuiet)
 		viper.Set("size", oldSize)
+		viper.Set("background", oldBackground)
 	}()
 
 	data := &burndown.ProcessedBurndown{
@@ -93,8 +96,12 @@ func TestPlotBurndownMatplotlibUsesBackends(t *testing.T) {
 		t.Fatalf("open png: %v", err)
 	}
 	defer pngFile.Close()
-	if _, err := png.Decode(pngFile); err != nil {
+	img, err := png.Decode(pngFile)
+	if err != nil {
 		t.Fatalf("decode png: %v", err)
+	}
+	if _, _, _, alpha := img.At(0, 0).RGBA(); alpha != 0xffff {
+		t.Fatalf("corner alpha = %d, want opaque", alpha)
 	}
 
 	svgPath := filepath.Join(dir, "burndown.svg")
@@ -107,5 +114,36 @@ func TestPlotBurndownMatplotlibUsesBackends(t *testing.T) {
 	}
 	if !strings.Contains(string(svgBytes), "<svg") {
 		t.Fatalf("svg output does not contain <svg")
+	}
+}
+
+func TestBurndownYAxisTicksUseScientificScale(t *testing.T) {
+	ticks, labels, offset := burndownYAxisTicks(25800)
+	if offset != "1e4" {
+		t.Fatalf("offset = %q, want 1e4", offset)
+	}
+	wantTicks := []float64{0, 5000, 10000, 15000, 20000, 25000}
+	if len(ticks) != len(wantTicks) {
+		t.Fatalf("ticks = %v, want %v", ticks, wantTicks)
+	}
+	for i := range wantTicks {
+		if ticks[i] != wantTicks[i] {
+			t.Fatalf("ticks = %v, want %v", ticks, wantTicks)
+		}
+	}
+	wantLabels := []string{"0", "0.5", "1", "1.5", "2", "2.5"}
+	if strings.Join(labels, ",") != strings.Join(wantLabels, ",") {
+		t.Fatalf("labels = %v, want %v", labels, wantLabels)
+	}
+
+	ticks, labels, offset = burndownYAxisTicks(6800)
+	if offset != "1e3" {
+		t.Fatalf("offset = %q, want 1e3", offset)
+	}
+	if got, want := ticks[len(ticks)-1], 7000.0; got != want {
+		t.Fatalf("last tick = %v, want %v", got, want)
+	}
+	if got, want := labels[len(labels)-1], "7"; got != want {
+		t.Fatalf("last label = %q, want %q", got, want)
 	}
 }
