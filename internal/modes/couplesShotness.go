@@ -3,6 +3,7 @@ package modes
 import (
 	"fmt"
 	"image/color"
+	"path/filepath"
 	"strconv"
 
 	"github.com/spf13/viper"
@@ -227,9 +228,8 @@ func plotTopShotnessCouplingPairs(analysis ShotnessCouplingAnalysis, output stri
 	}
 
 	p := plot.New()
-	p.Title.Text = "Top Shotness Coupling Pairs"
 	p.X.Label.Text = "Coupling Pair Rank"
-	p.Y.Label.Text = "Shotness Coupling Score"
+	p.Y.Label.Text = "Coupling Score"
 
 	// Prepare data for bar chart
 	maxPairs := len(analysis.TopCoupling)
@@ -243,29 +243,20 @@ func plotTopShotnessCouplingPairs(analysis ShotnessCouplingAnalysis, output stri
 	}
 
 	// Create bar chart
-	bars, err := plotter.NewBarChart(values, vg.Points(25))
+	bars, err := plotter.NewBarChart(values, couplingBarWidth(maxPairs))
 	if err != nil {
 		return fmt.Errorf("error creating bar chart: %v", err)
 	}
 
-	bars.Color = graphics.ColorPalette[4]
+	bars.Color = color.RGBA{R: 76, G: 120, B: 168, A: 255}
 	p.Add(bars)
 
-	// Add x-axis labels with entity pair names (truncated)
 	labels := make([]string, maxPairs)
 	for i := 0; i < maxPairs; i++ {
 		pair := analysis.TopCoupling[i]
-		// Truncate entity names for readability
-		entity1 := pair.Entity1
-		entity2 := pair.Entity2
-		if len(entity1) > 8 {
-			entity1 = entity1[:8] + "..."
-		}
-		if len(entity2) > 8 {
-			entity2 = entity2[:8] + "..."
-		}
-		labels[i] = entity1 + "-" + entity2
+		labels[i] = compactCouplingPairLabel(filepath.Base(pair.Entity1)+"-"+filepath.Base(pair.Entity2), 28)
 	}
+	addTopCouplingPairLabels(p, labels, values, 10)
 
 	// Create custom tick marks
 	ticks := make([]plot.Tick, maxPairs)
@@ -276,6 +267,14 @@ func plotTopShotnessCouplingPairs(analysis ShotnessCouplingAnalysis, output stri
 		}
 	}
 	p.X.Tick.Marker = plot.ConstantTicks(ticks)
+	p.X.Min = -0.5
+	p.X.Max = float64(maxPairs) - 0.5
+	p.Y.Min = 0
+	p.Y.Max = maxCouplingValue(values) * 1.05
+	p.Y.Tick.Marker = plot.ConstantTicks(couplingScoreTicks(p.Y.Max, 2, 0))
+	addCouplingPairsTitle(p, "Top Shotness Coupling Pairs", float64(maxPairs-1)/2, p.Y.Max)
+	p.Add(plotTopPadding{Height: vg.Points(84)})
+	p.Add(plotAxesRectangle{})
 
 	pngFile, svgFile, err := savePlotPNGAndSVG(p, 16*vg.Inch, 8*vg.Inch, output, "top_shotness_coupling_pairs")
 	if err != nil {

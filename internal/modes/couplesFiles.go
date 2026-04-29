@@ -13,6 +13,7 @@ import (
 	"gonum.org/v1/plot/plotter"
 	"gonum.org/v1/plot/text"
 	"gonum.org/v1/plot/vg"
+	"gonum.org/v1/plot/vg/draw"
 	"labours-go/internal/graphics"
 	"labours-go/internal/progress"
 	"labours-go/internal/readers"
@@ -248,7 +249,7 @@ func plotTopCouplingPairs(analysis FileCouplingAnalysis, output string) error {
 	}
 
 	// Create bar chart
-	bars, err := plotter.NewBarChart(values, vg.Points(55))
+	bars, err := plotter.NewBarChart(values, couplingBarWidth(maxPairs))
 	if err != nil {
 		return fmt.Errorf("error creating bar chart: %v", err)
 	}
@@ -256,39 +257,12 @@ func plotTopCouplingPairs(analysis FileCouplingAnalysis, output string) error {
 	bars.Color = color.RGBA{R: 76, G: 120, B: 168, A: 255}
 	p.Add(bars)
 
-	labelCount := maxPairs
-	if labelCount > 10 {
-		labelCount = 10
-	}
-	labels := make([]string, labelCount)
-	labelPoints := make(plotter.XYs, labelCount)
-	for i := 0; i < labelCount; i++ {
+	labels := make([]string, maxPairs)
+	for i := 0; i < maxPairs; i++ {
 		pair := analysis.TopCoupling[i]
 		labels[i] = compactCouplingPairLabel(filepath.Base(pair.File1)+"-"+filepath.Base(pair.File2), 28)
-		labelPoints[i].X = float64(i)
-		labelPoints[i].Y = values[i]
 	}
-
-	labelPlotter, err := plotter.NewLabels(plotter.XYLabels{
-		XYs:    labelPoints,
-		Labels: labels,
-	})
-	if err != nil {
-		return fmt.Errorf("error creating coupling pair labels: %v", err)
-	}
-	labelStyle := text.Style{
-		Color:    color.Black,
-		Font:     font.From(plot.DefaultFont, vg.Points(7)),
-		Rotation: 70 * math.Pi / 180,
-		XAlign:   text.XLeft,
-		YAlign:   text.YBottom,
-		Handler:  plot.DefaultTextHandler,
-	}
-	for i := range labelPlotter.TextStyle {
-		labelPlotter.TextStyle[i] = labelStyle
-	}
-	labelPlotter.Offset = vg.Point{Y: vg.Points(2)}
-	p.Add(labelPlotter)
+	addTopCouplingPairLabels(p, labels, values, 10)
 
 	// Create custom tick marks
 	ticks := make([]plot.Tick, maxPairs)
@@ -303,8 +277,10 @@ func plotTopCouplingPairs(analysis FileCouplingAnalysis, output string) error {
 	p.X.Max = float64(maxPairs) - 0.5
 	p.Y.Min = 0
 	p.Y.Max = maxCouplingValue(values) * 1.05
-	p.Y.Tick.Marker = plot.ConstantTicks(couplingScoreTicks(p.Y.Max))
+	p.Y.Tick.Marker = plot.ConstantTicks(couplingScoreTicks(p.Y.Max, 2.5, 1))
 	addCouplingPairsTitle(p, "Top File Coupling Pairs", float64(maxPairs-1)/2, p.Y.Max)
+	p.Add(plotTopPadding{Height: vg.Points(84)})
+	p.Add(plotAxesRectangle{})
 
 	// Save the plot
 	outputFile := filepath.Join(output, "top_file_coupling_pairs.png")
@@ -323,6 +299,48 @@ func plotTopCouplingPairs(analysis FileCouplingAnalysis, output string) error {
 	fmt.Printf("  Max coupling score: %d\n", analysis.Statistics.MaxCoupling)
 
 	return nil
+}
+
+func addTopCouplingPairLabels(p *plot.Plot, labels []string, values plotter.Values, maxLabels int) {
+	labelCount := len(labels)
+	if labelCount > len(values) {
+		labelCount = len(values)
+	}
+	if maxLabels > 0 && labelCount > maxLabels {
+		labelCount = maxLabels
+	}
+	if labelCount == 0 {
+		return
+	}
+
+	labelPoints := make(plotter.XYs, labelCount)
+	shownLabels := make([]string, labelCount)
+	for i := 0; i < labelCount; i++ {
+		labelPoints[i].X = float64(i)
+		labelPoints[i].Y = values[i]
+		shownLabels[i] = labels[i]
+	}
+
+	labelPlotter, err := plotter.NewLabels(plotter.XYLabels{
+		XYs:    labelPoints,
+		Labels: shownLabels,
+	})
+	if err != nil {
+		return
+	}
+	labelStyle := text.Style{
+		Color:    color.Black,
+		Font:     font.From(plot.DefaultFont, vg.Points(7)),
+		Rotation: 70 * math.Pi / 180,
+		XAlign:   text.XLeft,
+		YAlign:   text.YBottom,
+		Handler:  plot.DefaultTextHandler,
+	}
+	for i := range labelPlotter.TextStyle {
+		labelPlotter.TextStyle[i] = labelStyle
+	}
+	labelPlotter.Offset = vg.Point{Y: vg.Points(2)}
+	p.Add(labelPlotter)
 }
 
 func addCouplingPairsTitle(p *plot.Plot, title string, x, y float64) {
@@ -366,17 +384,58 @@ func maxCouplingValue(values plotter.Values) float64 {
 	return maxValue
 }
 
-func couplingScoreTicks(maxValue float64) []plot.Tick {
+func couplingBarWidth(maxPairs int) vg.Length {
+	if maxPairs <= 0 {
+		return vg.Points(40)
+	}
+	return vg.Points(880 / float64(maxPairs))
+}
+
+func couplingScoreTicks(maxValue, step float64, decimals int) []plot.Tick {
 	if maxValue <= 0 {
-		return []plot.Tick{{Value: 0, Label: "0.0"}}
+		return []plot.Tick{{Value: 0, Label: fmt.Sprintf("%.*f", decimals, 0.0)}}
+	}
+	if step <= 0 {
+		step = 1
 	}
 	ticks := []plot.Tick{}
-	for value := 0.0; value <= maxValue; value += 2.5 {
-		label := fmt.Sprintf("%.1f", value)
-		if value == 0 {
-			label = "0.0"
-		}
+	for value := 0.0; value <= maxValue; value += step {
+		label := fmt.Sprintf("%.*f", decimals, value)
 		ticks = append(ticks, plot.Tick{Value: value, Label: label})
 	}
 	return ticks
+}
+
+type plotAxesRectangle struct{}
+
+func (plotAxesRectangle) Plot(c draw.Canvas, _ *plot.Plot) {
+	style := draw.LineStyle{
+		Color: color.Black,
+		Width: vg.Points(0.8),
+	}
+	c.StrokeLines(style, []vg.Point{
+		{X: c.Min.X, Y: c.Min.Y},
+		{X: c.Max.X, Y: c.Min.Y},
+		{X: c.Max.X, Y: c.Max.Y},
+		{X: c.Min.X, Y: c.Max.Y},
+		{X: c.Min.X, Y: c.Min.Y},
+	})
+}
+
+type plotTopPadding struct {
+	Height vg.Length
+}
+
+func (plotTopPadding) Plot(draw.Canvas, *plot.Plot) {}
+
+func (p plotTopPadding) GlyphBoxes(*plot.Plot) []plot.GlyphBox {
+	return []plot.GlyphBox{
+		{
+			Y: 1,
+			Rectangle: vg.Rectangle{
+				Min: vg.Point{},
+				Max: vg.Point{Y: p.Height},
+			},
+		},
+	}
 }
