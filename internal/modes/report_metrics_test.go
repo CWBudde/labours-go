@@ -2,6 +2,7 @@ package modes
 
 import (
 	"fmt"
+	"image/png"
 	"io"
 	"os"
 	"path/filepath"
@@ -123,6 +124,27 @@ func TestReportMetricModesCreateSVGOutputFiles(t *testing.T) {
 				assertNonEmptyFile(t, filepath.Join(dir, extra))
 			}
 		})
+	}
+}
+
+func TestBusFactorSubsystemOutputPreservesTransparentBackground(t *testing.T) {
+	dir := t.TempDir()
+	output := filepath.Join(dir, "bus-factor.png")
+	if err := BusFactor(&reportMetricsReader{}, output); err != nil {
+		t.Fatalf("BusFactor() unexpected error: %v", err)
+	}
+
+	file, err := os.Open(filepath.Join(dir, "bus-factor_subsystems.png"))
+	if err != nil {
+		t.Fatalf("open subsystem png: %v", err)
+	}
+	defer file.Close()
+	img, err := png.Decode(file)
+	if err != nil {
+		t.Fatalf("decode subsystem png: %v", err)
+	}
+	if _, _, _, alpha := img.At(0, 0).RGBA(); alpha != 0 {
+		t.Fatalf("corner alpha = %d, want transparent", alpha)
 	}
 }
 

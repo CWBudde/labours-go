@@ -1008,10 +1008,11 @@ func saveReportFigureWithoutTightLayout(fig *core.Figure, output string, width, 
 
 func saveReportFigureDirect(fig *core.Figure, output string, width, height int) error {
 	config := backends.Config{
-		Width:      width,
-		Height:     height,
-		Background: render.Color{R: 1, G: 1, B: 1, A: 0},
-		DPI:        100,
+		Width:       width,
+		Height:      height,
+		Background:  render.Color{R: 1, G: 1, B: 1, A: 0},
+		DPI:         100,
+		Transparent: true,
 	}
 	switch strings.ToLower(filepath.Ext(output)) {
 	case ".svg":

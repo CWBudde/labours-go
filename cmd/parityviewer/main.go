@@ -23,7 +23,12 @@ import (
 
 const rerenderAllButtonPlaceholder = "__RERENDER_ALL_BUTTON__"
 
-var parityDisplayBackground = color.RGBA{R: 255, G: 255, B: 255, A: 255}
+var (
+	parityCheckerLight = color.RGBA{R: 248, G: 250, B: 252, A: 255}
+	parityCheckerDark  = color.RGBA{R: 203, G: 213, B: 225, A: 255}
+)
+
+const parityCheckerSize = 16
 
 type caseEntry struct {
 	Suite       string
@@ -691,7 +696,7 @@ func buildArtifactOnlyEntry(suite, baseline, name, artifactPath string) (caseEnt
 	}
 	rawDiff := rawDiffImage(act, act)
 	ampDiff := amplifiedDiffImage(act, act)
-	actB64, err := pngToBase64(compositeOverSolid(act, parityDisplayBackground))
+	actB64, err := pngToBase64(displayImage(act, hasTransparency(act)))
 	if err != nil {
 		return caseEntry{}, err
 	}
@@ -809,8 +814,9 @@ func buildEntry(suite, baseline, name, baselinePath, artifactPath string) (caseE
 		return caseEntry{}, fmt.Errorf("read artifact: %w", err)
 	}
 
-	refVisible := compositeOverSolid(ref, parityDisplayBackground)
-	actVisible := compositeOverSolid(act, parityDisplayBackground)
+	useCheckerboard := hasTransparency(ref) || hasTransparency(act)
+	refVisible := displayImage(ref, useCheckerboard)
+	actVisible := displayImage(act, useCheckerboard)
 	rawDiff := rawDiffImage(refVisible, actVisible)
 	ampDiff := amplifiedDiffImage(refVisible, actVisible)
 	stats := compareImages(refVisible, actVisible)
@@ -1044,7 +1050,44 @@ func max(a, b int) int {
 	return b
 }
 
-func compositeOverSolid(src *image.RGBA, bg color.RGBA) *image.RGBA {
+func displayImage(src *image.RGBA, checkerboard bool) *image.RGBA {
+	if !checkerboard {
+		return copyRGBAWithZeroOrigin(src)
+	}
+	return compositeOverCheckerboard(src)
+}
+
+func hasTransparency(img *image.RGBA) bool {
+	if img == nil {
+		return false
+	}
+	bounds := img.Bounds()
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			_, _, _, a := rgbaAt(img, x, y)
+			if a < 255 {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func copyRGBAWithZeroOrigin(src *image.RGBA) *image.RGBA {
+	if src == nil {
+		return nil
+	}
+	bounds := src.Bounds()
+	out := image.NewRGBA(image.Rect(0, 0, bounds.Dx(), bounds.Dy()))
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			out.SetRGBA(x-bounds.Min.X, y-bounds.Min.Y, src.RGBAAt(x, y))
+		}
+	}
+	return out
+}
+
+func compositeOverCheckerboard(src *image.RGBA) *image.RGBA {
 	if src == nil {
 		return nil
 	}
@@ -1053,10 +1096,18 @@ func compositeOverSolid(src *image.RGBA, bg color.RGBA) *image.RGBA {
 	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
 		for x := bounds.Min.X; x < bounds.Max.X; x++ {
 			r, g, b, a := rgbaAt(src, x, y)
+			bg := checkerboardColor(x-bounds.Min.X, y-bounds.Min.Y)
 			out.SetRGBA(x-bounds.Min.X, y-bounds.Min.Y, compositePixel(r, g, b, a, bg))
 		}
 	}
 	return out
+}
+
+func checkerboardColor(x, y int) color.RGBA {
+	if ((x/parityCheckerSize)+(y/parityCheckerSize))%2 == 0 {
+		return parityCheckerLight
+	}
+	return parityCheckerDark
 }
 
 func compositePixel(r, g, b, a uint8, bg color.RGBA) color.RGBA {

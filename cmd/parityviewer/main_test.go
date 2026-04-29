@@ -25,7 +25,24 @@ func TestLaboursReferenceRecipesIncludeBurndownProject(t *testing.T) {
 	}
 }
 
-func TestBuildEntryComparesDisplayedComposite(t *testing.T) {
+func TestBuildEntryComparesTransparentImagesOnCheckerboard(t *testing.T) {
+	dir := t.TempDir()
+	transparentA := filepath.Join(dir, "transparent-a.png")
+	transparentB := filepath.Join(dir, "transparent-b.png")
+
+	writeTestPNG(t, transparentA, color.RGBA{R: 255, G: 255, B: 255, A: 0})
+	writeTestPNG(t, transparentB, color.RGBA{R: 255, G: 255, B: 255, A: 0})
+
+	entry, err := buildEntry("plots", "reference", "background", transparentA, transparentB)
+	if err != nil {
+		t.Fatalf("build entry: %v", err)
+	}
+	if entry.RMSE != 0 || entry.AvgDiff != 0 || entry.MaxDiff != 0 || entry.DiffPixels != 0 {
+		t.Fatalf("matching transparent images should compare equal on checkerboard: %+v", entry)
+	}
+}
+
+func TestBuildEntryShowsTransparentOpaqueBackgroundMismatch(t *testing.T) {
 	dir := t.TempDir()
 	transparentWhite := filepath.Join(dir, "transparent-white.png")
 	opaqueWhite := filepath.Join(dir, "opaque-white.png")
@@ -37,8 +54,8 @@ func TestBuildEntryComparesDisplayedComposite(t *testing.T) {
 	if err != nil {
 		t.Fatalf("build entry: %v", err)
 	}
-	if entry.RMSE != 0 || entry.AvgDiff != 0 || entry.MaxDiff != 0 || entry.DiffPixels != 0 {
-		t.Fatalf("transparent white and opaque white should compare equal after display compositing: %+v", entry)
+	if entry.RMSE == 0 || entry.AvgDiff == 0 || entry.MaxDiff == 0 || entry.DiffPixels == 0 {
+		t.Fatalf("transparent white and opaque white should differ on checkerboard: %+v", entry)
 	}
 }
 
