@@ -58,7 +58,14 @@ func GenerateBurndownProjectPython(reader readers.Reader, output string, relativ
 		resample = "year" // Default to yearly like Python
 	}
 
-	processedData, err := burndown.LoadBurndown(header, "project", matrix, resample, true, true)
+	// Python labours uses the repository name returned by the reader as the
+	// burndown title (`"%s %d x %d ..." % (name, ...)` in plot_burndown).
+	// Falling back to "project" only when the reader does not provide one.
+	titleName := name
+	if titleName == "" {
+		titleName = "project"
+	}
+	processedData, err := burndown.LoadBurndown(header, titleName, matrix, resample, true, true)
 	if err != nil {
 		progEstimator.FinishMultiOperation()
 		return fmt.Errorf("failed to process burndown data: %v", err)

@@ -91,8 +91,11 @@ func PlotBurndownMatplotlib(data *burndown.ProcessedBurndown, output string, rel
 	background, foreground := laboursPlotColors(viper.GetString("background"))
 	transparentBackground := background
 	transparentBackground.A = 0
-	legendBackground := background
-	legendBackground.A = 0.8
+	// Python labours forces the legend frame fully opaque in `apply_plot_style`
+	// (`frame.set_facecolor(background)` / `frame.set_edgecolor(background)`),
+	// so the legend stays consistent regardless of how the saved PNG is later
+	// composited. Leaving the legend at alpha < 1 made it render dark in
+	// viewers that composite against a non-white background.
 	fig := core.NewFigure(
 		width,
 		height,
@@ -103,8 +106,8 @@ func PlotBurndownMatplotlib(data *burndown.ProcessedBurndown, output string, rel
 		style.WithAxesEdgeColor(foreground),
 		style.WithTextColor(foreground.R, foreground.G, foreground.B, foreground.A),
 		style.WithLegendColors(
-			legendBackground,
-			legendBackground,
+			background,
+			background,
 			foreground,
 		),
 	)
@@ -301,12 +304,50 @@ func configureMatplotlibBurndownTimeAxis(ax *core.Axes, dates []time.Time, resam
 	}
 	ax.XAxis.Locator = core.FixedLocator{TicksList: ticks}
 	ax.XAxis.Formatter = core.FixedFormatter{Labels: labels}
-	if len(labels) > 6 {
+	if shouldRotateDateLabels(labels) {
 		ax.XAxis.MajorLabelStyle = core.TickLabelStyle{Rotation: 30, AutoAlign: true}
 	}
 }
 
+// shouldRotateDateLabels mirrors matplotlib's pragmatic rule: rotate only when
+// the labels would actually collide. We approximate label width as 7 px per
+// character at 12 pt and assume a default 16-inch (1600 px) plot. Long-format
+// labels (e.g. "2017-01-01") are wide enough that even a handful overlap, so
+// we still rotate them, but compact "YYYY-MM" labels fit horizontally up to
+// ~12 ticks the way Python's labours-equivalent old-vs-new chart renders.
+func shouldRotateDateLabels(labels []string) bool {
+	if len(labels) <= 1 {
+		return false
+	}
+	maxLen := 0
+	for _, label := range labels {
+		if len(label) > maxLen {
+			maxLen = len(label)
+		}
+	}
+	approxAxisWidth := 1500.0
+	approxLabelWidth := float64(maxLen) * 8.0 // px per character at default fontsize
+	totalLabelWidth := approxLabelWidth * float64(len(labels))
+	return totalLabelWidth > approxAxisWidth*0.9
+}
+
+// burndownDateTicks chooses tick locations for the burndown family of charts.
+// Burndown.py in Python labours conditionally appends the data range
+// endpoints when the natural locator leaves a wide gap on either side
+// (`if locs[0] - xlim()[0] > (locs[1] - locs[0]) / 2` etc.), so we mirror that
+// here via includeEndpoints=true.
 func burndownDateTicks(dates []time.Time, resampleMode string) ([]float64, []string) {
+	return chooseDateTicks(dates, resampleMode, true)
+}
+
+// timeAxisDateTicks chooses tick locations for general time-axis charts that
+// rely on matplotlib's `AutoDateLocator` rather than burndown.py's hand-rolled
+// endpoint extension. We therefore never inject the data-range endpoints.
+func timeAxisDateTicks(dates []time.Time, resampleMode string) ([]float64, []string) {
+	return chooseDateTicks(dates, resampleMode, false)
+}
+
+func chooseDateTicks(dates []time.Time, resampleMode string, includeEndpoints bool) ([]float64, []string) {
 	if len(dates) == 0 {
 		return nil, nil
 	}
@@ -319,79 +360,135 @@ func burndownDateTicks(dates []time.Time, resampleMode string) ([]float64, []str
 	mode := strings.ToLower(resampleMode)
 	switch {
 	case strings.Contains(mode, "m"):
-		return buildMonthlyTicks(start, end)
+		return buildMonthlyTicks(start, end, includeEndpoints)
 	case strings.Contains(mode, "a"), strings.Contains(mode, "y"), strings.Contains(mode, "year"):
-		return buildYearlyTicks(start, end)
+		return buildYearlyTicks(start, end, includeEndpoints)
 	}
 
 	days := end.Sub(start).Hours() / 24
 	switch {
 	case days <= 45:
-		return buildDailyTicks(start, end)
+		return buildDailyTicks(start, end, includeEndpoints)
 	case days <= 730:
-		return buildMonthlyTicks(start, end)
+		return buildMonthlyTicks(start, end, includeEndpoints)
 	default:
-		return buildYearlyTicks(start, end)
+		return buildYearlyTicks(start, end, includeEndpoints)
 	}
 }
 
-func buildDailyTicks(start, end time.Time) ([]float64, []string) {
+// buildDailyTicks emits day-aligned ticks across [start, end]. Python's
+// matplotlib AutoDateLocator picks "nice" day boundaries; we step to keep at
+// most ~10 ticks. Endpoints are added only when includeEndpoints is true and
+// the natural ticks leave a meaningful gap, mirroring Python burndown.py.
+func buildDailyTicks(start, end time.Time, includeEndpoints bool) ([]float64, []string) {
 	days := int(math.Ceil(end.Sub(start).Hours() / 24))
 	step := max(1, int(math.Ceil(float64(max(1, days))/10)))
-	ticks := []time.Time{start}
-	for t := start.Truncate(24 * time.Hour); !t.After(end); t = t.AddDate(0, 0, step) {
-		if !t.Before(start) {
-			ticks = append(ticks, t)
-		}
+	first := start.Truncate(24 * time.Hour)
+	if first.Before(start) {
+		first = first.AddDate(0, 0, 1)
 	}
-	ticks = append(ticks, end)
-	return formatDateTicks(ticks, "2006-01-02")
+	natural := make([]time.Time, 0, days/step+2)
+	for t := first; !t.After(end); t = t.AddDate(0, 0, step) {
+		natural = append(natural, t)
+	}
+	stepDuration := time.Duration(step) * 24 * time.Hour
+	return formatDateTicks(maybeAddEndpoints(natural, start, end, stepDuration, includeEndpoints), "2006-01-02")
 }
 
-func buildMonthlyTicks(start, end time.Time) ([]float64, []string) {
+// buildMonthlyTicks emits month-aligned ticks across [start, end]. Endpoints
+// are added only when no natural tick formats to the same "YYYY-MM" string,
+// avoiding the overlapping-label artifact Python's locator does not produce.
+func buildMonthlyTicks(start, end time.Time, includeEndpoints bool) ([]float64, []string) {
 	months := (end.Year()-start.Year())*12 + int(end.Month()-start.Month()) + 1
 	step := max(1, int(math.Ceil(float64(max(1, months))/10)))
-	ticks := []time.Time{start}
-	for t := time.Date(start.Year(), start.Month(), 1, 0, 0, 0, 0, start.Location()); !t.After(end); t = t.AddDate(0, step, 0) {
-		if !t.Before(start) {
-			ticks = append(ticks, t)
-		}
+	first := time.Date(start.Year(), start.Month(), 1, 0, 0, 0, 0, start.Location())
+	if first.Before(start) {
+		first = first.AddDate(0, step, 0)
 	}
-	ticks = append(ticks, end)
-	return formatDateTicks(ticks, "2006-01")
+	natural := make([]time.Time, 0, months/step+2)
+	for t := first; !t.After(end); t = t.AddDate(0, step, 0) {
+		natural = append(natural, t)
+	}
+	stepDuration := time.Duration(step*30) * 24 * time.Hour
+	return formatDateTicks(maybeAddEndpoints(natural, start, end, stepDuration, includeEndpoints), "2006-01")
 }
 
-func buildYearlyTicks(start, end time.Time) ([]float64, []string) {
+// buildYearlyTicks emits year-aligned ticks across [start, end]. Mirrors
+// matplotlib's YearLocator selection used by Python labours when sampling is
+// yearly.
+func buildYearlyTicks(start, end time.Time, includeEndpoints bool) ([]float64, []string) {
 	years := max(1, end.Year()-start.Year()+1)
 	step := max(1, int(math.Ceil(float64(years)/10)))
-	ticks := make([]time.Time, 0, years)
+	natural := make([]time.Time, 0, years)
 	for year := start.Year(); year <= end.Year(); year += step {
 		t := time.Date(year, 1, 1, 0, 0, 0, 0, start.Location())
 		if !t.Before(start) && !t.After(end) {
-			ticks = append(ticks, t)
+			natural = append(natural, t)
 		}
 	}
-	if len(ticks) == 0 {
-		ticks = append(ticks, start)
+	stepDuration := time.Duration(step) * 365 * 24 * time.Hour
+	out := maybeAddEndpoints(natural, start, end, stepDuration, includeEndpoints)
+	if len(out) <= 2 {
+		// Short spans look better as dated endpoints (e.g. "2017-01-01") so
+		// the reader can tell what range is shown without a year-only label.
+		return formatDateTicks(out, "2006-01-02")
 	}
-	if len(ticks) <= 2 {
-		return formatDateTicks(ticks, "2006-01-02")
-	}
-	return formatDateTicks(ticks, "2006")
+	return formatDateTicks(out, "2006")
 }
 
+// maybeAddEndpoints implements two policies for the data-range endpoints.
+//
+// When includeEndpoints is true (burndown family), this matches Python
+// `burndown.py`'s `if locs[0] - xlim()[0] > (locs[1] - locs[0]) / 2`
+// rule: prepend `start` when the gap to the first natural tick exceeds half
+// the inter-tick distance, and likewise for `end`. When natural ticks are
+// empty, both endpoints are added so the chart is not unlabeled.
+//
+// When includeEndpoints is false, the natural ticks alone are returned —
+// matching matplotlib's default `AutoDateLocator` behavior used by every
+// non-burndown date chart in Python labours (e.g. `old_vs_new.py`).
+func maybeAddEndpoints(natural []time.Time, start, end time.Time, stepDuration time.Duration, includeEndpoints bool) []time.Time {
+	if !includeEndpoints {
+		if len(natural) == 0 {
+			// Without natural ticks the axis would be entirely unlabeled,
+			// which is worse than diverging from Python's auto-locator.
+			return []time.Time{start, end}
+		}
+		return append([]time.Time(nil), natural...)
+	}
+
+	out := make([]time.Time, 0, len(natural)+2)
+	tolerance := stepDuration / 2
+	if tolerance <= 0 {
+		tolerance = 24 * time.Hour
+	}
+
+	if len(natural) == 0 || natural[0].Sub(start) > tolerance {
+		out = append(out, start)
+	}
+	out = append(out, natural...)
+
+	if len(natural) == 0 || end.Sub(natural[len(natural)-1]) > tolerance {
+		out = append(out, end)
+	}
+	return out
+}
+
+// formatDateTicks deduplicates by formatted label so two dates that render to
+// the same string (e.g. two days within the same month for a "2006-01"
+// formatter) do not both appear on the axis.
 func formatDateTicks(dates []time.Time, layout string) ([]float64, []string) {
-	seen := map[int64]bool{}
+	seenLabel := map[string]bool{}
 	ticks := make([]float64, 0, len(dates))
 	labels := make([]string, 0, len(dates))
 	for _, date := range dates {
-		unix := date.Unix()
-		if seen[unix] {
+		label := date.Format(layout)
+		if seenLabel[label] {
 			continue
 		}
-		seen[unix] = true
-		ticks = append(ticks, float64(unix))
-		labels = append(labels, date.Format(layout))
+		seenLabel[label] = true
+		ticks = append(ticks, float64(date.Unix()))
+		labels = append(labels, label)
 	}
 	return ticks, labels
 }
@@ -557,35 +654,36 @@ func PrintSurvivalFunction(matrix [][]float64) {
 	}
 }
 
-// generatePythonLaboursColorPalette matches Python labours' tab20 color cycle.
+// PythonLaboursColorPalette returns the color cycle Python labours actually
+// produces. Python labours runs `pyplot.style.use("ggplot")` before plotting,
+// so its `axes.prop_cycle` is the ggplot palette below — not matplotlib's
+// default tab10/tab20. Matching this palette is what makes burndown layers,
+// devs spikes and old-vs-new fills look right relative to the Python baseline.
+//
+// When more series are needed than palette entries, callers cycle modulo
+// length, which mirrors matplotlib's `axes.prop_cycle` wrap-around.
 func PythonLaboursColorPalette(n int) []color.Color {
-	tab20Colors := []color.Color{
-		color.RGBA{R: 31, G: 119, B: 180, A: 255},
-		color.RGBA{R: 174, G: 199, B: 232, A: 255},
-		color.RGBA{R: 255, G: 127, B: 14, A: 255},
-		color.RGBA{R: 255, G: 187, B: 120, A: 255},
-		color.RGBA{R: 44, G: 160, B: 44, A: 255},
-		color.RGBA{R: 152, G: 223, B: 138, A: 255},
-		color.RGBA{R: 214, G: 39, B: 40, A: 255},
-		color.RGBA{R: 255, G: 152, B: 150, A: 255},
-		color.RGBA{R: 148, G: 103, B: 189, A: 255},
-		color.RGBA{R: 197, G: 176, B: 213, A: 255},
-		color.RGBA{R: 140, G: 86, B: 75, A: 255},
-		color.RGBA{R: 196, G: 156, B: 148, A: 255},
-		color.RGBA{R: 227, G: 119, B: 194, A: 255},
-		color.RGBA{R: 247, G: 182, B: 210, A: 255},
-		color.RGBA{R: 127, G: 127, B: 127, A: 255},
-		color.RGBA{R: 199, G: 199, B: 199, A: 255},
-		color.RGBA{R: 188, G: 189, B: 34, A: 255},
-		color.RGBA{R: 219, G: 219, B: 141, A: 255},
-		color.RGBA{R: 23, G: 190, B: 207, A: 255},
-		color.RGBA{R: 158, G: 218, B: 229, A: 255},
-	}
-
+	palette := ggplotPalette()
 	colors := make([]color.Color, n)
 	for i := 0; i < n; i++ {
-		colors[i] = tab20Colors[i%len(tab20Colors)]
+		colors[i] = palette[i%len(palette)]
 	}
-
 	return colors
+}
+
+// ggplotPalette returns the color list that matplotlib's "ggplot" style
+// installs into `axes.prop_cycle`. Hex codes lifted from
+// `matplotlib/mpl-data/stylelib/ggplot.mplstyle`:
+//
+//	#E24A33 #348ABD #988ED5 #777777 #FBC15E #8EBA42 #FFB5B8
+func ggplotPalette() []color.Color {
+	return []color.Color{
+		color.RGBA{R: 0xE2, G: 0x4A, B: 0x33, A: 255}, // red
+		color.RGBA{R: 0x34, G: 0x8A, B: 0xBD, A: 255}, // blue
+		color.RGBA{R: 0x98, G: 0x8E, B: 0xD5, A: 255}, // purple
+		color.RGBA{R: 0x77, G: 0x77, B: 0x77, A: 255}, // gray
+		color.RGBA{R: 0xFB, G: 0xC1, B: 0x5E, A: 255}, // yellow
+		color.RGBA{R: 0x8E, G: 0xBA, B: 0x42, A: 255}, // green
+		color.RGBA{R: 0xFF, G: 0xB5, B: 0xB8, A: 255}, // pink
+	}
 }

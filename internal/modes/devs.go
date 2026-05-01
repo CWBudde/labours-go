@@ -2,6 +2,7 @@ package modes
 
 import (
 	"fmt"
+	"image/color"
 	"sort"
 	"strings"
 	"time"
@@ -11,6 +12,15 @@ import (
 	"labours-go/internal/progress"
 	"labours-go/internal/readers"
 	"matplotlib-go/core"
+)
+
+// Python labours highlights per-developer summary stats with a green or red
+// background depending on whether the developer added or removed more lines
+// (`backgrounds = ("#C4FFDB", "#FFD0CD")` in `labours/modes/devs.py`). We mirror
+// those exact swatches so the rendered chart matches the baseline.
+var (
+	devsStatPositiveBackground = color.RGBA{R: 0xC4, G: 0xFF, B: 0xDB, A: 255}
+	devsStatNegativeBackground = color.RGBA{R: 0xFF, G: 0xD0, B: 0xCD, A: 255}
 )
 
 // Devs generates plots for individual developers' contributions over time.
@@ -125,6 +135,14 @@ func plotDevsPythonStyle(timeSeries *readers.DeveloperTimeSeriesData, startUnix,
 		}
 		baselines[i] = baseline
 		labelY := offset + rowHeight*0.45
+		// Match Python's two-column-per-row layout: name on the left, stats on
+		// the right, with the stats panel highlighted green when the developer
+		// is net-positive on lines and red when net-negative.
+		netDelta := row.LinesAdded - row.LinesRemove
+		statBackground := color.Color(devsStatPositiveBackground)
+		if netDelta < 0 {
+			statBackground = devsStatNegativeBackground
+		}
 		labels = append(labels,
 			graphics.MatplotlibTextLabel{
 				X:      float64(dates[0].Unix()),
@@ -133,10 +151,11 @@ func plotDevsPythonStyle(timeSeries *readers.DeveloperTimeSeriesData, startUnix,
 				HAlign: core.TextAlignLeft,
 			},
 			graphics.MatplotlibTextLabel{
-				X:      float64(dates[len(dates)-1].Unix()),
-				Y:      labelY,
-				Text:   fmt.Sprintf("%5d %8s %8s", row.Commits, formatNumber(row.LinesAdded-row.LinesRemove), formatNumber(row.LinesChange)),
-				HAlign: core.TextAlignRight,
+				X:               float64(dates[len(dates)-1].Unix()),
+				Y:               labelY,
+				Text:             fmt.Sprintf("%5d %8s %8s", row.Commits, formatNumber(netDelta), formatNumber(row.LinesChange)),
+				HAlign:           core.TextAlignRight,
+				BackgroundColor: statBackground,
 			},
 		)
 	}
@@ -147,9 +166,11 @@ func plotDevsPythonStyle(timeSeries *readers.DeveloperTimeSeriesData, startUnix,
 		HAlign: core.TextAlignRight,
 	})
 
+	// Python labours suppresses the title and x-label when an output file is
+	// supplied (see `deploy_plot` and `show_devs` in
+	// `labours/modes/devs.py`). Mirroring that keeps the visual matching the
+	// baseline, where the chart frame stays minimal.
 	if err := graphics.PlotTimeAreasMatplotlib(dates, series, graphics.MatplotlibTimeAreaOptions{
-		Title:        "Developer Contributions Over Time",
-		XLabel:       "Time",
 		Output:       output,
 		WidthInches:  32,
 		HeightInches: 16,
