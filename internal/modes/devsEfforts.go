@@ -2,6 +2,8 @@ package modes
 
 import (
 	"fmt"
+	"image/color"
+	"path/filepath"
 	"sort"
 
 	"github.com/spf13/viper"
@@ -161,35 +163,49 @@ func plotCommitsVsLines(metrics []EffortMetric, output string) error {
 
 // plotProductivityRanking creates bar chart of developer productivity ranking
 func plotProductivityRanking(metrics []EffortMetric, output string) error {
-	p := plot.New()
-	p.Title.Text = "Developer Productivity Ranking"
-	p.X.Label.Text = "Developer Rank"
-	p.Y.Label.Text = "Productivity Score (Commits + Lines/100)"
-
 	// Prepare data for top developers only
 	maxDev := len(metrics)
 	if maxDev > 20 {
 		maxDev = 20 // Show top 20 developers
 	}
 
-	values := make(plotter.Values, maxDev)
+	labels := make([]string, maxDev)
+	values := make([]float64, maxDev)
 	for i := 0; i < maxDev; i++ {
 		metric := metrics[i]
+		labels[i] = fmt.Sprintf("%d", i+1)
 		values[i] = float64(metric.Commits) + float64(metric.LinesAdded+metric.LinesRemoved+metric.LinesModified)*0.01
 	}
 
-	// Create bar chart
-	bars, err := plotter.NewBarChart(values, vg.Points(20))
-	if err != nil {
-		return fmt.Errorf("error creating bar chart: %v", err)
+	barColor := color.RGBA{R: 245, G: 133, B: 24, A: 255}
+	pngFile := filepath.Join(output, "devs_productivity_ranking.png")
+	if err := graphics.PlotBarChartMatplotlib(labels, values, graphics.MatplotlibBarOptions{
+		Title:        "Developer Productivity Ranking",
+		XLabel:       "Developer Rank",
+		YLabel:       "Productivity Score (Commits + Lines/100)",
+		Output:       pngFile,
+		WidthInches:  15.36,
+		HeightInches: 7.68,
+		Color:        barColor,
+		DisableGrid:  true,
+		Opaque:       true,
+	}); err != nil {
+		return fmt.Errorf("failed to save productivity ranking PNG plot: %v", err)
 	}
 
-	bars.Color = graphics.ColorPalette[1]
-	p.Add(bars)
-
-	pngFile, svgFile, err := savePlotPNGAndSVG(p, 16*vg.Inch, 8*vg.Inch, output, "devs_productivity_ranking")
-	if err != nil {
-		return fmt.Errorf("failed to save productivity ranking plot: %v", err)
+	svgFile := filepath.Join(output, "devs_productivity_ranking.svg")
+	if err := graphics.PlotBarChartMatplotlib(labels, values, graphics.MatplotlibBarOptions{
+		Title:        "Developer Productivity Ranking",
+		XLabel:       "Developer Rank",
+		YLabel:       "Productivity Score (Commits + Lines/100)",
+		Output:       svgFile,
+		WidthInches:  15.36,
+		HeightInches: 7.68,
+		Color:        barColor,
+		DisableGrid:  true,
+		Opaque:       true,
+	}); err != nil {
+		return fmt.Errorf("failed to save productivity ranking SVG plot: %v", err)
 	}
 
 	fmt.Printf("Saved developer productivity ranking plots to %s and %s\n", pngFile, svgFile)

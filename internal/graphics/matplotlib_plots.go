@@ -54,6 +54,8 @@ type MatplotlibBarOptions struct {
 	HeightInches float64
 	RotateX      bool
 	Color        color.Color
+	DisableGrid  bool
+	Opaque       bool
 }
 
 type MatplotlibGroupedBarSeries struct {
@@ -186,6 +188,9 @@ func PlotTimeAreasMatplotlib(dates []time.Time, series []MatplotlibTimeAreaSerie
 		}
 	}
 
+	if opts.Opaque {
+		return saveMatplotlibFigure(fig, opts.Output, width, height, render.Color{R: 1, G: 1, B: 1, A: 1})
+	}
 	return saveMatplotlibFigure(fig, opts.Output, width, height)
 }
 
@@ -268,7 +273,9 @@ func PlotBarChartMatplotlib(labels []string, values []float64, opts MatplotlibBa
 	ax.SetTitle(opts.Title)
 	ax.SetXLabel(opts.XLabel)
 	ax.SetYLabel(opts.YLabel)
-	ax.AddYGrid()
+	if !opts.DisableGrid {
+		ax.AddYGrid()
+	}
 
 	x := make([]float64, len(values))
 	ticks := make([]float64, len(values))
