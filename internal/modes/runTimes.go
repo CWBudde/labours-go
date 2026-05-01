@@ -2,6 +2,8 @@ package modes
 
 import (
 	"fmt"
+	"image/color"
+	"path/filepath"
 	"sort"
 
 	"github.com/spf13/viper"
@@ -165,53 +167,70 @@ func plotRuntimeBreakdown(analysis RuntimeAnalysis, output string) error {
 		return fmt.Errorf("no runtime metrics available")
 	}
 
-	p := plot.New()
-	p.Title.Text = "Runtime Analysis Breakdown"
-	p.X.Label.Text = "Operations (by time)"
-	p.Y.Label.Text = "Time (milliseconds)"
-
 	// Prepare data for bar chart (show top 15 operations)
 	maxOps := len(analysis.Metrics)
 	if maxOps > 15 {
 		maxOps = 15
 	}
 
-	values := make(plotter.Values, maxOps)
+	labels := make([]string, maxOps)
+	values := make([]float64, maxOps)
 	for i := 0; i < maxOps; i++ {
+		labels[i] = compactRuntimeLabel(analysis.Metrics[i].Operation, 12)
 		values[i] = analysis.Metrics[i].TimeMs
 	}
 
-	// Create bar chart
-	bars, err := plotter.NewBarChart(values, vg.Points(30))
-	if err != nil {
-		return fmt.Errorf("error creating bar chart: %v", err)
+	xMargin := 0.05 * (float64(maxOps) - 0.2)
+	barColor := color.RGBA{R: 84, G: 162, B: 75, A: 255}
+	pngFile := filepath.Join(output, "runtime_breakdown.png")
+	if err := graphics.PlotBarChartMatplotlib(labels, values, graphics.MatplotlibBarOptions{
+		Title:        "Runtime Analysis Breakdown",
+		XLabel:       "Operations (by time)",
+		YLabel:       "Time",
+		Output:       pngFile,
+		WidthInches:  15.36,
+		HeightInches: 7.68,
+		RotateX:      true,
+		Color:        barColor,
+		DisableGrid:  true,
+		Opaque:       true,
+		DefaultStyle: true,
+		ManualXLim:   true,
+		XMin:         -0.4 - xMargin,
+		XMax:         float64(maxOps) - 0.6 + xMargin,
+	}); err != nil {
+		return fmt.Errorf("failed to save runtime breakdown PNG plot: %v", err)
 	}
 
-	bars.Color = graphics.ColorPalette[5]
-	p.Add(bars)
-
-	// Create custom tick marks with operation names
-	ticks := make([]plot.Tick, maxOps)
-	for i := 0; i < maxOps; i++ {
-		// Truncate operation names for readability
-		opName := analysis.Metrics[i].Operation
-		if len(opName) > 12 {
-			opName = opName[:12] + "..."
-		}
-		ticks[i] = plot.Tick{
-			Value: float64(i),
-			Label: opName,
-		}
-	}
-	p.X.Tick.Marker = plot.ConstantTicks(ticks)
-
-	pngFile, svgFile, err := savePlotPNGAndSVG(p, 16*vg.Inch, 8*vg.Inch, output, "runtime_breakdown")
-	if err != nil {
-		return fmt.Errorf("failed to save runtime breakdown plot: %v", err)
+	svgFile := filepath.Join(output, "runtime_breakdown.svg")
+	if err := graphics.PlotBarChartMatplotlib(labels, values, graphics.MatplotlibBarOptions{
+		Title:        "Runtime Analysis Breakdown",
+		XLabel:       "Operations (by time)",
+		YLabel:       "Time",
+		Output:       svgFile,
+		WidthInches:  15.36,
+		HeightInches: 7.68,
+		RotateX:      true,
+		Color:        barColor,
+		DisableGrid:  true,
+		Opaque:       true,
+		DefaultStyle: true,
+		ManualXLim:   true,
+		XMin:         -0.4 - xMargin,
+		XMax:         float64(maxOps) - 0.6 + xMargin,
+	}); err != nil {
+		return fmt.Errorf("failed to save runtime breakdown SVG plot: %v", err)
 	}
 
 	fmt.Printf("Saved runtime breakdown plots to %s and %s\n", pngFile, svgFile)
 	return nil
+}
+
+func compactRuntimeLabel(label string, limit int) string {
+	if len(label) <= limit {
+		return label
+	}
+	return "..." + label[len(label)-(limit-3):]
 }
 
 // plotRuntimePieChart creates a pie chart showing percentage breakdown of runtime

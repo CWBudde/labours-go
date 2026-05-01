@@ -189,6 +189,10 @@ func plotProductivityRanking(metrics []EffortMetric, output string) error {
 		Color:        barColor,
 		DisableGrid:  true,
 		Opaque:       true,
+		DefaultStyle: true,
+		ManualXLim:   true,
+		XMin:         -0.64,
+		XMax:         float64(maxDev) - 0.36,
 	}); err != nil {
 		return fmt.Errorf("failed to save productivity ranking PNG plot: %v", err)
 	}
@@ -204,6 +208,10 @@ func plotProductivityRanking(metrics []EffortMetric, output string) error {
 		Color:        barColor,
 		DisableGrid:  true,
 		Opaque:       true,
+		DefaultStyle: true,
+		ManualXLim:   true,
+		XMin:         -0.64,
+		XMax:         float64(maxDev) - 0.36,
 	}); err != nil {
 		return fmt.Errorf("failed to save productivity ranking SVG plot: %v", err)
 	}

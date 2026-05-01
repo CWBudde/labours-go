@@ -56,6 +56,11 @@ type MatplotlibBarOptions struct {
 	Color        color.Color
 	DisableGrid  bool
 	Opaque       bool
+	DefaultStyle bool
+	ManualXLim   bool
+	XMin         float64
+	XMax         float64
+	YMax         float64
 }
 
 type MatplotlibGroupedBarSeries struct {
@@ -188,9 +193,6 @@ func PlotTimeAreasMatplotlib(dates []time.Time, series []MatplotlibTimeAreaSerie
 		}
 	}
 
-	if opts.Opaque {
-		return saveMatplotlibFigure(fig, opts.Output, width, height, render.Color{R: 1, G: 1, B: 1, A: 1})
-	}
 	return saveMatplotlibFigure(fig, opts.Output, width, height)
 }
 
@@ -261,11 +263,11 @@ func PlotBarChartMatplotlib(labels []string, values []float64, opts MatplotlibBa
 	}
 
 	width, height := pythonPlotPixelSize(defaultPlotWidth(opts.WidthInches), defaultPlotHeight(opts.HeightInches))
-	fig := core.NewFigure(
-		width,
-		height,
-		pythonTransparentFigureOptions()...,
-	)
+	figureOptions := pythonTransparentFigureOptions()
+	if opts.DefaultStyle {
+		figureOptions = nil
+	}
+	fig := core.NewFigure(width, height, figureOptions...)
 	ax := fig.AddSubplot(1, 1, 1)
 	if ax == nil {
 		return fmt.Errorf("failed to create axes")
@@ -289,14 +291,29 @@ func PlotBarChartMatplotlib(labels []string, values []float64, opts MatplotlibBa
 	}
 	renderedColor := renderColor(barColor)
 	ax.Bar(x, values, core.BarOptions{Color: &renderedColor})
-	ax.SetXLim(-0.5, float64(len(values))-0.5)
-	ax.SetYLim(0, math.Max(maxFloat64(values)*1.05, 1))
+	if opts.ManualXLim {
+		ax.SetXLim(opts.XMin, opts.XMax)
+	} else {
+		ax.SetXLim(-0.5, float64(len(values))-0.5)
+	}
+	if opts.YMax > 0 {
+		ax.SetYLim(0, opts.YMax)
+	} else {
+		ax.SetYLim(0, math.Max(maxFloat64(values)*1.05, 1))
+	}
 	ax.XAxis.Locator = core.FixedLocator{TicksList: ticks}
 	ax.XAxis.Formatter = core.FixedFormatter{Labels: append([]string(nil), labels...)}
 	if opts.RotateX {
-		ax.XAxis.MajorLabelStyle = core.TickLabelStyle{Rotation: 45, AutoAlign: true}
+		ax.XAxis.MajorLabelStyle = core.TickLabelStyle{
+			Rotation: 45,
+			HAlign:   core.TextAlignRight,
+			VAlign:   core.TextVAlignTop,
+		}
 	}
 
+	if opts.Opaque {
+		return saveMatplotlibFigure(fig, opts.Output, width, height, render.Color{R: 1, G: 1, B: 1, A: 1})
+	}
 	return saveMatplotlibFigure(fig, opts.Output, width, height)
 }
 

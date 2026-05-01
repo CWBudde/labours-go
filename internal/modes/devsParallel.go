@@ -619,12 +619,6 @@ func plotDeveloperConcurrency(metrics ParallelismMetrics, output string) error {
 		return fmt.Errorf("no active developers found")
 	}
 
-	// Create a bar chart showing average overlap per developer
-	p := plot.New()
-	p.Title.Text = "Developer Collaboration Patterns"
-	p.X.Label.Text = "Developers"
-	p.Y.Label.Text = "Average Overlap Coefficient"
-
 	// Calculate average overlap for each developer
 	devOverlapAvgs := make([]float64, len(metrics.ActiveDevelopers))
 	for i, dev := range metrics.ActiveDevelopers {
@@ -644,38 +638,73 @@ func plotDeveloperConcurrency(metrics ParallelismMetrics, output string) error {
 		}
 	}
 
-	// Create bar chart
-	bars := make(plotter.Values, len(devOverlapAvgs))
+	labels := make([]string, len(metrics.ActiveDevelopers))
+	values := make([]float64, len(devOverlapAvgs))
+	maxOverlap := 0.0
 	for i, avg := range devOverlapAvgs {
-		bars[i] = avg
+		values[i] = avg
+		labels[i] = compactParallelDeveloperLabel(metrics.ActiveDevelopers[i], 18)
+		if avg > maxOverlap {
+			maxOverlap = avg
+		}
 	}
+	yMax := maxOverlap * 1.05
 
-	barChart, err := plotter.NewBarChart(bars, vg.Points(20))
-	if err != nil {
-		return fmt.Errorf("error creating bar chart: %v", err)
-	}
-	barChart.Color = graphics.ColorPalette[2]
-
-	p.Add(barChart)
-
-	// Set custom X-axis labels
-	p.NominalX(metrics.ActiveDevelopers...)
-
-	// Save PNG with dynamic sizing
-	width2, height2 := graphics.GetPlotSize(graphics.ChartTypeDefault)
+	barColor := color.RGBA{R: 114, G: 183, B: 178, A: 255}
 	outputFile := filepath.Join(output, "developer_concurrency.png")
-	if err := p.Save(width2, height2, outputFile); err != nil {
+	if err := graphics.PlotBarChartMatplotlib(labels, values, graphics.MatplotlibBarOptions{
+		Title:        "Developer Collaboration Patterns",
+		XLabel:       "Developers",
+		YLabel:       "Average Overlap Coefficient",
+		Output:       outputFile,
+		WidthInches:  15.36,
+		HeightInches: 7.68,
+		RotateX:      true,
+		Color:        barColor,
+		DisableGrid:  true,
+		Opaque:       true,
+		DefaultStyle: true,
+		ManualXLim:   true,
+		XMin:         -0.64,
+		XMax:         float64(len(labels)) - 0.36,
+		YMax:         yMax,
+	}); err != nil {
 		return fmt.Errorf("failed to save developer concurrency plot: %v", err)
 	}
 
-	// Save SVG
 	outputFileSVG := filepath.Join(output, "developer_concurrency.svg")
-	if err := p.Save(width2, height2, outputFileSVG); err != nil {
+	if err := graphics.PlotBarChartMatplotlib(labels, values, graphics.MatplotlibBarOptions{
+		Title:        "Developer Collaboration Patterns",
+		XLabel:       "Developers",
+		YLabel:       "Average Overlap Coefficient",
+		Output:       outputFileSVG,
+		WidthInches:  15.36,
+		HeightInches: 7.68,
+		RotateX:      true,
+		Color:        barColor,
+		DisableGrid:  true,
+		Opaque:       true,
+		DefaultStyle: true,
+		ManualXLim:   true,
+		XMin:         -0.64,
+		XMax:         float64(len(labels)) - 0.36,
+		YMax:         yMax,
+	}); err != nil {
 		return fmt.Errorf("failed to save developer concurrency SVG: %v", err)
 	}
 
 	fmt.Printf("Saved developer concurrency plots to %s and %s\n", outputFile, outputFileSVG)
 	return nil
+}
+
+func compactParallelDeveloperLabel(label string, limit int) string {
+	if limit <= 0 || len(label) <= limit {
+		return label
+	}
+	if limit <= 3 {
+		return label[len(label)-limit:]
+	}
+	return "..." + label[len(label)-(limit-3):]
 }
 
 // generateSyntheticParallelAnalysis creates a fallback analysis when real data is not available
