@@ -3,7 +3,9 @@ package modes
 import (
 	"bytes"
 	"fmt"
+	"image"
 	"image/color"
+	"image/png"
 	"math"
 	"os"
 	"path/filepath"
@@ -428,7 +430,7 @@ func plotBusFactorSubsystemsMatplotlib(repoName string, labels []string, values 
 		ax.SetTitle("Bus Factor Subsystems")
 	}
 	ax.SetXLabel("Bus Factor")
-	ax.AddXGrid()
+	ax.XAxis.Locator = core.MaxNLocator{Integer: true}
 
 	y := make([]float64, len(values))
 	barValues := make([]float64, len(values))
@@ -470,7 +472,7 @@ func plotBusFactorSubsystemsMatplotlib(repoName string, labels []string, values 
 	ax.YAxis.Locator = core.FixedLocator{TicksList: ticks}
 	ax.YAxis.Formatter = core.FixedFormatter{Labels: append([]string(nil), labels...)}
 
-	if err := saveReportFigure(fig, output, width, height); err != nil {
+	if err := saveReportFigureWithoutTightLayout(fig, output, width, height); err != nil {
 		return err
 	}
 	fmt.Printf("Saved %s\n", output)
@@ -1026,8 +1028,58 @@ func saveReportFigureDirect(fig *core.Figure, output string, width, height int) 
 		if err != nil {
 			return fmt.Errorf("failed to create AGG renderer: %v", err)
 		}
-		return core.SavePNG(fig, renderer, output)
+		if err := core.SavePNG(fig, renderer, output); err != nil {
+			return err
+		}
+		return whitenTransparentPNGMatte(output)
 	}
+}
+
+func whitenTransparentPNGMatte(path string) error {
+	file, err := os.Open(path)
+	if err != nil {
+		return fmt.Errorf("failed to open PNG for matte normalization: %v", err)
+	}
+	img, _, err := image.Decode(file)
+	closeErr := file.Close()
+	if err != nil {
+		return fmt.Errorf("failed to decode PNG for matte normalization: %v", err)
+	}
+	if closeErr != nil {
+		return fmt.Errorf("failed to close PNG for matte normalization: %v", closeErr)
+	}
+
+	bounds := img.Bounds()
+	out := image.NewNRGBA(bounds)
+	changed := false
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			pixel := color.NRGBAModel.Convert(img.At(x, y)).(color.NRGBA)
+			if pixel.A == 0 && (pixel.R != 255 || pixel.G != 255 || pixel.B != 255) {
+				pixel.R = 255
+				pixel.G = 255
+				pixel.B = 255
+				changed = true
+			}
+			out.SetNRGBA(x, y, pixel)
+		}
+	}
+	if !changed {
+		return nil
+	}
+
+	file, err = os.Create(path)
+	if err != nil {
+		return fmt.Errorf("failed to rewrite PNG for matte normalization: %v", err)
+	}
+	if err := png.Encode(file, out); err != nil {
+		_ = file.Close()
+		return fmt.Errorf("failed to encode PNG for matte normalization: %v", err)
+	}
+	if err := file.Close(); err != nil {
+		return fmt.Errorf("failed to close normalized PNG: %v", err)
+	}
+	return nil
 }
 
 func knowledgeDistributionColor(editors int) color.Color {

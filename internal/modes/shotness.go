@@ -104,6 +104,15 @@ func processShotnessRecords(records []readers.ShotnessRecord) []ShotnessResult {
 	// Sort by total hits (descending) to identify the hottest spots
 	sort.Slice(results, func(i, j int) bool {
 		if results[i].TotalHits == results[j].TotalHits {
+			if results[i].File != results[j].File {
+				return results[i].File > results[j].File
+			}
+			if results[i].Name != results[j].Name {
+				return results[i].Name > results[j].Name
+			}
+			if results[i].Type != results[j].Type {
+				return results[i].Type > results[j].Type
+			}
 			return results[i].OriginalIndex > results[j].OriginalIndex
 		}
 		return results[i].TotalHits > results[j].TotalHits
@@ -122,24 +131,37 @@ func plotShotness(results []ShotnessResult, output string) error {
 
 	labels := make([]string, len(results))
 	values := make(plotter.Values, len(results))
+	maxValue := 0.0
 	for i, result := range results {
 		labels[i] = compactPlotLabel(fmt.Sprintf("%s:%s", result.Type, result.Name), 24)
 		values[i] = float64(result.TotalHits)
+		if values[i] > maxValue {
+			maxValue = values[i]
+		}
 	}
 
 	p := plot.New()
 	p.Title.Text = "Code Hotspots (Most Frequently Modified Structural Units)"
+	// Match the Python reference's tight_layout spacing around rotated ticks.
+	p.Title.Padding = vg.Points(10)
 	p.X.Label.Text = "Structural Units"
+	p.X.Label.Padding = vg.Points(10)
 	p.Y.Label.Text = "Total Modifications"
+	p.Y.Min = 0
+	p.Y.Max = maxValue * 1.05
 
 	bars, err := plotter.NewBarChart(values, vg.Points(40))
 	if err != nil {
 		return fmt.Errorf("failed to create bar chart: %v", err)
 	}
 	bars.Color = color.RGBA{R: 228, G: 87, B: 86, A: 255}
+	bars.LineStyle.Width = 0
 	p.Add(bars)
 
 	p.NominalX(labels...)
+	// Matplotlib's bar autoscale leaves asymmetric room for edge bars and labels.
+	p.X.Min = -0.53
+	p.X.Max = float64(len(results)) + 0.60
 	p.X.Tick.Label.Rotation = 0.785398 // 45 degrees in radians
 	p.X.Tick.Label.XAlign = -0.5
 	p.X.Tick.Label.YAlign = -0.5
