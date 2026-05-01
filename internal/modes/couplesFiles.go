@@ -178,48 +178,8 @@ func plotCouplingHeatmap(analysis FileCouplingAnalysis, output string) error {
 		return fmt.Errorf("no coupling matrix data available")
 	}
 
-	// Create heatmap data
-	heatmapData := make([][]float64, len(analysis.CouplingMatrix))
-	maxVal := 0.0
-	minVal := float64(analysis.Statistics.MaxCoupling)
-
-	for i, row := range analysis.CouplingMatrix {
-		heatmapData[i] = make([]float64, len(row))
-		for j, val := range row {
-			heatmapData[i][j] = float64(val)
-			if float64(val) > maxVal {
-				maxVal = float64(val)
-			}
-			if float64(val) < minVal && val > 0 {
-				minVal = float64(val)
-			}
-		}
-	}
-
-	// Create custom palette for heatmap
-	palette := &graphics.CustomPalette{
-		Colors: []color.Color{
-			color.RGBA{255, 255, 255, 255}, // White for low values
-			color.RGBA{255, 200, 200, 255}, // Light red
-			color.RGBA{255, 100, 100, 255}, // Medium red
-			color.RGBA{200, 0, 0, 255},     // Dark red for high values
-		},
-		Min: minVal,
-		Max: maxVal,
-	}
-
-	// Create plot
-	p := plot.New()
-	p.Title.Text = "File Coupling Heatmap"
-
-	// Create heatmap
-	heatmap := graphics.NewHeatMap(heatmapData, analysis.FileNames, analysis.FileNames, palette)
-	p.Add(heatmap)
-
-	// Save the plot
 	outputFile := filepath.Join(output, "file_coupling_heatmap.png")
-	widthHeat, heightHeat := graphics.GetPlotSize(graphics.ChartTypeSquare)
-	if err := p.Save(widthHeat, heightHeat, outputFile); err != nil {
+	if err := plotPythonCouplingHeatmap("File Coupling Heatmap", outputFile, analysis.FileNames, analysis.CouplingMatrix, "Reds"); err != nil {
 		return fmt.Errorf("failed to save heatmap: %v", err)
 	}
 

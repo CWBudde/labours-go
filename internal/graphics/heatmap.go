@@ -19,6 +19,28 @@ var registerHeatmapColormapsOnce sync.Once
 // but not provided by matplotlib-go's default registry.
 func RegisterPythonLaboursHeatmapColormaps() {
 	registerHeatmapColormapsOnce.Do(func() {
+		matcolor.RegisterColormap("Reds", matcolor.NewColormap("Reds", []matcolor.ColorStop{
+			{Pos: 0.000, Color: render.Color{R: 1.000, G: 0.961, B: 0.941, A: 1}},
+			{Pos: 0.125, Color: render.Color{R: 0.996, G: 0.878, B: 0.824, A: 1}},
+			{Pos: 0.250, Color: render.Color{R: 0.988, G: 0.733, B: 0.631, A: 1}},
+			{Pos: 0.375, Color: render.Color{R: 0.988, G: 0.573, B: 0.447, A: 1}},
+			{Pos: 0.500, Color: render.Color{R: 0.984, G: 0.416, B: 0.290, A: 1}},
+			{Pos: 0.625, Color: render.Color{R: 0.937, G: 0.231, B: 0.173, A: 1}},
+			{Pos: 0.750, Color: render.Color{R: 0.796, G: 0.094, B: 0.114, A: 1}},
+			{Pos: 0.875, Color: render.Color{R: 0.647, G: 0.059, B: 0.082, A: 1}},
+			{Pos: 1.000, Color: render.Color{R: 0.404, G: 0.000, B: 0.051, A: 1}},
+		}))
+		matcolor.RegisterColormap("Greens", matcolor.NewColormap("Greens", []matcolor.ColorStop{
+			{Pos: 0.000, Color: render.Color{R: 0.969, G: 0.988, B: 0.961, A: 1}},
+			{Pos: 0.125, Color: render.Color{R: 0.898, G: 0.961, B: 0.878, A: 1}},
+			{Pos: 0.250, Color: render.Color{R: 0.780, G: 0.914, B: 0.753, A: 1}},
+			{Pos: 0.375, Color: render.Color{R: 0.631, G: 0.851, B: 0.608, A: 1}},
+			{Pos: 0.500, Color: render.Color{R: 0.455, G: 0.769, B: 0.463, A: 1}},
+			{Pos: 0.625, Color: render.Color{R: 0.255, G: 0.671, B: 0.365, A: 1}},
+			{Pos: 0.750, Color: render.Color{R: 0.137, G: 0.545, B: 0.271, A: 1}},
+			{Pos: 0.875, Color: render.Color{R: 0.000, G: 0.427, B: 0.173, A: 1}},
+			{Pos: 1.000, Color: render.Color{R: 0.000, G: 0.267, B: 0.106, A: 1}},
+		}))
 		matcolor.RegisterColormap("OrRd", matcolor.NewColormap("OrRd", []matcolor.ColorStop{
 			{Pos: 0.000, Color: render.Color{R: 1.000, G: 0.969, B: 0.925, A: 1}},
 			{Pos: 0.125, Color: render.Color{R: 0.996, G: 0.910, B: 0.784, A: 1}},

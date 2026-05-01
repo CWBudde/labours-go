@@ -97,6 +97,16 @@ type MatplotlibLineOptions struct {
 	Legend       bool
 }
 
+type MatplotlibHeatmapOptions struct {
+	Title        string
+	Output       string
+	Colormap     string
+	WidthInches  float64
+	HeightInches float64
+	XLabelLimit  int
+	YLabelLimit  int
+}
+
 func PlotTimeAreasMatplotlib(dates []time.Time, series []MatplotlibTimeAreaSeries, opts MatplotlibTimeAreaOptions) error {
 	if len(dates) == 0 {
 		return fmt.Errorf("no dates to plot")
@@ -252,6 +262,50 @@ func PlotLineChartMatplotlib(series []MatplotlibLineSeries, opts MatplotlibLineO
 	}
 
 	return saveMatplotlibFigure(fig, opts.Output, width, height)
+}
+
+func PlotHeatmapMatplotlib(matrix [][]float64, rowLabels, colLabels []string, opts MatplotlibHeatmapOptions) error {
+	if err := ValidateHeatMap(matrix, rowLabels, colLabels); err != nil {
+		return err
+	}
+
+	RegisterPythonLaboursHeatmapColormaps()
+
+	width, height := pythonPlotPixelSize(defaultPlotWidth(opts.WidthInches), defaultPlotHeight(opts.HeightInches))
+	fig := core.NewFigure(width, height)
+	fig.RC.XTickLabelFontSize = 8
+	fig.RC.YTickLabelFontSize = 8
+	gs := fig.GridSpec(1, 1,
+		core.WithGridSpecPadding(0.125, 0.965, 0.087, 0.970),
+		core.WithGridSpecSpacing(0, 0),
+	)
+	ax := gs.Cell(0, 0).AddAxes()
+	if ax == nil {
+		return fmt.Errorf("failed to create axes")
+	}
+
+	ax.SetTitle(opts.Title)
+	cmap := opts.Colormap
+	if cmap == "" {
+		cmap = "Reds"
+	}
+	vmin := 0.0
+	vmax := maxMatrixFloat64(matrix)
+	img := ax.ImShow(matrix, core.ImShowOptions{
+		Colormap: &cmap,
+		VMin:     &vmin,
+		VMax:     &vmax,
+		Aspect:   "auto",
+		Origin:   core.ImageOriginUpper,
+	})
+	if img == nil {
+		return fmt.Errorf("failed to create heatmap image")
+	}
+
+	configureMatplotlibHeatmapTicks(ax, rowLabels, colLabels, opts)
+	fig.AddColorbar(ax, img, core.ColorbarOptions{Width: 0.038, Padding: 0.034})
+
+	return saveMatplotlibFigureWithoutTightLayout(fig, opts.Output, width, height, render.Color{R: 1, G: 1, B: 1, A: 1})
 }
 
 func PlotBarChartMatplotlib(labels []string, values []float64, opts MatplotlibBarOptions) error {
@@ -442,4 +496,59 @@ func maxFloat64(values []float64) float64 {
 		}
 	}
 	return maxValue
+}
+
+func maxMatrixFloat64(matrix [][]float64) float64 {
+	maxValue := 0.0
+	for _, row := range matrix {
+		for _, value := range row {
+			if value > maxValue {
+				maxValue = value
+			}
+		}
+	}
+	return maxValue
+}
+
+func configureMatplotlibHeatmapTicks(ax *core.Axes, rowLabels, colLabels []string, opts MatplotlibHeatmapOptions) {
+	xTicks := make([]float64, len(colLabels))
+	xLabels := make([]string, len(colLabels))
+	xLimit := opts.XLabelLimit
+	if xLimit <= 0 {
+		xLimit = 18
+	}
+	for i, label := range colLabels {
+		xTicks[i] = float64(i)
+		xLabels[i] = compactMatplotlibLabel(label, xLimit)
+	}
+	ax.XAxis.Locator = core.FixedLocator{TicksList: xTicks}
+	ax.XAxis.Formatter = core.FixedFormatter{Labels: xLabels}
+	ax.XAxis.MajorLabelStyle = core.TickLabelStyle{
+		Rotation: 90,
+		HAlign:   core.TextAlignRight,
+		VAlign:   core.TextVAlignMiddle,
+	}
+
+	yTicks := make([]float64, len(rowLabels))
+	yLabels := make([]string, len(rowLabels))
+	yLimit := opts.YLabelLimit
+	if yLimit <= 0 {
+		yLimit = 28
+	}
+	for i, label := range rowLabels {
+		yTicks[i] = float64(i)
+		yLabels[i] = compactMatplotlibLabel(label, yLimit)
+	}
+	ax.YAxis.Locator = core.FixedLocator{TicksList: yTicks}
+	ax.YAxis.Formatter = core.FixedFormatter{Labels: yLabels}
+}
+
+func compactMatplotlibLabel(label string, limit int) string {
+	if limit <= 0 || len(label) <= limit {
+		return label
+	}
+	if limit <= 3 {
+		return label[len(label)-limit:]
+	}
+	return "..." + label[len(label)-(limit-3):]
 }

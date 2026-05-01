@@ -11,7 +11,6 @@ import (
 	"gonum.org/v1/plot/plotter"
 	"gonum.org/v1/plot/vg"
 	"gonum.org/v1/plot/vg/draw"
-	"labours-go/internal/graphics"
 	"labours-go/internal/progress"
 	"labours-go/internal/readers"
 )
@@ -175,46 +174,13 @@ func plotShotnessCouplingHeatmap(analysis ShotnessCouplingAnalysis, output strin
 		return fmt.Errorf("no coupling matrix data available")
 	}
 
-	// Create heatmap data
-	heatmapData := make([][]float64, len(analysis.CouplingMatrix))
-	maxVal := 0.0
-	minVal := float64(analysis.Statistics.MaxCoupling)
-
-	for i, row := range analysis.CouplingMatrix {
-		heatmapData[i] = make([]float64, len(row))
-		for j, val := range row {
-			heatmapData[i][j] = float64(val)
-			if float64(val) > maxVal {
-				maxVal = float64(val)
-			}
-			if float64(val) < minVal && val > 0 {
-				minVal = float64(val)
-			}
-		}
+	pngFile := filepath.Join(output, "shotness_coupling_heatmap.png")
+	if err := plotPythonCouplingHeatmap("Shotness Coupling Heatmap", pngFile, analysis.EntityNames, analysis.CouplingMatrix, "Greens"); err != nil {
+		return fmt.Errorf("failed to save heatmap: %v", err)
 	}
 
-	// Create custom palette for heatmap (green theme for shotness)
-	palette := &graphics.CustomPalette{
-		Colors: []color.Color{
-			color.RGBA{255, 255, 255, 255}, // White for no coupling
-			color.RGBA{200, 255, 200, 255}, // Light green
-			color.RGBA{100, 255, 100, 255}, // Medium green
-			color.RGBA{0, 200, 0, 255},     // Dark green for high coupling
-		},
-		Min: minVal,
-		Max: maxVal,
-	}
-
-	// Create plot
-	p := plot.New()
-	p.Title.Text = "Shotness Coupling Heatmap"
-
-	// Create heatmap
-	heatmap := graphics.NewHeatMap(heatmapData, analysis.EntityNames, analysis.EntityNames, palette)
-	p.Add(heatmap)
-
-	pngFile, svgFile, err := savePlotPNGAndSVG(p, 12*vg.Inch, 12*vg.Inch, output, "shotness_coupling_heatmap")
-	if err != nil {
+	svgFile := filepath.Join(output, "shotness_coupling_heatmap.svg")
+	if err := plotPythonCouplingHeatmap("Shotness Coupling Heatmap", svgFile, analysis.EntityNames, analysis.CouplingMatrix, "Greens"); err != nil {
 		return fmt.Errorf("failed to save heatmap: %v", err)
 	}
 

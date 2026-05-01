@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -189,8 +190,8 @@ func HotspotRisk(reader readers.Reader, output string) error {
 	sort.Slice(files, func(i, j int) bool {
 		return files[i].RiskScore > files[j].RiskScore
 	})
-	if len(files) > 15 {
-		files = files[:15]
+	if len(files) > 20 {
+		files = files[:20]
 	}
 
 	labels := make([]string, len(files))
@@ -202,7 +203,7 @@ func HotspotRisk(reader readers.Reader, output string) error {
 
 	fmt.Printf("Hotspot risk: %d files, window=%d days, top risk=%.3f (%s)\n",
 		len(data.Files), data.WindowDays, files[0].RiskScore, files[0].Path)
-	if err := plotHotspotRiskRanked(files, labels, values, output); err != nil {
+	if err := plotHotspotRiskRanked(reader.GetName(), files, labels, values, output); err != nil {
 		return err
 	}
 	if err := writeHotspotRiskTable(files, siblingOutputPath(output, "hotspot-risk.png", "table.tsv")); err != nil {
@@ -705,19 +706,28 @@ func writeHotspotRiskTable(files []readers.HotspotRiskFile, output string) error
 	return nil
 }
 
-func plotHotspotRiskRanked(files []readers.HotspotRiskFile, labels []string, values plotter.Values, output string) error {
+func plotHotspotRiskRanked(repoName string, files []readers.HotspotRiskFile, labels []string, values plotter.Values, output string) error {
 	output, err := resolveReportOutput(output, "hotspot-risk.png")
 	if err != nil {
 		return err
 	}
 	width, height := reportPlotPixels("hotspot-risk.png")
-	fig := newReportFigure(width, height)
-	grid := fig.Subplots(1, 2, core.WithSubplotPadding(0.18, 0.95, 0.14, 0.88), core.WithSubplotSpacing(0.22, 0.1))
-	if len(grid) == 0 || len(grid[0]) < 2 {
+	fig := newHotspotRiskFigure(width, height)
+	gs := fig.GridSpec(
+		1,
+		2,
+		core.WithGridSpecPadding(0.18, 0.95, 0.14, 0.88),
+		core.WithGridSpecSpacing(0.22, 0.1),
+		core.WithGridSpecWidthRatios(3, 2),
+	)
+	if gs == nil {
 		return fmt.Errorf("failed to create hotspot risk axes")
 	}
-	axRisk := grid[0][0]
-	axComponents := grid[0][1]
+	axRisk := gs.Cell(0, 0).AddAxes()
+	axComponents := gs.Cell(0, 1).AddAxes()
+	if axRisk == nil || axComponents == nil {
+		return fmt.Errorf("failed to create hotspot risk axes")
+	}
 
 	y := make([]float64, len(files))
 	risk := make([]float64, len(files))
@@ -735,10 +745,10 @@ func plotHotspotRiskRanked(files []readers.HotspotRiskFile, labels []string, val
 		risk[i] = float64(values[i])
 		maxRisk = math.Max(maxRisk, risk[i])
 		displayNames[i] = hotspotDisplayName(labels[i], file.Path)
-		sizeNorm[i] = math.Log(float64(file.Size)+1) / math.Log(maxSize+1)
-		churnNorm[i] = float64(file.Churn) / maxChurn
-		couplingNorm[i] = float64(file.CouplingDegree) / maxCoupling
-		ownershipNorm[i] = file.OwnershipGini
+		sizeNorm[i] = hotspotSizeNormalized(file, maxSize)
+		churnNorm[i] = hotspotNormalized(file.ChurnNormalized, float64(file.Churn), maxChurn)
+		couplingNorm[i] = hotspotNormalized(file.CouplingNormalized, float64(file.CouplingDegree), maxCoupling)
+		ownershipNorm[i] = hotspotNormalized(file.OwnershipNormalized, file.OwnershipGini, 1)
 	}
 
 	orientation := core.BarHorizontal
@@ -750,27 +760,42 @@ func plotHotspotRiskRanked(files []readers.HotspotRiskFile, labels []string, val
 	riskBars.Colors = hotspotRiskColors(risk, maxRisk)
 	riskBars.EdgeColor = render.Color{R: 0, G: 0, B: 0, A: 1}
 	riskBars.EdgeWidth = 0.5
-	axRisk.SetTitle("Top Risky Files")
+	axRisk.SetTitle(fmt.Sprintf("Top Risky Files - %s", repoName))
 	axRisk.SetXLabel("Composite Risk Score")
-	axRisk.SetXLim(0, math.Max(maxRisk*1.1, 1))
+	if maxRisk == 0 {
+		axRisk.SetXLim(-0.05, 0.05)
+		black := render.Color{R: 0, G: 0, B: 0, A: 1}
+		lineWidth := 0.5
+		axRisk.AxVLine(0, core.VLineOptions{Color: &black, LineWidth: &lineWidth})
+	} else {
+		axRisk.SetXLim(0, maxRisk*1.1)
+	}
 	axRisk.SetYLim(-0.5, float64(len(files))-0.5)
 	axRisk.InvertY()
 	axRisk.AddXGrid()
 	axRisk.YAxis.Locator = core.FixedLocator{TicksList: ticks}
 	axRisk.YAxis.Formatter = core.FixedFormatter{Labels: displayNames}
 
-	addHotspotComponentBars(axComponents, y, sizeNorm, nil, "#3498db", "Size (log)")
+	componentAlpha := 0.8
+	renderComponentAlpha := componentAlpha
+	if !strings.EqualFold(filepath.Ext(output), ".svg") {
+		// The AGG clipped-path alpha path corrupts these fills, so render
+		// them opaque and restore the intended alpha in the saved PNG.
+		renderComponentAlpha = 1
+	}
+
+	addHotspotComponentBars(axComponents, y, sizeNorm, nil, "#3498db", "Size (log)", renderComponentAlpha)
 	left := append([]float64(nil), sizeNorm...)
-	addHotspotComponentBars(axComponents, y, churnNorm, left, "#e74c3c", "Churn")
+	addHotspotComponentBars(axComponents, y, churnNorm, left, "#e74c3c", "Churn", renderComponentAlpha)
 	for i := range left {
 		left[i] += churnNorm[i]
 	}
-	addHotspotComponentBars(axComponents, y, couplingNorm, left, "#f39c12", "Coupling")
+	addHotspotComponentBars(axComponents, y, couplingNorm, left, "#f39c12", "Coupling", renderComponentAlpha)
 	for i := range left {
 		left[i] += couplingNorm[i]
 	}
-	addHotspotComponentBars(axComponents, y, ownershipNorm, left, "#9b59b6", "Ownership")
-	axComponents.SetTitle("Risk Components")
+	addHotspotComponentBars(axComponents, y, ownershipNorm, left, "#9b59b6", "Ownership", renderComponentAlpha)
+	axComponents.SetTitle(repoName)
 	axComponents.SetXLabel("Normalized Factors")
 	axComponents.SetXLim(0, 4)
 	axComponents.SetYLim(-0.5, float64(len(files))-0.5)
@@ -783,16 +808,20 @@ func plotHotspotRiskRanked(files []readers.HotspotRiskFile, labels []string, val
 	if err := saveReportFigure(fig, output, width, height); err != nil {
 		return err
 	}
+	if renderComponentAlpha != componentAlpha {
+		if err := applyHotspotComponentAlpha(output, componentAlpha); err != nil {
+			return err
+		}
+	}
 	fmt.Printf("Saved %s\n", output)
 	return nil
 }
 
-func addHotspotComponentBars(ax *core.Axes, y, values, left []float64, hex, label string) {
+func addHotspotComponentBars(ax *core.Axes, y, values, left []float64, hex, label string, alpha float64) {
 	orientation := core.BarHorizontal
 	barHeight := 0.8
-	alpha := 0.8
 	c := renderColor(mustHexColor(hex))
-	ax.Bar(y, values, core.BarOptions{
+	bars := ax.Bar(y, values, core.BarOptions{
 		Color:       &c,
 		Width:       &barHeight,
 		Baselines:   left,
@@ -800,6 +829,64 @@ func addHotspotComponentBars(ax *core.Axes, y, values, left []float64, hex, labe
 		Alpha:       &alpha,
 		Label:       label,
 	})
+	if bars != nil {
+		bars.Colors = make([]render.Color, len(values))
+		for i := range bars.Colors {
+			bars.Colors[i] = c
+		}
+	}
+}
+
+func applyHotspotComponentAlpha(path string, alpha float64) error {
+	file, err := os.Open(path)
+	if err != nil {
+		return fmt.Errorf("failed to open hotspot risk PNG for alpha normalization: %v", err)
+	}
+	img, _, err := image.Decode(file)
+	closeErr := file.Close()
+	if err != nil {
+		return fmt.Errorf("failed to decode hotspot risk PNG for alpha normalization: %v", err)
+	}
+	if closeErr != nil {
+		return fmt.Errorf("failed to close hotspot risk PNG: %v", closeErr)
+	}
+
+	targetAlpha := uint8(math.Round(math.Max(0, math.Min(1, alpha)) * 255))
+	colors := map[[3]uint8]struct{}{
+		{0x34, 0x98, 0xdb}: {},
+		{0xe7, 0x4c, 0x3c}: {},
+		{0xf3, 0x9c, 0x12}: {},
+		{0x9b, 0x59, 0xb6}: {},
+	}
+	bounds := img.Bounds()
+	out := image.NewNRGBA(bounds)
+	changed := false
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			pixel := color.NRGBAModel.Convert(img.At(x, y)).(color.NRGBA)
+			if _, ok := colors[[3]uint8{pixel.R, pixel.G, pixel.B}]; ok && pixel.A != targetAlpha {
+				pixel.A = targetAlpha
+				changed = true
+			}
+			out.SetNRGBA(x, y, pixel)
+		}
+	}
+	if !changed {
+		return nil
+	}
+
+	file, err = os.Create(path)
+	if err != nil {
+		return fmt.Errorf("failed to rewrite hotspot risk PNG alpha: %v", err)
+	}
+	if err := png.Encode(file, out); err != nil {
+		_ = file.Close()
+		return err
+	}
+	if err := file.Close(); err != nil {
+		return fmt.Errorf("failed to close hotspot risk PNG alpha: %v", err)
+	}
+	return nil
 }
 
 func hotspotMaxima(files []readers.HotspotRiskFile) (float64, float64, float64) {
@@ -810,6 +897,26 @@ func hotspotMaxima(files []readers.HotspotRiskFile) (float64, float64, float64) 
 		maxCoupling = math.Max(maxCoupling, float64(file.CouplingDegree))
 	}
 	return maxSize, maxChurn, maxCoupling
+}
+
+func hotspotSizeNormalized(file readers.HotspotRiskFile, maxSize float64) float64 {
+	if file.SizeNormalized > 0 {
+		return file.SizeNormalized
+	}
+	if maxSize <= 0 {
+		return 0
+	}
+	return math.Log(float64(file.Size)+1) / math.Log(maxSize+1)
+}
+
+func hotspotNormalized(normalized, raw, maxValue float64) float64 {
+	if normalized > 0 {
+		return normalized
+	}
+	if maxValue <= 0 {
+		return 0
+	}
+	return raw / maxValue
 }
 
 func hotspotDisplayName(label, path string) string {
@@ -999,6 +1106,28 @@ func newKnowledgeSilosFigure(width, height int) *core.Figure {
 	)
 }
 
+func newHotspotRiskFigure(width, height int) *core.Figure {
+	background := render.Color{R: 1, G: 1, B: 1, A: 0}
+	text := render.Color{R: 0, G: 0, B: 0, A: 1}
+	return core.NewFigure(
+		width,
+		height,
+		style.WithTheme(style.ThemeGGPlot),
+		style.WithFont("DejaVu Sans", 12),
+		style.WithTextColor(0, 0, 0, 1),
+		style.WithBackground(1, 1, 1, 0),
+		style.WithAxesBackground(background),
+		style.WithAxesEdgeColor(text),
+		style.WithLegendColors(render.Color{R: 1, G: 1, B: 1, A: 0.8}, background, text),
+		func(rc *style.RC) {
+			rc.TitleFontSize = 12
+			rc.AxisLabelFontSize = 11
+			rc.YTickLabelFontSize = 9
+			rc.LegendFontSize = 9
+		},
+	)
+}
+
 func saveReportFigure(fig *core.Figure, output string, width, height int) error {
 	fig.TightLayout()
 	return saveReportFigureDirect(fig, output, width, height)
@@ -1122,11 +1251,19 @@ func mustHexColor(hex string) color.RGBA {
 	if len(hex) != 6 {
 		return color.RGBA{A: 255}
 	}
-	var r, g, b uint8
-	if _, err := fmt.Sscanf(hex, "%02x%02x%02x", &r, &g, &b); err != nil {
+	r, err := strconv.ParseUint(hex[0:2], 16, 8)
+	if err != nil {
 		return color.RGBA{A: 255}
 	}
-	return color.RGBA{R: r, G: g, B: b, A: 255}
+	g, err := strconv.ParseUint(hex[2:4], 16, 8)
+	if err != nil {
+		return color.RGBA{A: 255}
+	}
+	b, err := strconv.ParseUint(hex[4:6], 16, 8)
+	if err != nil {
+		return color.RGBA{A: 255}
+	}
+	return color.RGBA{R: uint8(r), G: uint8(g), B: uint8(b), A: 255}
 }
 
 func interpolateColor(a, b color.RGBA, t float64) color.RGBA {
