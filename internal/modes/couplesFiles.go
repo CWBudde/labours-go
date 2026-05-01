@@ -235,6 +235,7 @@ func plotTopCouplingPairs(analysis FileCouplingAnalysis, output string) error {
 
 	p := plot.New()
 	p.X.Label.Text = "Coupling Pair Rank"
+	p.X.Label.Padding = vg.Points(3)
 	p.Y.Label.Text = "Coupling Score"
 
 	// Prepare data for bar chart
@@ -249,7 +250,7 @@ func plotTopCouplingPairs(analysis FileCouplingAnalysis, output string) error {
 	}
 
 	// Create bar chart
-	bars, err := plotter.NewBarChart(values, couplingBarWidth(maxPairs))
+	bars, err := plotter.NewBarChart(values, couplingFilePairBarWidth(maxPairs))
 	if err != nil {
 		return fmt.Errorf("error creating bar chart: %v", err)
 	}
@@ -274,13 +275,12 @@ func plotTopCouplingPairs(analysis FileCouplingAnalysis, output string) error {
 		}
 	}
 	p.X.Tick.Marker = plot.ConstantTicks(ticks)
-	p.X.Min = -0.5
-	p.X.Max = float64(maxPairs) - 0.5
+	p.X.Min, p.X.Max = couplingPairXRange(maxPairs)
 	p.Y.Min = 0
 	p.Y.Max = maxCouplingValue(values) * 1.05
 	p.Y.Tick.Marker = plot.ConstantTicks(couplingScoreTicks(p.Y.Max, 2.5, 1))
 	addCouplingPairsTitle(p, "Top File Coupling Pairs", float64(maxPairs-1)/2, p.Y.Max)
-	p.Add(plotTopPadding{Height: vg.Points(84)})
+	p.Add(plotTopPadding{Height: vg.Points(83.25)})
 	p.Add(plotAxesRectangle{})
 
 	// Save the plot
@@ -390,6 +390,23 @@ func couplingBarWidth(maxPairs int) vg.Length {
 		return vg.Points(40)
 	}
 	return vg.Points(880 / float64(maxPairs))
+}
+
+func couplingFilePairBarWidth(maxPairs int) vg.Length {
+	if maxPairs <= 0 {
+		return vg.Points(40)
+	}
+	return vg.Points(800 / float64(maxPairs))
+}
+
+func couplingPairXRange(maxPairs int) (float64, float64) {
+	if maxPairs <= 0 {
+		return -0.5, 0.5
+	}
+	// The Python baseline uses Matplotlib's default 0.8-width bars plus
+	// autoscale padding. Gonum leaves a slightly wider plot canvas, so this
+	// domain matches the same visible rank spacing in the rendered image.
+	return -1.2, float64(maxPairs) + 0.3
 }
 
 func couplingScoreTicks(maxValue, step float64, decimals int) []plot.Tick {
