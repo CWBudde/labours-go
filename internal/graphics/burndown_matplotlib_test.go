@@ -15,20 +15,34 @@ import (
 	"labours-go/internal/burndown"
 )
 
-func TestGeneratePythonLaboursColorPaletteMatchesPythonTab20Cycle(t *testing.T) {
-	colors := PythonLaboursColorPalette(2)
-	if len(colors) != 2 {
-		t.Fatalf("palette length = %d, want 2", len(colors))
+func TestPythonLaboursColorPaletteMatchesGGPlotCycle(t *testing.T) {
+	// Python labours runs `pyplot.style.use("ggplot")` before plotting, so the
+	// palette we produce must match `axes.prop_cycle` from
+	// `matplotlib/mpl-data/stylelib/ggplot.mplstyle`.
+	colors := PythonLaboursColorPalette(7)
+	if len(colors) != 7 {
+		t.Fatalf("palette length = %d, want 7", len(colors))
 	}
 
 	want := []color.Color{
-		color.RGBA{R: 31, G: 119, B: 180, A: 255},
-		color.RGBA{R: 174, G: 199, B: 232, A: 255},
+		color.RGBA{R: 0xE2, G: 0x4A, B: 0x33, A: 255},
+		color.RGBA{R: 0x34, G: 0x8A, B: 0xBD, A: 255},
+		color.RGBA{R: 0x98, G: 0x8E, B: 0xD5, A: 255},
+		color.RGBA{R: 0x77, G: 0x77, B: 0x77, A: 255},
+		color.RGBA{R: 0xFB, G: 0xC1, B: 0x5E, A: 255},
+		color.RGBA{R: 0x8E, G: 0xBA, B: 0x42, A: 255},
+		color.RGBA{R: 0xFF, G: 0xB5, B: 0xB8, A: 255},
 	}
 	for i := range want {
 		if colors[i] != want[i] {
 			t.Fatalf("color %d = %#v, want %#v", i, colors[i], want[i])
 		}
+	}
+
+	// More requested series than palette entries cycles, matching matplotlib.
+	wrapped := PythonLaboursColorPalette(8)
+	if wrapped[7] != want[0] {
+		t.Fatalf("wrap color = %#v, want %#v", wrapped[7], want[0])
 	}
 }
 

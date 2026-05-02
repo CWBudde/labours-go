@@ -23,6 +23,9 @@ type MatplotlibTextLabel struct {
 	Text     string
 	HAlign   core.TextAlign
 	FontSize float64
+	// BackgroundColor draws a filled rectangle behind the label, mirroring
+	// matplotlib's `text(..., backgroundcolor=...)`. Leave nil for no fill.
+	BackgroundColor color.Color
 }
 
 type MatplotlibTimeAreaOptions struct {
@@ -186,12 +189,21 @@ func PlotTimeAreasMatplotlib(dates []time.Time, series []MatplotlibTimeAreaSerie
 		if fontSize == 0 {
 			fontSize = 12
 		}
-		ax.Text(label.X, label.Y, label.Text, core.TextOptions{
+		textOpts := core.TextOptions{
 			FontSize: fontSize,
 			Color:    render.Color{R: 0, G: 0, B: 0, A: 1},
 			HAlign:   label.HAlign,
 			VAlign:   core.TextVAlignMiddle,
-		})
+		}
+		if label.BackgroundColor != nil {
+			fill := renderColor(label.BackgroundColor)
+			textOpts.BBox = &core.TextBBoxOptions{
+				FaceColor: fill,
+				EdgeColor: fill,
+				Padding:   2,
+			}
+		}
+		ax.Text(label.X, label.Y, label.Text, textOpts)
 	}
 
 	if opts.Legend {
@@ -431,13 +443,19 @@ func PlotGroupedBarChartMatplotlib(labels []string, series []MatplotlibGroupedBa
 
 func pythonTransparentFigureOptions() []style.Option {
 	transparent := render.Color{R: 1, G: 1, B: 1, A: 0}
+	white := render.Color{R: 1, G: 1, B: 1, A: 1}
 	text := render.Color{R: 0, G: 0, B: 0, A: 1}
+	// Python labours' `apply_plot_style` sets the legend frame face/edge to
+	// the (opaque) background color and the text to the foreground. Mirror
+	// that here so the legend doesn't render dark when the saved PNG is
+	// composited against a non-white surface.
 	return []style.Option{
 		style.WithTheme(style.ThemeGGPlot),
 		style.WithFont("DejaVu Sans", 12),
 		style.WithBackground(1, 1, 1, 0),
 		style.WithAxesBackground(transparent),
-		style.WithLegendColors(render.Color{R: 1, G: 1, B: 1, A: 0.8}, transparent, text),
+		style.WithAxesEdgeColor(text),
+		style.WithLegendColors(white, white, text),
 	}
 }
 
@@ -455,11 +473,16 @@ func configureTimeAreaAxes(ax *core.Axes, dates []time.Time, opts MatplotlibTime
 	if opts.YMax > opts.YMin {
 		ax.SetYLim(opts.YMin, opts.YMax)
 	}
-	ticks, labels := burndownDateTicks(dates, "")
+	// Generic time-area charts use matplotlib's AutoDateLocator behavior in
+	// Python labours, which never injects the data-range endpoints. We use
+	// timeAxisDateTicks (instead of burndownDateTicks) so a chart like
+	// old_vs_new shows clean monthly labels without the duplicated end-of-
+	// range artifact the burndown-only logic would introduce.
+	ticks, labels := timeAxisDateTicks(dates, "")
 	if len(ticks) > 0 {
 		ax.XAxis.Locator = core.FixedLocator{TicksList: ticks}
 		ax.XAxis.Formatter = core.FixedFormatter{Labels: labels}
-		if len(labels) > 6 {
+		if shouldRotateDateLabels(labels) {
 			ax.XAxis.MajorLabelStyle = core.TickLabelStyle{Rotation: 30, AutoAlign: true}
 		}
 	}
