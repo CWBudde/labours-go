@@ -19,7 +19,7 @@ func TestThemeValidation(t *testing.T) {
 				ColorPalette: []ColorRGB{
 					{R: 255, G: 0, B: 0, A: 255},
 				},
-				Text: TextStyle{Size: 10},
+				Text:  TextStyle{Size: 10},
 				Chart: ChartStyle{FillOpacity: 0.5},
 			},
 			wantErr: false,
@@ -27,8 +27,8 @@ func TestThemeValidation(t *testing.T) {
 		{
 			name: "empty palette",
 			theme: Theme{
-				Name: "test",
-				Text: TextStyle{Size: 10},
+				Name:  "test",
+				Text:  TextStyle{Size: 10},
 				Chart: ChartStyle{FillOpacity: 0.5},
 			},
 			wantErr: true,
@@ -39,7 +39,7 @@ func TestThemeValidation(t *testing.T) {
 				ColorPalette: []ColorRGB{
 					{R: 255, G: 0, B: 0, A: 255},
 				},
-				Text: TextStyle{Size: 10},
+				Text:  TextStyle{Size: 10},
 				Chart: ChartStyle{FillOpacity: 0.5},
 			},
 			wantErr: true,
@@ -51,7 +51,7 @@ func TestThemeValidation(t *testing.T) {
 				ColorPalette: []ColorRGB{
 					{R: 255, G: 0, B: 0, A: 255},
 				},
-				Text: TextStyle{Size: -1},
+				Text:  TextStyle{Size: -1},
 				Chart: ChartStyle{FillOpacity: 0.5},
 			},
 			wantErr: true,
@@ -63,7 +63,7 @@ func TestThemeValidation(t *testing.T) {
 				ColorPalette: []ColorRGB{
 					{R: 255, G: 0, B: 0, A: 255},
 				},
-				Text: TextStyle{Size: 10},
+				Text:  TextStyle{Size: 10},
 				Chart: ChartStyle{FillOpacity: 1.5},
 			},
 			wantErr: true,
@@ -83,7 +83,7 @@ func TestThemeValidation(t *testing.T) {
 func TestColorRGBToColor(t *testing.T) {
 	rgb := ColorRGB{R: 255, G: 128, B: 64, A: 200}
 	expected := color.RGBA{R: 255, G: 128, B: 64, A: 200}
-	
+
 	result := rgb.ToColor()
 	if result != expected {
 		t.Errorf("ColorRGB.ToColor() = %v, want %v", result, expected)
@@ -120,8 +120,8 @@ func TestThemeGetColorPalette(t *testing.T) {
 func TestThemeGetHeatColor(t *testing.T) {
 	theme := Theme{
 		HeatMap: HeatStyle{
-			ColdColor: ColorRGB{R: 0, G: 0, B: 255, A: 255},   // Blue
-			HotColor:  ColorRGB{R: 255, G: 0, B: 0, A: 255},   // Red
+			ColdColor: ColorRGB{R: 0, G: 0, B: 255, A: 255}, // Blue
+			HotColor:  ColorRGB{R: 255, G: 0, B: 0, A: 255}, // Red
 		},
 	}
 
@@ -153,7 +153,7 @@ func TestThemeManager(t *testing.T) {
 	// Test that built-in themes are loaded
 	themes := tm.ListThemes()
 	expectedThemes := []string{"default", "dark", "minimal", "vibrant"}
-	
+
 	if len(themes) < len(expectedThemes) {
 		t.Errorf("Expected at least %d themes, got %d", len(expectedThemes), len(themes))
 	}
@@ -189,7 +189,7 @@ func TestThemeManager(t *testing.T) {
 
 func TestThemeManagerSaveLoad(t *testing.T) {
 	tm := NewThemeManager()
-	
+
 	// Create a test theme
 	testTheme := Theme{
 		Name: "test-theme",
@@ -198,7 +198,7 @@ func TestThemeManagerSaveLoad(t *testing.T) {
 		},
 		Background: ColorRGB{R: 255, G: 255, B: 255, A: 255},
 		Text: TextStyle{
-			Size: 12,
+			Size:  12,
 			Color: ColorRGB{R: 0, G: 0, B: 0, A: 255},
 		},
 		Chart: ChartStyle{
@@ -233,7 +233,7 @@ func TestThemeManagerSaveLoad(t *testing.T) {
 	}
 
 	if len(loadedTheme.ColorPalette) != len(testTheme.ColorPalette) {
-		t.Errorf("Loaded theme palette length = %d, want %d", 
+		t.Errorf("Loaded theme palette length = %d, want %d",
 			len(loadedTheme.ColorPalette), len(testTheme.ColorPalette))
 	}
 }

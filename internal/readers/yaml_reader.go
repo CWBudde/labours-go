@@ -701,8 +701,8 @@ func (r *YamlReader) GetBurndownParameters() (burndown.BurndownParameters, error
 	}
 
 	// Extract parameters from YAML - these ARE present in hercules YAML output
-	var sampling int = 1         // Default
-	var granularity int = 1      // Default
+	sampling := 1                // Default
+	granularity := 1             // Default
 	var tickSize float64 = 86400 // Default (24 hours)
 
 	if val, exists := burndownData["sampling"]; exists {

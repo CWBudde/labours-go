@@ -26,48 +26,62 @@ func (r cliTestReader) GetHeader() (int64, int64) { return 0, 0 }
 func (r cliTestReader) GetProjectBurndown() (string, [][]int) {
 	return "test-repo", [][]int{{1, 2}, {3, 4}}
 }
+
 func (r cliTestReader) GetBurndownParameters() (burndown.BurndownParameters, error) {
 	return burndown.BurndownParameters{Sampling: 1, Granularity: 1, TickSize: 86400}, nil
 }
+
 func (r cliTestReader) GetProjectBurndownWithHeader() (burndown.BurndownHeader, string, [][]int, error) {
 	return burndown.BurndownHeader{Start: 0, Last: 86400, Sampling: 1, Granularity: 1, TickSize: 86400}, "test-repo", [][]int{{1, 2}, {3, 4}}, nil
 }
+
 func (r cliTestReader) GetFilesBurndown() ([]readers.FileBurndown, error) {
 	return nil, fmt.Errorf("missing files data")
 }
+
 func (r cliTestReader) GetPeopleBurndown() ([]readers.PeopleBurndown, error) {
 	return nil, fmt.Errorf("missing people data")
 }
+
 func (r cliTestReader) GetOwnershipBurndown() ([]string, map[string][][]int, error) {
 	return nil, nil, fmt.Errorf("missing people data")
 }
+
 func (r cliTestReader) GetPeopleInteraction() ([]string, [][]int, error) {
 	return nil, nil, fmt.Errorf("missing people interaction")
 }
+
 func (r cliTestReader) GetFileCooccurrence() ([]string, [][]int, error) {
 	return nil, nil, fmt.Errorf("missing couples data")
 }
+
 func (r cliTestReader) GetPeopleCooccurrence() ([]string, [][]int, error) {
 	return nil, nil, fmt.Errorf("missing couples data")
 }
+
 func (r cliTestReader) GetShotnessCooccurrence() ([]string, [][]int, error) {
 	return nil, nil, fmt.Errorf("missing shotness data")
 }
+
 func (r cliTestReader) GetShotnessRecords() ([]readers.ShotnessRecord, error) {
 	return nil, fmt.Errorf("missing shotness data")
 }
+
 func (r cliTestReader) GetDeveloperStats() ([]readers.DeveloperStat, error) {
 	if r.developerStats == nil {
 		return nil, fmt.Errorf("missing Devs data")
 	}
 	return r.developerStats, nil
 }
+
 func (r cliTestReader) GetLanguageStats() ([]readers.LanguageStat, error) {
 	return nil, fmt.Errorf("missing Devs data")
 }
+
 func (r cliTestReader) GetRuntimeStats() (map[string]float64, error) {
 	return map[string]float64{"Burndown": 1.25}, nil
 }
+
 func (r cliTestReader) GetDeveloperTimeSeriesData() (*readers.DeveloperTimeSeriesData, error) {
 	return nil, fmt.Errorf("missing Devs data")
 }

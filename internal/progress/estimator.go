@@ -9,9 +9,9 @@ import (
 
 // ProgressEstimator provides estimation and tracking for long-running operations
 type ProgressEstimator struct {
-	enabled         bool
-	currentBar      *progressbar.ProgressBar
-	totalOperations int
+	enabled          bool
+	currentBar       *progressbar.ProgressBar
+	totalOperations  int
 	currentOperation int
 }
 
@@ -59,7 +59,7 @@ func (pe *ProgressEstimator) EstimateFileReadSteps(fileSizeBytes int64) int {
 func (pe *ProgressEstimator) EstimateMatrixSteps(rows, cols int) int {
 	// Base estimation on matrix size - more complex matrices take longer
 	totalElements := rows * cols
-	
+
 	if totalElements < 1000 {
 		return 1
 	} else if totalElements < 10000 {
@@ -75,7 +75,7 @@ func (pe *ProgressEstimator) EstimateProcessingSteps(dataSize int, complexity Op
 	if baseSteps < 1 {
 		baseSteps = 1
 	}
-	
+
 	weight := OperationWeights[complexity]
 	return baseSteps * weight
 }
@@ -85,7 +85,7 @@ func (pe *ProgressEstimator) StartOperation(operationName string, estimatedSteps
 	if !pe.enabled {
 		return
 	}
-	
+
 	pe.currentBar = progressbar.NewOptions(estimatedSteps,
 		progressbar.OptionSetDescription(operationName),
 		progressbar.OptionShowCount(),
@@ -131,10 +131,10 @@ func (pe *ProgressEstimator) StartMultiOperation(totalOperations int, operationN
 	if !pe.enabled {
 		return
 	}
-	
+
 	pe.totalOperations = totalOperations
 	pe.currentOperation = 0
-	
+
 	pe.currentBar = progressbar.NewOptions(totalOperations,
 		progressbar.OptionSetDescription(operationName),
 		progressbar.OptionShowCount(),
@@ -154,7 +154,7 @@ func (pe *ProgressEstimator) NextOperation(operationName string) {
 	if !pe.enabled {
 		return
 	}
-	
+
 	pe.currentOperation++
 	if pe.currentBar != nil {
 		pe.currentBar.Set(pe.currentOperation)
@@ -180,7 +180,7 @@ func (pe *ProgressEstimator) SimpleProgress(description string, total int) *prog
 	if !pe.enabled {
 		return progressbar.NewOptions(total, progressbar.OptionClearOnFinish())
 	}
-	
+
 	return progressbar.NewOptions(total,
 		progressbar.OptionSetDescription(description),
 		progressbar.OptionShowCount(),
@@ -191,7 +191,7 @@ func (pe *ProgressEstimator) SimpleProgress(description string, total int) *prog
 // EstimateTimeBasedSteps estimates steps for time-based operations
 func (pe *ProgressEstimator) EstimateTimeBasedSteps(startTime, endTime time.Time, resampleInterval string) int {
 	duration := endTime.Sub(startTime)
-	
+
 	var stepDuration time.Duration
 	switch resampleInterval {
 	case "day", "D":
@@ -205,7 +205,7 @@ func (pe *ProgressEstimator) EstimateTimeBasedSteps(startTime, endTime time.Time
 	default:
 		stepDuration = 365 * 24 * time.Hour
 	}
-	
+
 	steps := int(duration / stepDuration)
 	if steps < 1 {
 		steps = 1

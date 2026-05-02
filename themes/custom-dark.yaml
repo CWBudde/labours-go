@@ -1,93 +1,93 @@
 name: custom-dark
 colors:
-    - r: 99
-      g: 165
-      b: 255
-      a: 255
-    - r: 255
-      g: 159
-      b: 64
-      a: 255
-    - r: 75
-      g: 192
-      b: 75
-      a: 255
-    - r: 255
-      g: 99
-      b: 132
-      a: 255
-    - r: 186
-      g: 148
-      b: 255
-      a: 255
-    - r: 200
-      g: 150
-      b: 130
-      a: 255
-    - r: 255
-      g: 159
-      b: 226
-      a: 255
-    - r: 180
-      g: 180
-      b: 180
-      a: 255
-    - r: 220
-      g: 220
-      b: 100
-      a: 255
-    - r: 100
-      g: 220
-      b: 240
-      a: 255
-background:
-    r: 35
-    g: 39
-    b: 42
+  - r: 99
+    g: 165
+    b: 255
     a: 255
+  - r: 255
+    g: 159
+    b: 64
+    a: 255
+  - r: 75
+    g: 192
+    b: 75
+    a: 255
+  - r: 255
+    g: 99
+    b: 132
+    a: 255
+  - r: 186
+    g: 148
+    b: 255
+    a: 255
+  - r: 200
+    g: 150
+    b: 130
+    a: 255
+  - r: 255
+    g: 159
+    b: 226
+    a: 255
+  - r: 180
+    g: 180
+    b: 180
+    a: 255
+  - r: 220
+    g: 220
+    b: 100
+    a: 255
+  - r: 100
+    g: 220
+    b: 240
+    a: 255
+background:
+  r: 35
+  g: 39
+  b: 42
+  a: 255
 grid:
-    show: true
-    color:
-        r: 68
-        g: 74
-        b: 79
-        a: 255
-    width: 0.5
+  show: true
+  color:
+    r: 68
+    g: 74
+    b: 79
+    a: 255
+  width: 0.5
 text:
-    font: Arial
-    size: 10
-    color:
-        r: 240
-        g: 240
-        b: 240
-        a: 255
-    title_size: 14
-    label_size: 10
+  font: Arial
+  size: 10
+  color:
+    r: 240
+    g: 240
+    b: 240
+    a: 255
+  title_size: 14
+  label_size: 10
 chart:
-    line_width: 1
-    border_width: 1
-    border_color:
-        r: 200
-        g: 200
-        b: 200
-        a: 255
-    fill_opacity: 0.8
-    legend_show: true
-    legend_position: right
+  line_width: 1
+  border_width: 1
+  border_color:
+    r: 200
+    g: 200
+    b: 200
+    a: 255
+  fill_opacity: 0.8
+  legend_show: true
+  legend_position: right
 heatmap:
-    cold_color:
-        r: 0
-        g: 100
-        b: 200
-        a: 255
-    hot_color:
-        r: 255
-        g: 80
-        b: 80
-        a: 255
-    mid_color:
-        r: 150
-        g: 50
-        b: 200
-        a: 255
-    use_mid_point: false
+  cold_color:
+    r: 0
+    g: 100
+    b: 200
+    a: 255
+  hot_color:
+    r: 255
+    g: 80
+    b: 80
+    a: 255
+  mid_color:
+    r: 150
+    g: 50
+    b: 200
+    a: 255
+  use_mid_point: false

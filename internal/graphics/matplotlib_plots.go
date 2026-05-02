@@ -6,9 +6,9 @@ import (
 	"math"
 	"time"
 
-	"matplotlib-go/core"
-	"matplotlib-go/render"
-	"matplotlib-go/style"
+	"github.com/cwbudde/matplotlib-go/core"
+	"github.com/cwbudde/matplotlib-go/render"
+	"github.com/cwbudde/matplotlib-go/style"
 )
 
 type MatplotlibTimeAreaSeries struct {

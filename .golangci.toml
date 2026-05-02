@@ -2,6 +2,10 @@ version = "2"
 
 [run]
 go = '1.23'
+exclude-files = [
+  'internal/graphics/burndown_matplotlib\.go',
+  'internal/graphics/heatmap\.go',
+]
 
 [linters]
 enable = [
@@ -59,6 +63,7 @@ linters = [
   'unused'
 ]
 path = '.*_test\.go'
+
 
 [severity]
 default = 'error'

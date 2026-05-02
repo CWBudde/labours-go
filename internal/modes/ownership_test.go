@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"matplotlib-go/core"
-	"matplotlib-go/render"
-	"matplotlib-go/style"
+	"github.com/cwbudde/matplotlib-go/core"
+	"github.com/cwbudde/matplotlib-go/render"
+	"github.com/cwbudde/matplotlib-go/style"
 )
 
 func TestGenerateOwnershipPlot(t *testing.T) {

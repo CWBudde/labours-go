@@ -27,6 +27,7 @@ func (m *MockSentimentReader) GetFileCooccurrence() ([]string, [][]int, error)  
 func (m *MockSentimentReader) GetPeopleCooccurrence() ([]string, [][]int, error) {
 	return nil, nil, nil
 }
+
 func (m *MockSentimentReader) GetShotnessCooccurrence() ([]string, [][]int, error) {
 	return nil, nil, nil
 }
@@ -35,6 +36,7 @@ func (m *MockSentimentReader) GetRuntimeStats() (map[string]float64, error)     
 func (m *MockSentimentReader) GetBurndownParameters() (burndown.BurndownParameters, error) {
 	return burndown.BurndownParameters{}, nil
 }
+
 func (m *MockSentimentReader) GetProjectBurndownWithHeader() (burndown.BurndownHeader, string, [][]int, error) {
 	return burndown.BurndownHeader{}, "", nil, nil
 }
@@ -202,6 +204,7 @@ func (n *NoDataReader) GetRuntimeStats() (map[string]float64, error)          { 
 func (n *NoDataReader) GetBurndownParameters() (burndown.BurndownParameters, error) {
 	return burndown.BurndownParameters{}, nil
 }
+
 func (n *NoDataReader) GetProjectBurndownWithHeader() (burndown.BurndownHeader, string, [][]int, error) {
 	return burndown.BurndownHeader{}, "", nil, nil
 }

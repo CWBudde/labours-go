@@ -17,7 +17,7 @@ import (
 func CouplesPeople(reader readers.Reader, output string) error {
 	quiet := viper.GetBool("quiet")
 	progEstimator := progress.NewProgressEstimator(!quiet)
-	
+
 	totalPhases := 3 // data extraction, preprocessing, embeddings
 	progEstimator.StartMultiOperation(totalPhases, "People Coupling Analysis")
 
@@ -63,9 +63,9 @@ type EmbeddingVector struct {
 
 // SparseMatrix represents a sparse matrix in CSR-like format
 type SparseMatrix struct {
-	Rows   int
-	Cols   int
-	Values []float64
+	Rows    int
+	Cols    int
+	Values  []float64
 	Indices []int
 	Indptr  []int
 }
@@ -79,7 +79,7 @@ func preprocessCouplingMatrix(matrix [][]int) [][]float64 {
 	// Convert to float64 and collect all non-zero values for percentile calculation
 	var allValues []float64
 	processed := make([][]float64, len(matrix))
-	
+
 	for i := range matrix {
 		processed[i] = make([]float64, len(matrix[i]))
 		for j, val := range matrix[i] {
@@ -93,7 +93,7 @@ func preprocessCouplingMatrix(matrix [][]int) [][]float64 {
 	// Calculate 99th percentile (outlier threshold)
 	if len(allValues) > 0 {
 		sort.Float64s(allValues)
-		percentileIdx := int(math.Ceil(0.99 * float64(len(allValues)))) - 1
+		percentileIdx := int(math.Ceil(0.99*float64(len(allValues)))) - 1
 		if percentileIdx >= len(allValues) {
 			percentileIdx = len(allValues) - 1
 		}
@@ -120,16 +120,16 @@ func trainEmbeddings(index []string, matrix [][]float64) ([]EmbeddingVector, err
 
 	// Simplified embedding: use normalized co-occurrence as features
 	embeddings := make([]EmbeddingVector, len(index))
-	
+
 	for i, name := range index {
 		if i >= len(matrix) {
 			break
 		}
-		
+
 		// Create embedding vector from matrix row
 		vector := make([]float64, len(matrix[i]))
 		copy(vector, matrix[i])
-		
+
 		// Normalize vector
 		norm := 0.0
 		for _, val := range vector {
@@ -141,7 +141,7 @@ func trainEmbeddings(index []string, matrix [][]float64) ([]EmbeddingVector, err
 				vector[j] /= norm
 			}
 		}
-		
+
 		embeddings[i] = EmbeddingVector{
 			Label:  name,
 			Vector: vector,
@@ -161,7 +161,7 @@ func writeEmbeddings(prefix, outputDir string, index []string, matrix [][]float6
 	}
 
 	// Create output directory if it doesn't exist
-	if err := os.MkdirAll(outputDir, 0755); err != nil {
+	if err := os.MkdirAll(outputDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create output directory: %v", err)
 	}
 
@@ -260,7 +260,7 @@ func writeMetadataFile(filename string, embeddings []EmbeddingVector, matrix [][
 		if i < len(matrix) && i < len(matrix[i]) {
 			diagonal = matrix[i][i]
 		}
-		if _, err := file.WriteString(fmt.Sprintf("%s\t%.6f\n", emb.Label, diagonal)); err != nil {
+		if _, err := fmt.Fprintf(file, "%s\t%.6f\n", emb.Label, diagonal); err != nil {
 			return err
 		}
 	}

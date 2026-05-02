@@ -4,6 +4,7 @@ go 1.24.0
 
 require (
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de
+	github.com/cwbudde/matplotlib-go v0.0.0
 	github.com/schollz/progressbar/v3 v3.17.1
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/viper v1.20.1
@@ -11,10 +12,9 @@ require (
 	gonum.org/v1/plot v0.15.0
 	google.golang.org/protobuf v1.36.1
 	gopkg.in/yaml.v3 v3.0.1
-	matplotlib-go v0.0.0
 )
 
-replace matplotlib-go => ../matplotlib-go
+replace github.com/cwbudde/matplotlib-go => ../matplotlib-go
 
 require (
 	codeberg.org/go-fonts/dejavu v0.4.0 // indirect

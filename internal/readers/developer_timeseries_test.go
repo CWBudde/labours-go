@@ -1,17 +1,18 @@
 package readers
 
 import (
-	"testing"
 	"os"
-	"github.com/stretchr/testify/require"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestDeveloperTimeSeriesFixVerification verifies that the fix for developer time series
 // produces the exact same data structure as Python's get_devs() method
 func TestDeveloperTimeSeriesFixVerification(t *testing.T) {
 	testFile := "../../example_data/hercules_devs.pb"
-	
+
 	reader := &ProtobufReader{}
 	file, err := os.Open(testFile)
 	require.NoError(t, err)
@@ -54,7 +55,7 @@ func TestDeveloperTimeSeriesFixVerification(t *testing.T) {
 		// Check each time tick
 		for tickKey, dayDevs := range devData.Days {
 			t.Logf("    Tick %d: %d developers", tickKey, len(dayDevs))
-			
+
 			// Verify developer data structure
 			for devIdx, devDay := range dayDevs {
 				// Verify DevDay structure has all required fields
@@ -63,7 +64,7 @@ func TestDeveloperTimeSeriesFixVerification(t *testing.T) {
 				assert.GreaterOrEqual(t, devDay.LinesRemoved, 0, "LinesRemoved should be non-negative")
 				assert.GreaterOrEqual(t, devDay.LinesModified, 0, "LinesModified should be non-negative")
 				assert.NotNil(t, devDay.Languages, "Languages map should be initialized")
-				
+
 				// Log detailed stats for first few developers
 				if len(dayDevs) <= 3 && devIdx < len(devData.People) {
 					devName := "unknown"
@@ -71,9 +72,9 @@ func TestDeveloperTimeSeriesFixVerification(t *testing.T) {
 						devName = devData.People[devIdx]
 					}
 					t.Logf("      Dev %d (%s): commits=%d, lines=+%d/-%d/%d, langs=%d",
-						devIdx, devName, devDay.Commits, devDay.LinesAdded, 
+						devIdx, devName, devDay.Commits, devDay.LinesAdded,
 						devDay.LinesRemoved, devDay.LinesModified, len(devDay.Languages))
-					
+
 					// Log language statistics
 					for lang, langStats := range devDay.Languages {
 						if len(langStats) >= 3 {
@@ -89,25 +90,25 @@ func TestDeveloperTimeSeriesFixVerification(t *testing.T) {
 		// Verify the structure exactly matches Python's expectations:
 		// Python: people, days = reader.get_devs()
 		// where days is: {day_int: {dev_int: DevDay}}
-		
+
 		// Test that we can iterate like Python does
 		pythonStyleIteration := true
-		
+
 		// Python: for day, dev_data in days.items():
 		for dayInt, devData := range devData.Days {
 			assert.IsType(t, 0, dayInt, "Day keys should be integers")
-			
+
 			// Python: for dev_idx, dev_day in dev_data.items():
 			for devIdx, devDay := range devData {
 				assert.IsType(t, 0, devIdx, "Developer indices should be integers")
-				
+
 				// Verify DevDay has all the fields Python expects
 				_ = devDay.Commits       // Python: dev_day.commits
-				_ = devDay.LinesAdded    // Python: dev_day.stats.added  
+				_ = devDay.LinesAdded    // Python: dev_day.stats.added
 				_ = devDay.LinesRemoved  // Python: dev_day.stats.removed
 				_ = devDay.LinesModified // Python: dev_day.stats.changed
 				_ = devDay.Languages     // Python: dev_day.languages
-				
+
 				// Python language format: {lang: [added, removed, changed]}
 				for lang, langStats := range devDay.Languages {
 					assert.IsType(t, "", lang, "Language keys should be strings")
@@ -115,7 +116,7 @@ func TestDeveloperTimeSeriesFixVerification(t *testing.T) {
 				}
 			}
 		}
-		
+
 		assert.True(t, pythonStyleIteration, "Data structure should support Python-style iteration")
 	})
 }
@@ -123,7 +124,7 @@ func TestDeveloperTimeSeriesFixVerification(t *testing.T) {
 // TestDeveloperModeIntegration tests that developer analysis modes work with real temporal data
 func TestDeveloperModeIntegration(t *testing.T) {
 	testFile := "../../example_data/hercules_devs.pb"
-	
+
 	reader := &ProtobufReader{}
 	file, err := os.Open(testFile)
 	require.NoError(t, err)
@@ -146,20 +147,20 @@ func TestDeveloperModeIntegration(t *testing.T) {
 	t.Run("TemporalAnalysis", func(t *testing.T) {
 		totalCommits := 0
 		totalLinesAdded := 0
-		
+
 		// Aggregate across all time ticks (like devs mode would do)
 		for tickKey, dayDevs := range devData.Days {
 			t.Logf("Processing tick %d with %d developers", tickKey, len(dayDevs))
-			
+
 			for _, devDay := range dayDevs {
 				totalCommits += devDay.Commits
 				totalLinesAdded += devDay.LinesAdded
 			}
 		}
-		
+
 		t.Logf("Total commits across all ticks: %d", totalCommits)
 		t.Logf("Total lines added across all ticks: %d", totalLinesAdded)
-		
+
 		// These should be non-negative (sanity check)
 		assert.GreaterOrEqual(t, totalCommits, 0, "Total commits should be non-negative")
 		assert.GreaterOrEqual(t, totalLinesAdded, 0, "Total lines added should be non-negative")
@@ -167,14 +168,14 @@ func TestDeveloperModeIntegration(t *testing.T) {
 
 	t.Run("ParallelAnalysis", func(t *testing.T) {
 		// Test analysis that would be used by devs-parallel mode
-		
+
 		if len(devData.Days) < 2 {
 			t.Skip("Need multiple time ticks for parallel analysis")
 		}
-		
+
 		// Count developers active in multiple time periods
 		developerActivity := make(map[int]int) // devIdx -> number of active time ticks
-		
+
 		for _, dayDevs := range devData.Days {
 			for devIdx, devDay := range dayDevs {
 				if devDay.Commits > 0 || devDay.LinesAdded > 0 {
@@ -182,7 +183,7 @@ func TestDeveloperModeIntegration(t *testing.T) {
 				}
 			}
 		}
-		
+
 		parallelDevs := 0
 		for devIdx, activeTickCount := range developerActivity {
 			if activeTickCount > 1 {
@@ -190,7 +191,7 @@ func TestDeveloperModeIntegration(t *testing.T) {
 				t.Logf("Developer %d active in %d time ticks", devIdx, activeTickCount)
 			}
 		}
-		
+
 		t.Logf("Developers active in multiple time periods: %d", parallelDevs)
 	})
 }

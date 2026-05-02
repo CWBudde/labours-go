@@ -1,13 +1,13 @@
 package graphics
 
 import (
-	"image/color"
 	"fmt"
+	"image/color"
 )
 
 // Theme represents a complete visual theme configuration
 type Theme struct {
-	Name       string      `yaml:"name" json:"name"`
+	Name         string     `yaml:"name" json:"name"`
 	ColorPalette []ColorRGB `yaml:"colors" json:"colors"`
 	Background   ColorRGB   `yaml:"background" json:"background"`
 	Grid         GridStyle  `yaml:"grid" json:"grid"`
@@ -38,29 +38,29 @@ type GridStyle struct {
 
 // TextStyle configures text appearance
 type TextStyle struct {
-	Font     string   `yaml:"font" json:"font"`
-	Size     float64  `yaml:"size" json:"size"`
-	Color    ColorRGB `yaml:"color" json:"color"`
-	TitleSize float64 `yaml:"title_size" json:"title_size"`
-	LabelSize float64 `yaml:"label_size" json:"label_size"`
+	Font      string   `yaml:"font" json:"font"`
+	Size      float64  `yaml:"size" json:"size"`
+	Color     ColorRGB `yaml:"color" json:"color"`
+	TitleSize float64  `yaml:"title_size" json:"title_size"`
+	LabelSize float64  `yaml:"label_size" json:"label_size"`
 }
 
 // ChartStyle configures chart-specific styling
 type ChartStyle struct {
-	LineWidth    float64 `yaml:"line_width" json:"line_width"`
-	BorderWidth  float64 `yaml:"border_width" json:"border_width"`
-	BorderColor  ColorRGB `yaml:"border_color" json:"border_color"`
-	FillOpacity  float64 `yaml:"fill_opacity" json:"fill_opacity"`
-	LegendShow   bool    `yaml:"legend_show" json:"legend_show"`
-	LegendPos    string  `yaml:"legend_position" json:"legend_position"`
+	LineWidth   float64  `yaml:"line_width" json:"line_width"`
+	BorderWidth float64  `yaml:"border_width" json:"border_width"`
+	BorderColor ColorRGB `yaml:"border_color" json:"border_color"`
+	FillOpacity float64  `yaml:"fill_opacity" json:"fill_opacity"`
+	LegendShow  bool     `yaml:"legend_show" json:"legend_show"`
+	LegendPos   string   `yaml:"legend_position" json:"legend_position"`
 }
 
 // HeatStyle configures heatmap-specific styling
 type HeatStyle struct {
-	ColdColor ColorRGB `yaml:"cold_color" json:"cold_color"`
-	HotColor  ColorRGB `yaml:"hot_color" json:"hot_color"`
-	MidColor  ColorRGB `yaml:"mid_color" json:"mid_color"`
-	UseMidPoint bool   `yaml:"use_mid_point" json:"use_mid_point"`
+	ColdColor   ColorRGB `yaml:"cold_color" json:"cold_color"`
+	HotColor    ColorRGB `yaml:"hot_color" json:"hot_color"`
+	MidColor    ColorRGB `yaml:"mid_color" json:"mid_color"`
+	UseMidPoint bool     `yaml:"use_mid_point" json:"use_mid_point"`
 }
 
 // Default themes
@@ -93,12 +93,12 @@ var (
 			LabelSize: 10,
 		},
 		Chart: ChartStyle{
-			LineWidth:    1.0,
-			BorderWidth:  1.0,
-			BorderColor:  ColorRGB{R: 0, G: 0, B: 0, A: 255},
-			FillOpacity:  0.7,
-			LegendShow:   true,
-			LegendPos:    "right",
+			LineWidth:   1.0,
+			BorderWidth: 1.0,
+			BorderColor: ColorRGB{R: 0, G: 0, B: 0, A: 255},
+			FillOpacity: 0.7,
+			LegendShow:  true,
+			LegendPos:   "right",
 		},
 		HeatMap: HeatStyle{
 			ColdColor:   ColorRGB{R: 31, G: 119, B: 180, A: 255},  // Blue
@@ -136,17 +136,17 @@ var (
 			LabelSize: 10,
 		},
 		Chart: ChartStyle{
-			LineWidth:    1.0,
-			BorderWidth:  1.0,
-			BorderColor:  ColorRGB{R: 200, G: 200, B: 200, A: 255},
-			FillOpacity:  0.8,
-			LegendShow:   true,
-			LegendPos:    "right",
+			LineWidth:   1.0,
+			BorderWidth: 1.0,
+			BorderColor: ColorRGB{R: 200, G: 200, B: 200, A: 255},
+			FillOpacity: 0.8,
+			LegendShow:  true,
+			LegendPos:   "right",
 		},
 		HeatMap: HeatStyle{
-			ColdColor:   ColorRGB{R: 0, G: 100, B: 200, A: 255},   // Dark Blue
-			HotColor:    ColorRGB{R: 255, G: 80, B: 80, A: 255},   // Bright Red
-			MidColor:    ColorRGB{R: 150, G: 50, B: 200, A: 255},  // Dark Purple
+			ColdColor:   ColorRGB{R: 0, G: 100, B: 200, A: 255},  // Dark Blue
+			HotColor:    ColorRGB{R: 255, G: 80, B: 80, A: 255},  // Bright Red
+			MidColor:    ColorRGB{R: 150, G: 50, B: 200, A: 255}, // Dark Purple
 			UseMidPoint: false,
 		},
 	}
@@ -179,12 +179,12 @@ var (
 			LabelSize: 8,
 		},
 		Chart: ChartStyle{
-			LineWidth:    0.8,
-			BorderWidth:  0.5,
-			BorderColor:  ColorRGB{R: 120, G: 120, B: 120, A: 255},
-			FillOpacity:  0.9,
-			LegendShow:   false,
-			LegendPos:    "bottom",
+			LineWidth:   0.8,
+			BorderWidth: 0.5,
+			BorderColor: ColorRGB{R: 120, G: 120, B: 120, A: 255},
+			FillOpacity: 0.9,
+			LegendShow:  false,
+			LegendPos:   "bottom",
 		},
 		HeatMap: HeatStyle{
 			ColdColor:   ColorRGB{R: 240, G: 240, B: 240, A: 255}, // Very Light Gray
@@ -197,16 +197,16 @@ var (
 	VibranthColorTheme = Theme{
 		Name: "vibrant",
 		ColorPalette: []ColorRGB{
-			{R: 255, G: 0, B: 128, A: 255},   // Hot Pink
-			{R: 0, G: 255, B: 128, A: 255},   // Spring Green
-			{R: 128, G: 0, B: 255, A: 255},   // Electric Violet
-			{R: 255, G: 128, B: 0, A: 255},   // Dark Orange
-			{R: 0, G: 128, B: 255, A: 255},   // Dodger Blue
-			{R: 255, G: 255, B: 0, A: 255},   // Yellow
-			{R: 255, G: 0, B: 0, A: 255},     // Red
-			{R: 0, G: 255, B: 0, A: 255},     // Lime
-			{R: 0, G: 255, B: 255, A: 255},   // Cyan
-			{R: 255, G: 0, B: 255, A: 255},   // Magenta
+			{R: 255, G: 0, B: 128, A: 255}, // Hot Pink
+			{R: 0, G: 255, B: 128, A: 255}, // Spring Green
+			{R: 128, G: 0, B: 255, A: 255}, // Electric Violet
+			{R: 255, G: 128, B: 0, A: 255}, // Dark Orange
+			{R: 0, G: 128, B: 255, A: 255}, // Dodger Blue
+			{R: 255, G: 255, B: 0, A: 255}, // Yellow
+			{R: 255, G: 0, B: 0, A: 255},   // Red
+			{R: 0, G: 255, B: 0, A: 255},   // Lime
+			{R: 0, G: 255, B: 255, A: 255}, // Cyan
+			{R: 255, G: 0, B: 255, A: 255}, // Magenta
 		},
 		Background: ColorRGB{R: 250, G: 250, B: 250, A: 255}, // Very Light Gray
 		Grid: GridStyle{
@@ -222,17 +222,17 @@ var (
 			LabelSize: 11,
 		},
 		Chart: ChartStyle{
-			LineWidth:    1.5,
-			BorderWidth:  1.2,
-			BorderColor:  ColorRGB{R: 80, G: 80, B: 80, A: 255},
-			FillOpacity:  0.6,
-			LegendShow:   true,
-			LegendPos:    "right",
+			LineWidth:   1.5,
+			BorderWidth: 1.2,
+			BorderColor: ColorRGB{R: 80, G: 80, B: 80, A: 255},
+			FillOpacity: 0.6,
+			LegendShow:  true,
+			LegendPos:   "right",
 		},
 		HeatMap: HeatStyle{
-			ColdColor:   ColorRGB{R: 0, G: 100, B: 255, A: 255},   // Bright Blue
-			HotColor:    ColorRGB{R: 255, G: 50, B: 50, A: 255},   // Bright Red
-			MidColor:    ColorRGB{R: 255, G: 200, B: 0, A: 255},   // Bright Yellow
+			ColdColor:   ColorRGB{R: 0, G: 100, B: 255, A: 255}, // Bright Blue
+			HotColor:    ColorRGB{R: 255, G: 50, B: 50, A: 255}, // Bright Red
+			MidColor:    ColorRGB{R: 255, G: 200, B: 0, A: 255}, // Bright Yellow
 			UseMidPoint: true,
 		},
 	}
@@ -241,7 +241,7 @@ var (
 		Name: "matplotlib",
 		ColorPalette: []ColorRGB{
 			{R: 31, G: 119, B: 180, A: 255},  // Blue (C0) - matplotlib default
-			{R: 255, G: 127, B: 14, A: 255},  // Orange (C1) 
+			{R: 255, G: 127, B: 14, A: 255},  // Orange (C1)
 			{R: 44, G: 160, B: 44, A: 255},   // Green (C2)
 			{R: 214, G: 39, B: 40, A: 255},   // Red (C3)
 			{R: 148, G: 103, B: 189, A: 255}, // Purple (C4)
@@ -265,12 +265,12 @@ var (
 			LabelSize: 10,
 		},
 		Chart: ChartStyle{
-			LineWidth:    1.0,
-			BorderWidth:  1.0,
-			BorderColor:  ColorRGB{R: 0, G: 0, B: 0, A: 255},
-			FillOpacity:  0.7,
-			LegendShow:   true,
-			LegendPos:    "right",
+			LineWidth:   1.0,
+			BorderWidth: 1.0,
+			BorderColor: ColorRGB{R: 0, G: 0, B: 0, A: 255},
+			FillOpacity: 0.7,
+			LegendShow:  true,
+			LegendPos:   "right",
 		},
 		HeatMap: HeatStyle{
 			ColdColor:   ColorRGB{R: 31, G: 119, B: 180, A: 255},  // Blue
@@ -283,10 +283,10 @@ var (
 
 // BuiltinThemes contains all built-in themes
 var BuiltinThemes = map[string]Theme{
-	"default":   DefaultTheme,
-	"dark":      DarkTheme,
-	"minimal":   MinimalTheme,
-	"vibrant":   VibranthColorTheme,
+	"default":    DefaultTheme,
+	"dark":       DarkTheme,
+	"minimal":    MinimalTheme,
+	"vibrant":    VibranthColorTheme,
 	"matplotlib": MatplotlibTheme,
 }
 
@@ -310,7 +310,7 @@ func (t *Theme) GetHeatColor(ratio float64) color.Color {
 
 	cold := t.HeatMap.ColdColor
 	hot := t.HeatMap.HotColor
-	
+
 	if t.HeatMap.UseMidPoint && ratio <= 0.5 {
 		// Interpolate from cold to mid
 		mid := t.HeatMap.MidColor
@@ -341,19 +341,19 @@ func (t *Theme) Validate() error {
 	if len(t.ColorPalette) == 0 {
 		return fmt.Errorf("theme must have at least one color in palette")
 	}
-	
+
 	if t.Name == "" {
 		return fmt.Errorf("theme must have a name")
 	}
-	
+
 	if t.Text.Size <= 0 {
 		return fmt.Errorf("text size must be positive")
 	}
-	
+
 	if t.Chart.FillOpacity < 0 || t.Chart.FillOpacity > 1 {
 		return fmt.Errorf("fill opacity must be between 0 and 1")
 	}
-	
+
 	return nil
 }
 

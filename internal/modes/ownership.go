@@ -12,16 +12,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cwbudde/matplotlib-go/backends"
+	_ "github.com/cwbudde/matplotlib-go/backends/agg"
+	_ "github.com/cwbudde/matplotlib-go/backends/svg"
+	"github.com/cwbudde/matplotlib-go/core"
+	"github.com/cwbudde/matplotlib-go/render"
+	"github.com/cwbudde/matplotlib-go/style"
 	"github.com/spf13/viper"
 	"labours-go/internal/graphics"
 	"labours-go/internal/progress"
 	"labours-go/internal/readers"
-	"matplotlib-go/backends"
-	_ "matplotlib-go/backends/agg"
-	_ "matplotlib-go/backends/svg"
-	"matplotlib-go/core"
-	"matplotlib-go/render"
-	"matplotlib-go/style"
 )
 
 func OwnershipBurndown(reader readers.Reader, output string) error {

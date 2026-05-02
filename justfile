@@ -162,19 +162,27 @@ deps:
     go mod download
     go mod tidy
 
-# Format Go code
+# Format code using treefmt
 fmt:
-    @echo "Formatting code"
-    go fmt ./...
+    treefmt --allow-missing-formatter
 
 # Run go vet
 vet:
     @echo "Running go vet"
     go vet ./...
 
-# Run golangci-lint when available
+# Run golangci-lint
 lint:
-    @if command -v golangci-lint >/dev/null 2>&1; then golangci-lint run; else echo "golangci-lint not found, please install it"; fi
+    golangci-lint run --config ./.golangci.toml --timeout 2m
+
+# Run golangci-lint with auto-fix
+lint-fix:
+    golangci-lint run --config ./.golangci.toml --timeout 2m --fix
+
+# Format and auto-fix lint issues
+fix:
+    just fmt
+    just lint-fix
 
 # Generate test data files
 testdata:

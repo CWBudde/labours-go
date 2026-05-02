@@ -5,10 +5,9 @@ import (
 	"os"
 	"strings"
 
-	"labours-go/internal/graphics"
-
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"labours-go/internal/graphics"
 )
 
 var rootCmd = &cobra.Command{

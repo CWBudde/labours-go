@@ -45,8 +45,8 @@ func GetColorPalette() []color.Color {
 // Red (#d62728) for bottom/older layer, Blue (#1f77b4) for top/newer layer
 func GetMatplotlibBurndownColors(opacity uint8) []color.Color {
 	return []color.Color{
-		color.RGBA{R: 214, G: 39, B: 40, A: opacity},   // Red (C3) - matplotlib #d62728
-		color.RGBA{R: 31, G: 119, B: 180, A: opacity},  // Blue (C0) - matplotlib #1f77b4
+		color.RGBA{R: 214, G: 39, B: 40, A: opacity},  // Red (C3) - matplotlib #d62728
+		color.RGBA{R: 31, G: 119, B: 180, A: opacity}, // Blue (C0) - matplotlib #1f77b4
 	}
 }
 
@@ -54,16 +54,16 @@ func GetMatplotlibBurndownColors(opacity uint8) []color.Color {
 // Uses matplotlib colors if matplotlib theme is active, otherwise uses theme colors
 func GetBurndownColors(numColors int) []color.Color {
 	opacity := uint8(float64(255) * CurrentTheme.Chart.FillOpacity)
-	
+
 	// Use matplotlib colors for 2-layer burndown when matplotlib theme is active
 	if numColors == 2 && CurrentTheme.Name == "matplotlib" {
 		return GetMatplotlibBurndownColors(opacity)
 	}
-	
+
 	// Otherwise use standard theme colors
 	themePalette := CurrentTheme.GetColorPalette()
 	colors := make([]color.Color, numColors)
-	
+
 	for i := 0; i < numColors; i++ {
 		if i < len(themePalette) {
 			if rgba, ok := themePalette[i].(color.RGBA); ok {
@@ -75,13 +75,12 @@ func GetBurndownColors(numColors int) []color.Color {
 			// Generate additional colors using simple fallback
 			colors[i] = color.RGBA{
 				R: uint8((i*60 + 120) % 255),
-				G: uint8((i*80 + 80) % 255), 
+				G: uint8((i*80 + 80) % 255),
 				B: uint8((i*40 + 180) % 255),
 				A: opacity,
 			}
 		}
 	}
-	
+
 	return colors
 }
-

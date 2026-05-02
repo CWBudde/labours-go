@@ -202,7 +202,7 @@ func generateRealisticBurndownData() *pb.AnalysisResults {
 				{Columns: generateUint32Data(50)},
 			},
 		},
-		Files: generateMultipleFileBurndown(10),
+		Files:  generateMultipleFileBurndown(10),
 		People: generateMultiplePeopleBurndown(5),
 		FilesOwnership: []*pb.FilesOwnership{
 			{
@@ -282,7 +282,7 @@ func generateUint32Data(count int) []uint32 {
 	data := make([]uint32, count)
 	for i := 0; i < count; i++ {
 		data[i] = uint32(1000 - i*5) // Decreasing pattern
-		if data[i] > 10000 { // Prevent overflow
+		if data[i] > 10000 {         // Prevent overflow
 			data[i] = 0
 		}
 	}

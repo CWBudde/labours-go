@@ -103,32 +103,32 @@ Therefore every mode must accept a single output file path and write that path, 
 
 ## Mode Parity Matrix
 
-| Mode | Current state | Required work |
-| --- | --- | --- |
-| `burndown-project` | Implemented, Python-compatible path exists | Verify raw/no/month/year resampling, start/end filters, JSON output, image parity. |
-| `burndown-file` | Implemented | Ensure output-file behavior matches Python and report expectations for many files. |
-| `burndown-person` | Implemented | Verify per-person output naming and date filtering. |
-| `burndown-repository` | Initial implementation | Validate with a real multi-repository payload; verify output naming, matrix orientation, and resampling against Python. |
-| `burndown-repos-combined` | Initial implementation | Validate combined matrix semantics with a real multi-repository payload and Python parity fixture. |
-| `overwrites-matrix` | Implemented | Verify data source: Python uses `Burndown.people_interaction`, not couples; add embedding asset behavior if required. |
-| `ownership` | Implemented | Verify against `files_ownership`/people burndown Python logic and `--order-ownership-by-time`. |
-| `couples-files` | Implemented differently | Decide compatibility target: projector embeddings/assets, static plots, or both. Ensure report file output works. |
-| `couples-people` | Implemented differently | Same as couples-files; verify matrix preprocessing and projector behavior. |
-| `couples-shotness` | Partial | Python uses shotness co-occurrence embeddings; protobuf reader now exposes shotness co-occurrence data, but mode/output parity remains. |
-| `shotness` | Implemented | Verify printed stats and optional output behavior against Python. |
-| `sentiment` | Partial | Uses `CommentSentimentResults` by default and gates legacy heuristics behind `--sentiment-fallback`. Validate against a real sentiment payload. |
-| `temporal-activity` | Basic implementation | Improve chart parity, date filters, and legend threshold behavior. |
-| `devs` | Implemented | Verify aggregate/time-series math, language parsing, `--max-people`, JSON output. |
-| `devs-efforts` | Implemented | Verify Python parity and output names. |
-| `old-vs-new` | Implemented | Verify against Python resampling and line classification. |
-| `languages` | Implemented | Language totals are now derived from Devs ticks for protobuf and compact YAML; temporal chart parity remains. |
-| `devs-parallel` | Approximate | NaN failures are guarded and synthetic fallback is explicitly gated, but Python `load_devs_parallel` and `show_devs_parallel` still need to be ported. |
-| `run-times` | Implemented | Verify text output and JSON behavior. Not used by report. |
-| `bus-factor` | Basic implementation | Improve Python parity and subsystem output. |
-| `ownership-concentration` | Basic implementation | Improve Python parity and subsystem output. |
-| `knowledge-diffusion` | Basic implementation | Improve optional top files/time trend parity. |
-| `hotspot-risk` | Basic implementation | Improve table-like output and risk metric parity. |
-| `refactoring-proxy` | Implemented | Parses `RefactoringProxyResults` and writes a rename-ratio chart. Not used by Hercules report. |
+| Mode                      | Current state                              | Required work                                                                                                                                          |
+| ------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `burndown-project`        | Implemented, Python-compatible path exists | Verify raw/no/month/year resampling, start/end filters, JSON output, image parity.                                                                     |
+| `burndown-file`           | Implemented                                | Ensure output-file behavior matches Python and report expectations for many files.                                                                     |
+| `burndown-person`         | Implemented                                | Verify per-person output naming and date filtering.                                                                                                    |
+| `burndown-repository`     | Initial implementation                     | Validate with a real multi-repository payload; verify output naming, matrix orientation, and resampling against Python.                                |
+| `burndown-repos-combined` | Initial implementation                     | Validate combined matrix semantics with a real multi-repository payload and Python parity fixture.                                                     |
+| `overwrites-matrix`       | Implemented                                | Verify data source: Python uses `Burndown.people_interaction`, not couples; add embedding asset behavior if required.                                  |
+| `ownership`               | Implemented                                | Verify against `files_ownership`/people burndown Python logic and `--order-ownership-by-time`.                                                         |
+| `couples-files`           | Implemented differently                    | Decide compatibility target: projector embeddings/assets, static plots, or both. Ensure report file output works.                                      |
+| `couples-people`          | Implemented differently                    | Same as couples-files; verify matrix preprocessing and projector behavior.                                                                             |
+| `couples-shotness`        | Partial                                    | Python uses shotness co-occurrence embeddings; protobuf reader now exposes shotness co-occurrence data, but mode/output parity remains.                |
+| `shotness`                | Implemented                                | Verify printed stats and optional output behavior against Python.                                                                                      |
+| `sentiment`               | Partial                                    | Uses `CommentSentimentResults` by default and gates legacy heuristics behind `--sentiment-fallback`. Validate against a real sentiment payload.        |
+| `temporal-activity`       | Basic implementation                       | Improve chart parity, date filters, and legend threshold behavior.                                                                                     |
+| `devs`                    | Implemented                                | Verify aggregate/time-series math, language parsing, `--max-people`, JSON output.                                                                      |
+| `devs-efforts`            | Implemented                                | Verify Python parity and output names.                                                                                                                 |
+| `old-vs-new`              | Implemented                                | Verify against Python resampling and line classification.                                                                                              |
+| `languages`               | Implemented                                | Language totals are now derived from Devs ticks for protobuf and compact YAML; temporal chart parity remains.                                          |
+| `devs-parallel`           | Approximate                                | NaN failures are guarded and synthetic fallback is explicitly gated, but Python `load_devs_parallel` and `show_devs_parallel` still need to be ported. |
+| `run-times`               | Implemented                                | Verify text output and JSON behavior. Not used by report.                                                                                              |
+| `bus-factor`              | Basic implementation                       | Improve Python parity and subsystem output.                                                                                                            |
+| `ownership-concentration` | Basic implementation                       | Improve Python parity and subsystem output.                                                                                                            |
+| `knowledge-diffusion`     | Basic implementation                       | Improve optional top files/time trend parity.                                                                                                          |
+| `hotspot-risk`            | Basic implementation                       | Improve table-like output and risk metric parity.                                                                                                      |
+| `refactoring-proxy`       | Implemented                                | Parses `RefactoringProxyResults` and writes a rename-ratio chart. Not used by Hercules report.                                                         |
 
 ## Phase 0: Baseline and Truth Cleanup
 

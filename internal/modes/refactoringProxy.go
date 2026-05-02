@@ -28,7 +28,7 @@ func RefactoringProxy(reader readers.Reader, output string) error {
 }
 
 func plotRefactoringProxy(data *readers.RefactoringProxyData, output string) error {
-	if err := os.MkdirAll(filepath.Dir(output), 0755); err != nil && filepath.Dir(output) != "." {
+	if err := os.MkdirAll(filepath.Dir(output), 0o755); err != nil && filepath.Dir(output) != "." {
 		return fmt.Errorf("failed to create output directory: %v", err)
 	}
 
@@ -61,8 +61,8 @@ func plotRefactoringProxy(data *readers.RefactoringProxyData, output string) err
 		if err != nil {
 			return fmt.Errorf("failed to create refactoring markers: %v", err)
 		}
-		scatter.GlyphStyle.Color = graphics.ColorPalette[3]
-		scatter.GlyphStyle.Radius = vg.Points(4)
+		scatter.Color = graphics.ColorPalette[3]
+		scatter.Radius = vg.Points(4)
 		p.Add(scatter)
 		p.Legend.Add("Refactoring", scatter)
 	}

@@ -16,85 +16,85 @@ export MPLCONFIGDIR="$mpl_dir"
 export COUPLES_SERVER_TIME="${COUPLES_SERVER_TIME:-0}"
 
 run_labours() {
-  local timeout_s="$1"
-  shift
-  timeout "$timeout_s" python3 -m labours --backend Agg "$@"
+	local timeout_s="$1"
+	shift
+	timeout "$timeout_s" python3 -m labours --backend Agg "$@"
 }
 
 copy_if_present() {
-  local src="$1"
-  local dst="$2"
-  if [[ -f "$src" ]]; then
-    cp "$src" "$dst"
-    echo "OK $(basename "$dst")"
-  else
-    echo "MISSING $(basename "$dst") from $src" >&2
-    return 1
-  fi
+	local src="$1"
+	local dst="$2"
+	if [[ -f $src ]]; then
+		cp "$src" "$dst"
+		echo "OK $(basename "$dst")"
+	else
+		echo "MISSING $(basename "$dst") from $src" >&2
+		return 1
+	fi
 }
 
 render_simple() {
-  local name="$1"
-  local input="$2"
-  local mode="$3"
-  shift 3
+	local name="$1"
+	local input="$2"
+	local mode="$3"
+	shift 3
 
-  local output="$ref_dir/python_$name.png"
-  echo "Generating $output"
-  if ! run_labours 90s -i "$input" -m "$mode" -o "$output" "$@" >"$work_dir/$name.log" 2>&1; then
-    echo "FAILED $name" >&2
-    tail -20 "$work_dir/$name.log" >&2
-    return 1
-  fi
+	local output="$ref_dir/python_$name.png"
+	echo "Generating $output"
+	if ! run_labours 90s -i "$input" -m "$mode" -o "$output" "$@" >"$work_dir/$name.log" 2>&1; then
+		echo "FAILED $name" >&2
+		tail -20 "$work_dir/$name.log" >&2
+		return 1
+	fi
 }
 
 render_and_copy() {
-  local name="$1"
-  local input="$2"
-  local mode="$3"
-  local generated="$4"
-  shift 4
+	local name="$1"
+	local input="$2"
+	local mode="$3"
+	local generated="$4"
+	shift 4
 
-  local dir="$work_dir/$name"
-  rm -rf "$dir"
-  mkdir -p "$dir"
-  echo "Generating python_$name.png from $mode"
-  run_labours 90s -f pb -i "$input" -m "$mode" -o "$dir/out.png" --disable-projector --max-people 20 "$@" >"$dir/log.txt" 2>&1
-  local status=$?
-  if [[ $status -ne 0 ]]; then
-    echo "WARN $name exited with $status; trying to use any plot produced before exit." >&2
-    tail -20 "$dir/log.txt" >&2
-  fi
-  copy_if_present "$dir/$generated" "$ref_dir/python_$name.png"
+	local dir="$work_dir/$name"
+	rm -rf "$dir"
+	mkdir -p "$dir"
+	echo "Generating python_$name.png from $mode"
+	run_labours 90s -f pb -i "$input" -m "$mode" -o "$dir/out.png" --disable-projector --max-people 20 "$@" >"$dir/log.txt" 2>&1
+	local status=$?
+	if [[ $status -ne 0 ]]; then
+		echo "WARN $name exited with $status; trying to use any plot produced before exit." >&2
+		tail -20 "$dir/log.txt" >&2
+	fi
+	copy_if_present "$dir/$generated" "$ref_dir/python_$name.png"
 }
 
 render_optional_timeout() {
-  local name="$1"
-  local input="$2"
-  local mode="$3"
-  local generated="$4"
-  local timeout_s="$5"
-  shift 5
+	local name="$1"
+	local input="$2"
+	local mode="$3"
+	local generated="$4"
+	local timeout_s="$5"
+	shift 5
 
-  local dir="$work_dir/$name"
-  rm -rf "$dir"
-  mkdir -p "$dir"
-  echo "Generating optional python_$name.png from $mode"
-  run_labours "$timeout_s" -f pb -i "$input" -m "$mode" -o "$dir/out.png" --disable-projector --max-people 5 "$@" >"$dir/log.txt" 2>&1
-  local status=$?
-  if [[ $status -ne 0 ]]; then
-    echo "WARN $name exited with $status; using partial plot if one was produced." >&2
-    tail -20 "$dir/log.txt" >&2
-  fi
-  copy_if_present "$dir/$generated" "$ref_dir/python_$name.png"
+	local dir="$work_dir/$name"
+	rm -rf "$dir"
+	mkdir -p "$dir"
+	echo "Generating optional python_$name.png from $mode"
+	run_labours "$timeout_s" -f pb -i "$input" -m "$mode" -o "$dir/out.png" --disable-projector --max-people 5 "$@" >"$dir/log.txt" 2>&1
+	local status=$?
+	if [[ $status -ne 0 ]]; then
+		echo "WARN $name exited with $status; using partial plot if one was produced." >&2
+		tail -20 "$dir/log.txt" >&2
+	fi
+	copy_if_present "$dir/$generated" "$ref_dir/python_$name.png"
 }
 
 render_hotspot_risk() {
-  local dir="$work_dir/hotspot_risk"
-  rm -rf "$dir"
-  mkdir -p "$dir"
-  echo "Generating python_hotspot_risk.png from patched Python hotspot renderer"
-  python3 - "$report_fixture" "$dir/out.png" >"$dir/log.txt" 2>&1 <<'PY'
+	local dir="$work_dir/hotspot_risk"
+	rm -rf "$dir"
+	mkdir -p "$dir"
+	echo "Generating python_hotspot_risk.png from patched Python hotspot renderer"
+	python3 - "$report_fixture" "$dir/out.png" >"$dir/log.txt" 2>&1 <<'PY'
 import os
 import sys
 from argparse import Namespace
@@ -142,21 +142,21 @@ args = Namespace(
 )
 hotspot.show_hotspot_risk(args, reader.get_name(), files, int(hr.window_days))
 PY
-  local status=$?
-  if [[ $status -ne 0 ]]; then
-    echo "FAILED hotspot_risk" >&2
-    tail -30 "$dir/log.txt" >&2
-    return 1
-  fi
-  copy_if_present "$dir/out/hotspot_risk_ranked.png" "$ref_dir/python_hotspot_risk.png"
+	local status=$?
+	if [[ $status -ne 0 ]]; then
+		echo "FAILED hotspot_risk" >&2
+		tail -30 "$dir/log.txt" >&2
+		return 1
+	fi
+	copy_if_present "$dir/out/hotspot_risk_ranked.png" "$ref_dir/python_hotspot_risk.png"
 }
 
 render_sentiment() {
-  local dir="$work_dir/sentiment"
-  rm -rf "$dir"
-  mkdir -p "$dir"
-  echo "Generating python_sentiment.png from patched Python sentiment renderer"
-  python3 - "$sentiment_fixture" "$ref_dir/python_sentiment.png" >"$dir/log.txt" 2>&1 <<'PY'
+	local dir="$work_dir/sentiment"
+	rm -rf "$dir"
+	mkdir -p "$dir"
+	echo "Generating python_sentiment.png from patched Python sentiment renderer"
+	python3 - "$sentiment_fixture" "$ref_dir/python_sentiment.png" >"$dir/log.txt" 2>&1 <<'PY'
 import sys
 from argparse import Namespace
 from types import SimpleNamespace
@@ -197,21 +197,21 @@ args = Namespace(
 )
 show_sentiment_stats(args, reader.get_name(), "year", reader.get_header()[0], data)
 PY
-  local status=$?
-  if [[ $status -ne 0 ]]; then
-    echo "FAILED sentiment" >&2
-    tail -30 "$dir/log.txt" >&2
-    return 1
-  fi
-  echo "OK python_sentiment.png"
+	local status=$?
+	if [[ $status -ne 0 ]]; then
+		echo "FAILED sentiment" >&2
+		tail -30 "$dir/log.txt" >&2
+		return 1
+	fi
+	echo "OK python_sentiment.png"
 }
 
 render_python_derived_baselines() {
-  local dir="$work_dir/derived"
-  rm -rf "$dir"
-  mkdir -p "$dir"
-  echo "Generating derived Python baselines from Python labours readers"
-  python3 - "$report_fixture" "$repo_root/test/testdata/hercules/shotness.pb" "$ref_dir" >"$dir/log.txt" 2>&1 <<'PY'
+	local dir="$work_dir/derived"
+	rm -rf "$dir"
+	mkdir -p "$dir"
+	echo "Generating derived Python baselines from Python labours readers"
+	python3 - "$report_fixture" "$repo_root/test/testdata/hercules/shotness.pb" "$ref_dir" >"$dir/log.txt" 2>&1 <<'PY'
 import os
 import sys
 from collections import defaultdict
@@ -484,35 +484,35 @@ plot_knowledge_trend(report)
 plot_shotness(shotness)
 plot_devs_parallel(report)
 PY
-  local status=$?
-  if [[ $status -ne 0 ]]; then
-    echo "FAILED derived Python baselines" >&2
-    tail -60 "$dir/log.txt" >&2
-    return 1
-  fi
+	local status=$?
+	if [[ $status -ne 0 ]]; then
+		echo "FAILED derived Python baselines" >&2
+		tail -60 "$dir/log.txt" >&2
+		return 1
+	fi
 }
 
 main() {
-  render_simple burndown_absolute "$repo_root/example_data/hercules_burndown.yaml" burndown-project || return 1
-  render_simple burndown_relative "$repo_root/example_data/hercules_burndown.yaml" burndown-project --relative || return 1
-  render_simple devs "$repo_root/example_data/hercules_devs.yaml" devs || return 1
-  render_simple languages "$repo_root/example_data/hercules_devs.yaml" languages || return 1
-  render_simple old_vs_new "$repo_root/example_data/hercules_devs.yaml" old-vs-new || return 1
+	render_simple burndown_absolute "$repo_root/example_data/hercules_burndown.yaml" burndown-project || return 1
+	render_simple burndown_relative "$repo_root/example_data/hercules_burndown.yaml" burndown-project --relative || return 1
+	render_simple devs "$repo_root/example_data/hercules_devs.yaml" devs || return 1
+	render_simple languages "$repo_root/example_data/hercules_devs.yaml" languages || return 1
+	render_simple old_vs_new "$repo_root/example_data/hercules_devs.yaml" old-vs-new || return 1
 
-  render_and_copy burndown_project "$report_fixture" burndown-project out.png || return 1
-  render_and_copy burndown_file_sample "$report_fixture" burndown-file "out/CODE_OF_CONDUCT.md.png" || return 1
-  render_and_copy burndown_person_sample "$report_fixture" burndown-person "out/alexander bezzubov|bzz@apache.org.png" || return 1
-  render_and_copy ownership "$report_fixture" ownership out.png || return 1
-  render_and_copy bus_factor "$report_fixture" bus-factor out_timeline.png || return 1
-  render_and_copy bus_factor_subsystems "$report_fixture" bus-factor out_subsystems.png || return 1
-  render_and_copy ownership_concentration "$report_fixture" ownership-concentration out_timeline.png || return 1
-  render_and_copy knowledge_diffusion "$report_fixture" knowledge-diffusion out_distribution.png || return 1
-  render_and_copy knowledge_diffusion_silos "$report_fixture" knowledge-diffusion out_silos.png || return 1
-  render_and_copy temporal_activity "$report_fixture" temporal-activity out_hours_commits.png || return 1
-  render_optional_timeout overwrites_matrix "$report_fixture" overwrites-matrix out.png 45s || return 1
-  render_hotspot_risk || return 1
-  render_sentiment || return 1
-  render_python_derived_baselines || return 1
+	render_and_copy burndown_project "$report_fixture" burndown-project out.png || return 1
+	render_and_copy burndown_file_sample "$report_fixture" burndown-file "out/CODE_OF_CONDUCT.md.png" || return 1
+	render_and_copy burndown_person_sample "$report_fixture" burndown-person "out/alexander bezzubov|bzz@apache.org.png" || return 1
+	render_and_copy ownership "$report_fixture" ownership out.png || return 1
+	render_and_copy bus_factor "$report_fixture" bus-factor out_timeline.png || return 1
+	render_and_copy bus_factor_subsystems "$report_fixture" bus-factor out_subsystems.png || return 1
+	render_and_copy ownership_concentration "$report_fixture" ownership-concentration out_timeline.png || return 1
+	render_and_copy knowledge_diffusion "$report_fixture" knowledge-diffusion out_distribution.png || return 1
+	render_and_copy knowledge_diffusion_silos "$report_fixture" knowledge-diffusion out_silos.png || return 1
+	render_and_copy temporal_activity "$report_fixture" temporal-activity out_hours_commits.png || return 1
+	render_optional_timeout overwrites_matrix "$report_fixture" overwrites-matrix out.png 45s || return 1
+	render_hotspot_risk || return 1
+	render_sentiment || return 1
+	render_python_derived_baselines || return 1
 }
 
 main

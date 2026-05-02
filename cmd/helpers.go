@@ -202,7 +202,7 @@ func isExecutable(path string) bool {
 	if err != nil {
 		return false
 	}
-	return info.Mode()&0111 != 0
+	return info.Mode()&0o111 != 0
 }
 
 // isGitRepository checks if a directory is a git repository
@@ -536,7 +536,7 @@ func runHerculesAndVisualize(herculesPath, repoPath, analysis string) error {
 	}
 
 	// Write output to temporary file
-	if err := os.WriteFile(outputFile, output, 0644); err != nil {
+	if err := os.WriteFile(outputFile, output, 0o644); err != nil {
 		return fmt.Errorf("failed to write hercules output: %v", err)
 	}
 
@@ -562,7 +562,7 @@ func runHerculesAndVisualize(herculesPath, repoPath, analysis string) error {
 
 		if outputPath == "" {
 			// Default to centralized analysis_results directory
-			os.MkdirAll("analysis_results", 0755)
+			os.MkdirAll("analysis_results", 0o755)
 			format = detectOutputFormat("") // Will use backend flag or default to PNG
 			basePath := fmt.Sprintf("analysis_results/%s_%s", analysis, mode)
 			outputPath = generateOutputPath(basePath, format)

@@ -135,7 +135,7 @@ func plotCollectedSentimentTimeline(name string, startUnix int64, ticks map[int]
 	if output == "" {
 		output = "."
 	}
-	if err := os.MkdirAll(output, 0755); err != nil {
+	if err := os.MkdirAll(output, 0o755); err != nil {
 		return fmt.Errorf("failed to create output directory %s: %v", output, err)
 	}
 
@@ -514,9 +514,10 @@ func plotSentimentByType(results []SentimentResult, output string) error {
 	// Separate by type
 	var developers, languages []SentimentResult
 	for _, result := range results {
-		if result.Type == "developer" {
+		switch result.Type {
+		case "developer":
 			developers = append(developers, result)
-		} else if result.Type == "language" {
+		case "language":
 			languages = append(languages, result)
 		}
 	}
@@ -562,8 +563,8 @@ func plotSentimentForType(results []SentimentResult, title, output, filename str
 	if err != nil {
 		return fmt.Errorf("failed to create scatter plot: %v", err)
 	}
-	scatter.GlyphStyle.Color = graphics.ColorPalette[0]
-	scatter.GlyphStyle.Radius = vg.Points(4)
+	scatter.Color = graphics.ColorPalette[0]
+	scatter.Radius = vg.Points(4)
 
 	p.Add(scatter)
 

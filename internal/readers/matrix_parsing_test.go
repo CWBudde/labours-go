@@ -5,10 +5,10 @@ import (
 	"os"
 	"testing"
 
-	"labours-go/internal/pb"
-	"google.golang.org/protobuf/proto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
+	"labours-go/internal/pb"
 )
 
 // TestMatrixParsingCompatibility performs comprehensive verification of matrix parsing
@@ -16,7 +16,7 @@ import (
 func TestMatrixParsingCompatibility(t *testing.T) {
 	testFiles := []string{
 		"../../example_data/hercules_burndown.pb",
-		"../../example_data/hercules_devs.pb", 
+		"../../example_data/hercules_devs.pb",
 		"../../example_data/hercules_couples.pb",
 	}
 
@@ -24,7 +24,7 @@ func TestMatrixParsingCompatibility(t *testing.T) {
 		t.Run(fmt.Sprintf("File_%s", testFile), func(t *testing.T) {
 			// Test basic matrix parsing functionality
 			testBurndownMatrixParsing(t, testFile)
-			testCompressedSparseRowMatrixParsing(t, testFile) 
+			testCompressedSparseRowMatrixParsing(t, testFile)
 			testMatrixFormatSelection(t, testFile)
 			testContentsAccessPattern(t, testFile)
 		})
@@ -52,10 +52,10 @@ func testBurndownMatrixParsing(t *testing.T, testFile string) {
 
 		t.Logf("BurndownSparseMatrix parsing successful:")
 		t.Logf("  Matrix dimensions: %dx%d", len(matrix), len(matrix[0]))
-		
+
 		// Verify matrix structure consistency (Python compatibility)
 		verifyMatrixStructure(t, matrix, "BurndownSparseMatrix")
-		
+
 		// Test individual file burndown matrices
 		files, err := reader.GetFilesBurndown()
 		if err == nil {
@@ -67,7 +67,7 @@ func testBurndownMatrixParsing(t *testing.T, testFile string) {
 			}
 		}
 
-		// Test people burndown matrices  
+		// Test people burndown matrices
 		people, err := reader.GetPeopleBurndown()
 		if err == nil {
 			t.Logf("  Found %d people burndown matrices", len(people))
@@ -137,12 +137,12 @@ func testMatrixFormatSelection(t *testing.T, testFile string) {
 		require.NoError(t, err)
 
 		t.Logf("Analyzing format selection for %s:", testFile)
-		
+
 		// Check Contents map for different analysis types
 		if results.Contents != nil {
 			for key, data := range results.Contents {
 				t.Logf("  Found Contents[\"%s\"] (%d bytes)", key, len(data))
-				
+
 				switch key {
 				case "Burndown":
 					verifyBurndownFormatSelection(t, data)
@@ -180,7 +180,7 @@ func verifyBurndownFormatSelection(t *testing.T, data []byte) {
 		t.Logf("    - PeopleInteraction: CompressedSparseRowMatrix (%dx%d)",
 			burndownData.PeopleInteraction.NumberOfRows, burndownData.PeopleInteraction.NumberOfColumns)
 	}
-	
+
 	// Verify format selection logic
 	// Python uses _parse_burndown_matrix() for Project/Files/People (row/column format)
 	// Python uses _parse_sparse_matrix() for PeopleInteraction (CSR format)
@@ -205,7 +205,7 @@ func verifyCouplesFormatSelection(t *testing.T, data []byte) {
 		t.Logf("    - PeopleCouples: CompressedSparseRowMatrix (%dx%d)",
 			couplesData.PeopleCouples.Matrix.NumberOfRows, couplesData.PeopleCouples.Matrix.NumberOfColumns)
 	}
-	
+
 	// Python uses _parse_sparse_matrix() for both FileCouples and PeopleCouples
 	// Go should use parseCompressedSparseRowMatrix() for both
 }
@@ -222,7 +222,7 @@ func verifyDevsFormatSelection(t *testing.T, data []byte) {
 	t.Log("    Devs analysis structure:")
 	t.Logf("    - Developer count: %d", len(devsData.DevIndex))
 	t.Logf("    - Time ticks: %d", len(devsData.Ticks))
-	
+
 	// This is critical for time series compatibility
 	if len(devsData.Ticks) > 0 {
 		t.Log("    - Has time series data (compatible with Python)")
@@ -249,7 +249,7 @@ func testContentsAccessPattern(t *testing.T, testFile string) {
 	t.Run("ContentsAccess", func(t *testing.T) {
 		// This test specifically validates that Go's Contents access pattern
 		// produces the same results as Python's PB_MESSAGES dynamic parsing
-		
+
 		reader := &ProtobufReader{}
 		file, err := os.Open(testFile)
 		require.NoError(t, err)
@@ -305,7 +305,7 @@ func testContentsAccessPattern(t *testing.T, testFile string) {
 		}
 
 		t.Logf("Contents access success rate: %d/%d methods", successCount, len(testMethods))
-		
+
 		// A reasonable file should support at least basic analysis
 		assert.Greater(t, successCount, 0, "At least one Contents access method should succeed")
 	})
@@ -314,7 +314,7 @@ func testContentsAccessPattern(t *testing.T, testFile string) {
 // verifyMatrixStructure validates matrix structure and provides debugging info
 func verifyMatrixStructure(t *testing.T, matrix [][]int, name string) {
 	t.Helper()
-	
+
 	if len(matrix) == 0 {
 		t.Logf("    %s: EMPTY matrix", name)
 		return
@@ -322,7 +322,7 @@ func verifyMatrixStructure(t *testing.T, matrix [][]int, name string) {
 
 	rows := len(matrix)
 	cols := len(matrix[0])
-	
+
 	// Verify rectangular matrix
 	for i, row := range matrix {
 		if len(row) != cols {
@@ -335,7 +335,7 @@ func verifyMatrixStructure(t *testing.T, matrix [][]int, name string) {
 	nonZeroValues := 0
 	maxValue := 0
 	minValue := matrix[0][0]
-	
+
 	for _, row := range matrix {
 		for _, val := range row {
 			totalValues++
@@ -350,10 +350,10 @@ func verifyMatrixStructure(t *testing.T, matrix [][]int, name string) {
 			}
 		}
 	}
-	
+
 	sparsity := float64(nonZeroValues) / float64(totalValues) * 100
-	
-	t.Logf("    %s: %dx%d, sparsity: %.1f%%, range: %d-%d", 
+
+	t.Logf("    %s: %dx%d, sparsity: %.1f%%, range: %d-%d",
 		name, rows, cols, sparsity, minValue, maxValue)
 
 	// Validate that matrix contains meaningful data
@@ -389,10 +389,10 @@ func TestTransposeOperationCompatibility(t *testing.T) {
 			t.Logf("  Matrix dimensions after transpose: %dx%d", len(matrix), len(matrix[0]))
 
 			// For burndown data, the transpose should result in:
-			// - Rows: different metrics (added, removed, etc.) 
+			// - Rows: different metrics (added, removed, etc.)
 			// - Columns: time points
 			// This matches Python's behavior: dense = ... ; return matrix.name, dense.T
-			
+
 			verifyTransposeLogic(t, matrix, "Project")
 
 			// Test file burndown transposes
@@ -421,14 +421,14 @@ func TestTransposeOperationCompatibility(t *testing.T) {
 // verifyTransposeLogic validates that transpose operation produces expected structure
 func verifyTransposeLogic(t *testing.T, matrix [][]int, name string) {
 	t.Helper()
-	
+
 	if len(matrix) == 0 {
 		return
 	}
 
 	rows := len(matrix)
 	cols := len(matrix[0])
-	
+
 	t.Logf("    %s transpose: %dx%d", name, rows, cols)
 
 	// For burndown matrices, we expect:
@@ -458,7 +458,7 @@ func verifyTransposeLogic(t *testing.T, matrix [][]int, name string) {
 			break
 		}
 	}
-	
+
 	if !hasNegative {
 		t.Logf("    ✓ %s contains only non-negative values", name)
 	}

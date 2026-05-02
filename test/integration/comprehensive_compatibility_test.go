@@ -1,17 +1,18 @@
 package integration_test
 
 import (
-	"testing"
 	"os"
-	"labours-go/internal/readers"
+	"testing"
+
 	"github.com/stretchr/testify/require"
+	"labours-go/internal/readers"
 )
 
 // TestComprehensiveCompatibility tests all available example files
 func TestComprehensiveCompatibility(t *testing.T) {
 	testFiles := map[string]string{
 		"Burndown":   "../../example_data/hercules_burndown.pb",
-		"Developers": "../../example_data/hercules_devs.pb", 
+		"Developers": "../../example_data/hercules_devs.pb",
 		"Couples":    "../../example_data/hercules_couples.pb",
 	}
 
@@ -43,7 +44,7 @@ func testAllReaderMethods(t *testing.T, reader *readers.ProtobufReader, dataType
 
 	// Test project burndown
 	if header, projName, matrix, err := reader.GetProjectBurndownWithHeader(); err == nil {
-		t.Logf("✓ Project burndown: %s, %dx%d, tick_size=%.3f", 
+		t.Logf("✓ Project burndown: %s, %dx%d, tick_size=%.3f",
 			projName, len(matrix), len(matrix[0]), header.TickSize)
 		verifyMatrixIntegrity(t, matrix, "Project")
 	} else {
@@ -76,7 +77,7 @@ func testAllReaderMethods(t *testing.T, reader *readers.ProtobufReader, dataType
 
 	// Test ownership burndown
 	if peopleSeq, ownership, err := reader.GetOwnershipBurndown(); err == nil {
-		t.Logf("✓ Ownership burndown: %d people, %d ownership maps", 
+		t.Logf("✓ Ownership burndown: %d people, %d ownership maps",
 			len(peopleSeq), len(ownership))
 	} else {
 		t.Logf("✗ Ownership burndown: %v", err)
@@ -84,7 +85,7 @@ func testAllReaderMethods(t *testing.T, reader *readers.ProtobufReader, dataType
 
 	// Test people interaction
 	if people, matrix, err := reader.GetPeopleInteraction(); err == nil {
-		t.Logf("✓ People interaction: %d people, %dx%d matrix", 
+		t.Logf("✓ People interaction: %d people, %dx%d matrix",
 			len(people), len(matrix), len(matrix[0]))
 		verifyMatrixIntegrity(t, matrix, "PeopleInteraction")
 	} else {
@@ -93,16 +94,16 @@ func testAllReaderMethods(t *testing.T, reader *readers.ProtobufReader, dataType
 
 	// Test file cooccurrence
 	if fileIndex, matrix, err := reader.GetFileCooccurrence(); err == nil {
-		t.Logf("✓ File cooccurrence: %d files, %dx%d matrix", 
+		t.Logf("✓ File cooccurrence: %d files, %dx%d matrix",
 			len(fileIndex), len(matrix), len(matrix[0]))
 		verifyMatrixIntegrity(t, matrix, "FileCooccurrence")
 	} else {
 		t.Logf("✗ File cooccurrence: %v", err)
 	}
 
-	// Test people cooccurrence  
+	// Test people cooccurrence
 	if peopleIndex, matrix, err := reader.GetPeopleCooccurrence(); err == nil {
-		t.Logf("✓ People cooccurrence: %d people, %dx%d matrix", 
+		t.Logf("✓ People cooccurrence: %d people, %dx%d matrix",
 			len(peopleIndex), len(matrix), len(matrix[0]))
 		verifyMatrixIntegrity(t, matrix, "PeopleCooccurrence")
 	} else {
@@ -114,7 +115,7 @@ func testAllReaderMethods(t *testing.T, reader *readers.ProtobufReader, dataType
 		t.Logf("✓ Developer stats: %d developers", len(stats))
 		for i, dev := range stats {
 			if i < 3 {
-				t.Logf("    Dev %d: %s (commits: %d, lines: +%d/-%d)", 
+				t.Logf("    Dev %d: %s (commits: %d, lines: +%d/-%d)",
 					i, dev.Name, dev.Commits, dev.LinesAdded, dev.LinesRemoved)
 			}
 		}
@@ -124,9 +125,9 @@ func testAllReaderMethods(t *testing.T, reader *readers.ProtobufReader, dataType
 
 	// Test developer time series data (critical for Python compatibility)
 	if devData, err := reader.GetDeveloperTimeSeriesData(); err == nil {
-		t.Logf("✓ Developer time series: %d people, %d time ticks", 
+		t.Logf("✓ Developer time series: %d people, %d time ticks",
 			len(devData.People), len(devData.Days))
-		
+
 		// Analyze time series structure in detail
 		if len(devData.Days) == 1 {
 			t.Logf("    WARNING: Single-day aggregation (may be synthetic data)")
@@ -166,7 +167,7 @@ func testAllReaderMethods(t *testing.T, reader *readers.ProtobufReader, dataType
 		t.Logf("✓ Shotness records: %d records", len(records))
 		for i, record := range records {
 			if i < 3 {
-				t.Logf("    Record %d: %s:%s (%s), %d counters", 
+				t.Logf("    Record %d: %s:%s (%s), %d counters",
 					i, record.File, record.Name, record.Type, len(record.Counters))
 			}
 		}
@@ -176,7 +177,7 @@ func testAllReaderMethods(t *testing.T, reader *readers.ProtobufReader, dataType
 
 	// Test shotness cooccurrence
 	if index, matrix, err := reader.GetShotnessCooccurrence(); err == nil {
-		t.Logf("✓ Shotness cooccurrence: %d items, %dx%d matrix", 
+		t.Logf("✓ Shotness cooccurrence: %d items, %dx%d matrix",
 			len(index), len(matrix), len(matrix[0]))
 		verifyMatrixIntegrity(t, matrix, "ShotnessCooccurrence")
 	} else {
@@ -186,7 +187,7 @@ func testAllReaderMethods(t *testing.T, reader *readers.ProtobufReader, dataType
 
 func verifyMatrixIntegrity(t *testing.T, matrix [][]int, name string) {
 	t.Helper()
-	
+
 	if len(matrix) == 0 {
 		t.Logf("    %s: EMPTY", name)
 		return
@@ -194,19 +195,19 @@ func verifyMatrixIntegrity(t *testing.T, matrix [][]int, name string) {
 
 	rows := len(matrix)
 	cols := len(matrix[0])
-	
+
 	// Check for negative values and other integrity issues
 	negatives := 0
 	positives := 0
 	minVal := 0
 	maxVal := 0
-	
+
 	for i, row := range matrix {
 		// Verify rectangular structure
 		if len(row) != cols {
 			t.Errorf("    %s: Row %d has %d cols, expected %d", name, i, len(row), cols)
 		}
-		
+
 		for _, val := range row {
 			if val < 0 {
 				negatives++
@@ -221,14 +222,14 @@ func verifyMatrixIntegrity(t *testing.T, matrix [][]int, name string) {
 			}
 		}
 	}
-	
+
 	sparsity := float64(positives) / float64(rows*cols) * 100
-	
+
 	if negatives > 0 {
-		t.Logf("    %s: %dx%d, sparsity=%.1f%%, range=[%d,%d], ❌ %d negatives", 
+		t.Logf("    %s: %dx%d, sparsity=%.1f%%, range=[%d,%d], ❌ %d negatives",
 			name, rows, cols, sparsity, minVal, maxVal, negatives)
 	} else {
-		t.Logf("    %s: %dx%d, sparsity=%.1f%%, range=[%d,%d], ✓ integrity OK", 
+		t.Logf("    %s: %dx%d, sparsity=%.1f%%, range=[%d,%d], ✓ integrity OK",
 			name, rows, cols, sparsity, minVal, maxVal)
 	}
 }
@@ -237,7 +238,7 @@ func verifyMatrixIntegrity(t *testing.T, matrix [][]int, name string) {
 func TestMatrixFormatDecisionTree(t *testing.T) {
 	testFiles := []string{
 		"../../example_data/hercules_burndown.pb",
-		"../../example_data/hercules_devs.pb", 
+		"../../example_data/hercules_devs.pb",
 		"../../example_data/hercules_couples.pb",
 	}
 
@@ -257,7 +258,7 @@ func TestMatrixFormatDecisionTree(t *testing.T) {
 			// Python: _parse_burndown_matrix() for rows[].columns[] structure
 			// Go: parseBurndownSparseMatrix() for BurndownSparseMatrix
 			if _, _, matrix, err := reader.GetProjectBurndownWithHeader(); err == nil {
-				t.Logf("✓ Project: BurndownSparseMatrix → parseBurndownSparseMatrix() → %dx%d", 
+				t.Logf("✓ Project: BurndownSparseMatrix → parseBurndownSparseMatrix() → %dx%d",
 					len(matrix), len(matrix[0]))
 			}
 
@@ -265,17 +266,17 @@ func TestMatrixFormatDecisionTree(t *testing.T) {
 			// Python: _parse_sparse_matrix() for CSR format with scipy.sparse
 			// Go: parseCompressedSparseRowMatrix() for CompressedSparseRowMatrix
 			if _, matrix, err := reader.GetPeopleInteraction(); err == nil {
-				t.Logf("✓ PeopleInteraction: CompressedSparseRowMatrix → parseCompressedSparseRowMatrix() → %dx%d", 
+				t.Logf("✓ PeopleInteraction: CompressedSparseRowMatrix → parseCompressedSparseRowMatrix() → %dx%d",
 					len(matrix), len(matrix[0]))
 			}
 
 			if _, matrix, err := reader.GetFileCooccurrence(); err == nil {
-				t.Logf("✓ FileCooccurrence: CompressedSparseRowMatrix → parseCompressedSparseRowMatrix() → %dx%d", 
+				t.Logf("✓ FileCooccurrence: CompressedSparseRowMatrix → parseCompressedSparseRowMatrix() → %dx%d",
 					len(matrix), len(matrix[0]))
 			}
 
 			if _, matrix, err := reader.GetPeopleCooccurrence(); err == nil {
-				t.Logf("✓ PeopleCooccurrence: CompressedSparseRowMatrix → parseCompressedSparseRowMatrix() → %dx%d", 
+				t.Logf("✓ PeopleCooccurrence: CompressedSparseRowMatrix → parseCompressedSparseRowMatrix() → %dx%d",
 					len(matrix), len(matrix[0]))
 			}
 
@@ -287,7 +288,7 @@ func TestMatrixFormatDecisionTree(t *testing.T) {
 // TestDeveloperTimeSeriesCompatibility focuses on the critical time series issue
 func TestDeveloperTimeSeriesCompatibility(t *testing.T) {
 	devFile := "../../example_data/hercules_devs.pb"
-	
+
 	reader := &readers.ProtobufReader{}
 	file, err := os.Open(devFile)
 	require.NoError(t, err)
@@ -315,29 +316,29 @@ func TestDeveloperTimeSeriesCompatibility(t *testing.T) {
 		t.Log("  Go is using synthetic single-day aggregation")
 		t.Log("  Python likely has richer multi-day temporal data")
 		t.Log("  This could lead to different temporal analysis results")
-		
+
 		// Show what the single day contains
 		if dayData, exists := devData.Days[0]; exists {
 			t.Logf("  Single day (day 0) contains %d developers:", len(dayData))
 			for devIdx, devStats := range dayData {
 				if devIdx < len(devData.People) {
 					devName := devData.People[devIdx]
-					t.Logf("    Dev %d (%s): commits=%d, lines=+%d/-%d/%d", 
-						devIdx, devName, devStats.Commits, devStats.LinesAdded, 
+					t.Logf("    Dev %d (%s): commits=%d, lines=+%d/-%d/%d",
+						devIdx, devName, devStats.Commits, devStats.LinesAdded,
 						devStats.LinesRemoved, devStats.LinesModified)
 				}
 			}
 		}
 	} else {
 		t.Logf("✓ Multi-day time series available (%d days)", len(devData.Days))
-		
+
 		// Show temporal distribution
 		dayIndices := make([]int, 0, len(devData.Days))
 		for dayIdx := range devData.Days {
 			dayIndices = append(dayIndices, dayIdx)
 		}
 		t.Logf("  Day indices: %v (first few)", dayIndices[:minInt(len(dayIndices), 10)])
-		
+
 		// This would be compatible with Python's rich time series format
 	}
 
@@ -346,11 +347,11 @@ func TestDeveloperTimeSeriesCompatibility(t *testing.T) {
 		t.Logf("Developer stats (aggregated): %d developers", len(stats))
 		for i, dev := range stats {
 			if i < 3 {
-				t.Logf("    %s: commits=%d, lines=+%d/-%d", 
+				t.Logf("    %s: commits=%d, lines=+%d/-%d",
 					dev.Name, dev.Commits, dev.LinesAdded, dev.LinesRemoved)
 			}
 		}
-		
+
 		// TODO: Compare aggregated stats vs time series data to verify consistency
 	}
 }

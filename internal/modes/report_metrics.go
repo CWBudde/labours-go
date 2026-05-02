@@ -14,16 +14,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cwbudde/matplotlib-go/backends"
+	_ "github.com/cwbudde/matplotlib-go/backends/agg"
+	_ "github.com/cwbudde/matplotlib-go/backends/svg"
+	"github.com/cwbudde/matplotlib-go/core"
+	"github.com/cwbudde/matplotlib-go/render"
+	"github.com/cwbudde/matplotlib-go/style"
 	"gonum.org/v1/plot"
 	"gonum.org/v1/plot/plotter"
 	"labours-go/internal/graphics"
 	"labours-go/internal/readers"
-	"matplotlib-go/backends"
-	_ "matplotlib-go/backends/agg"
-	_ "matplotlib-go/backends/svg"
-	"matplotlib-go/core"
-	"matplotlib-go/render"
-	"matplotlib-go/style"
 )
 
 func TemporalActivity(reader readers.Reader, output string, legendThreshold, singleColumnThreshold int, startTime, endTime *time.Time) error {
@@ -696,10 +696,10 @@ func writeHotspotRiskTable(files []readers.HotspotRiskFile, output string) error
 	if output == "" {
 		output = "hotspot-risk-table.tsv"
 	}
-	if err := os.MkdirAll(filepath.Dir(output), 0755); err != nil && filepath.Dir(output) != "." {
+	if err := os.MkdirAll(filepath.Dir(output), 0o755); err != nil && filepath.Dir(output) != "." {
 		return fmt.Errorf("failed to create output directory: %v", err)
 	}
-	if err := os.WriteFile(output, buffer.Bytes(), 0644); err != nil {
+	if err := os.WriteFile(output, buffer.Bytes(), 0o644); err != nil {
 		return fmt.Errorf("failed to write hotspot risk table: %v", err)
 	}
 	fmt.Printf("Saved %s\n", output)
@@ -1041,7 +1041,7 @@ func resolveReportOutput(output, defaultOutput string) (string, error) {
 		output = defaultOutput
 	}
 	if dir := filepath.Dir(output); dir != "." {
-		if err := os.MkdirAll(dir, 0755); err != nil {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return "", fmt.Errorf("failed to create output directory %s: %v", dir, err)
 		}
 	}

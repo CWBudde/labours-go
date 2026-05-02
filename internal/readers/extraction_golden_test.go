@@ -230,7 +230,7 @@ func requireGoldenJSON(t *testing.T, name string, actual any) {
 
 	path := filepath.Join("../../test/testdata/hercules", name)
 	if os.Getenv("LABOURS_GO_UPDATE_GOLDENS") == "1" {
-		require.NoError(t, os.WriteFile(path, actualJSON, 0644))
+		require.NoError(t, os.WriteFile(path, actualJSON, 0o644))
 	}
 
 	expectedJSON, err := os.ReadFile(path)

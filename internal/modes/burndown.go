@@ -18,7 +18,7 @@ func generateBurndownPlot(name string, matrix [][]int, output string, relative b
 	// Initialize progress tracking
 	quiet := viper.GetBool("quiet")
 	progEstimator := progress.NewProgressEstimator(!quiet)
-	
+
 	// Start multi-phase operation
 	totalPhases := 4 // validation, resampling, interpolation, plotting
 	progEstimator.StartMultiOperation(totalPhases, "Burndown Analysis")
@@ -56,9 +56,10 @@ func generateBurndownPlot(name string, matrix [][]int, output string, relative b
 	// Use earliest time in the matrix if startTime is not provided
 	if startTime == nil {
 		tickSize := time.Duration(365*24) * time.Hour // Assuming yearly granularity by default
-		if resample == "month" {
+		switch resample {
+		case "month":
 			tickSize = time.Duration(30*24) * time.Hour
-		} else if resample == "day" {
+		case "day":
 			tickSize = 24 * time.Hour
 		}
 		earliest := findEarliestTime(matrix, tickSize, *endTime)
@@ -71,7 +72,7 @@ func generateBurndownPlot(name string, matrix [][]int, output string, relative b
 
 	// Phase 4: Final processing and visualization
 	progEstimator.NextOperation("Generating visualization")
-	
+
 	// Survival analysis
 	survivalRatios := calculateSurvivalRatios(interpolatedMatrix, *startTime)
 	if !quiet {

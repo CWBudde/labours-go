@@ -26,15 +26,15 @@ func NewChartGenerator(outputDir string) *ChartGenerator {
 // GenerateChart creates a chart using the specified mode and input data
 func (cg *ChartGenerator) GenerateChart(t *testing.T, mode, inputFile string) (string, error) {
 	t.Helper()
-	
+
 	// Ensure output directory exists
-	if err := os.MkdirAll(cg.OutputDir, 0755); err != nil {
+	if err := os.MkdirAll(cg.OutputDir, 0o755); err != nil {
 		return "", fmt.Errorf("failed to create output directory: %w", err)
 	}
-	
+
 	// Create output file path
 	outputPath := filepath.Join(cg.OutputDir, fmt.Sprintf("test_%s.png", mode))
-	
+
 	// Read input data - auto-detect format
 	var reader readers.Reader
 	if filepath.Ext(inputFile) == ".yaml" || filepath.Ext(inputFile) == ".yml" {
@@ -42,18 +42,18 @@ func (cg *ChartGenerator) GenerateChart(t *testing.T, mode, inputFile string) (s
 	} else {
 		reader = &readers.ProtobufReader{}
 	}
-	
+
 	file, err := os.Open(inputFile)
 	if err != nil {
 		return "", fmt.Errorf("failed to open input file %s: %w", inputFile, err)
 	}
 	defer file.Close()
-	
+
 	err = reader.Read(file)
 	if err != nil {
 		return "", fmt.Errorf("failed to read input data: %w", err)
 	}
-	
+
 	// Generate chart based on mode
 	switch mode {
 	case "burndown-project":
@@ -75,16 +75,16 @@ func (cg *ChartGenerator) GenerateChart(t *testing.T, mode, inputFile string) (s
 	default:
 		return "", fmt.Errorf("unsupported chart mode: %s", mode)
 	}
-	
+
 	if err != nil {
 		return "", fmt.Errorf("failed to generate %s chart: %w", mode, err)
 	}
-	
+
 	// Verify output file was created
 	if _, err := os.Stat(outputPath); os.IsNotExist(err) {
 		return "", fmt.Errorf("chart file was not created: %s", outputPath)
 	}
-	
+
 	return outputPath, nil
 }
 
@@ -93,7 +93,7 @@ func (cg *ChartGenerator) generateBurndownProject(reader readers.Reader, outputP
 	// Set viper config for relative mode
 	viper.Set("relative", relative)
 	viper.Set("resample", "year") // Default resampling for consistency
-	
+
 	// Call the actual burndown project generation using Python-compatible version
 	return modes.GenerateBurndownProjectPython(reader, outputPath, relative, "year")
 }
@@ -139,82 +139,82 @@ func (cg *ChartGenerator) generateCouplesFiles(reader readers.Reader, outputPath
 // GenerateReferenceSet creates a complete set of reference images for golden file testing
 func (cg *ChartGenerator) GenerateReferenceSet(t *testing.T, inputFile string) map[string]string {
 	t.Helper()
-	
+
 	generatedFiles := make(map[string]string)
-	
+
 	// List of modes to generate reference images for
 	modes := []string{
 		"burndown-project",
-		"burndown-project-relative", 
+		"burndown-project-relative",
 		"ownership",
 		"devs",
 	}
-	
+
 	for _, mode := range modes {
 		outputPath, err := cg.GenerateChart(t, mode, inputFile)
 		if err != nil {
 			t.Logf("Warning: Failed to generate reference for %s: %v", mode, err)
 			continue
 		}
-		
+
 		generatedFiles[mode] = outputPath
 		t.Logf("✅ Generated reference image for %s: %s", mode, outputPath)
 	}
-	
+
 	return generatedFiles
 }
 
 // ValidateChartStructure performs structural validation on a generated chart
 func (cg *ChartGenerator) ValidateChartStructure(t *testing.T, chartPath string) error {
 	t.Helper()
-	
+
 	// Load the chart image
 	img, err := loadImage(chartPath)
 	if err != nil {
 		return fmt.Errorf("failed to load chart image: %w", err)
 	}
-	
+
 	bounds := img.Bounds()
 	width := bounds.Dx()
 	height := bounds.Dy()
-	
+
 	// Basic structural validations
 	if width < 400 || height < 200 {
 		return fmt.Errorf("chart dimensions too small: %dx%d", width, height)
 	}
-	
+
 	if width > 4000 || height > 4000 {
 		return fmt.Errorf("chart dimensions too large: %dx%d", width, height)
 	}
-	
+
 	// Check for reasonable aspect ratio (should be wider than tall for most charts)
 	aspectRatio := float64(width) / float64(height)
 	if aspectRatio < 0.5 || aspectRatio > 5.0 {
 		t.Logf("Warning: Unusual aspect ratio: %.2f (width/height)", aspectRatio)
 	}
-	
+
 	// Validate color usage
 	histogram := buildColorHistogram(img)
-	
+
 	// Check for sufficient color diversity (should have multiple distinct colors)
 	if len(histogram) < 5 {
 		return fmt.Errorf("chart has too few colors (%d), may be incorrectly rendered", len(histogram))
 	}
-	
+
 	// Look for pure white/black dominance (may indicate rendering issues)
 	whitePixels := histogram["248,248,248"] + histogram["255,255,255"]
 	blackPixels := histogram["0,0,0"] + histogram["8,8,8"]
-	
+
 	if whitePixels > 0.9 {
 		return fmt.Errorf("chart is mostly white (%.1f%%), may be empty", whitePixels*100)
 	}
-	
+
 	if blackPixels > 0.9 {
 		return fmt.Errorf("chart is mostly black (%.1f%%), may have rendering issues", blackPixels*100)
 	}
-	
-	t.Logf("Chart structure validation passed: %dx%d, %d colors, %.1f%% white", 
+
+	t.Logf("Chart structure validation passed: %dx%d, %d colors, %.1f%% white",
 		width, height, len(histogram), whitePixels*100)
-	
+
 	return nil
 }

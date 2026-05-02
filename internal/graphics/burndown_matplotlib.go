@@ -12,14 +12,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cwbudde/matplotlib-go/backends"
+	_ "github.com/cwbudde/matplotlib-go/backends/agg"
+	_ "github.com/cwbudde/matplotlib-go/backends/svg"
+	"github.com/cwbudde/matplotlib-go/core"
+	"github.com/cwbudde/matplotlib-go/render"
+	"github.com/cwbudde/matplotlib-go/style"
 	"github.com/spf13/viper"
 	"labours-go/internal/burndown"
-	"matplotlib-go/backends"
-	_ "matplotlib-go/backends/agg"
-	_ "matplotlib-go/backends/svg"
-	"matplotlib-go/core"
-	"matplotlib-go/render"
-	"matplotlib-go/style"
 )
 
 // PlotBurndownMatplotlib creates a burndown plot with matplotlib-go stackplot rendering.
@@ -505,7 +505,7 @@ func saveMatplotlibFigureWithLayout(fig *core.Figure, output string, width, heig
 	if output == "" {
 		output = "burndown_project_python.png"
 	}
-	if err := os.MkdirAll(filepath.Dir(output), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(output), 0o755); err != nil {
 		return fmt.Errorf("failed to create output directory for %s: %v", output, err)
 	}
 

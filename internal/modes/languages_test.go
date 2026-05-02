@@ -23,6 +23,7 @@ func (m *MockLanguageReader) GetFilesBurndown() ([]readers.FileBurndown, error) 
 func (m *MockLanguageReader) GetPeopleBurndown() ([]readers.PeopleBurndown, error) {
 	return nil, nil
 }
+
 func (m *MockLanguageReader) GetOwnershipBurndown() ([]string, map[string][][]int, error) {
 	return nil, nil, nil
 }
@@ -38,6 +39,7 @@ func (m *MockLanguageReader) GetRuntimeStats() (map[string]float64, error)      
 func (m *MockLanguageReader) GetBurndownParameters() (burndown.BurndownParameters, error) {
 	return burndown.BurndownParameters{}, nil
 }
+
 func (m *MockLanguageReader) GetProjectBurndownWithHeader() (burndown.BurndownHeader, string, [][]int, error) {
 	return burndown.BurndownHeader{}, "", nil, nil
 }

@@ -233,10 +233,11 @@ func LoadBurndown(header BurndownHeader, name string, matrix [][]int, resample s
 		dateRange, finalMatrix, labels, err = resampleBurndownData(daily, start, finish, resample)
 		if err != nil {
 			// Try fallback resampling like Python does
-			if resample == "year" || resample == "A" {
+			switch resample {
+			case "year", "A":
 				fmt.Println("too loose resampling - by year, trying by month")
 				return LoadBurndown(header, name, matrix, "month", false, interpolationProgress)
-			} else if resample == "month" || resample == "M" {
+			case "month", "M":
 				fmt.Println("too loose resampling - by month, trying by day")
 				return LoadBurndown(header, name, matrix, "day", false, interpolationProgress)
 			}

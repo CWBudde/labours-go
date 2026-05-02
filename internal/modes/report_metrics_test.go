@@ -252,30 +252,39 @@ func (r *reportMetricsReader) GetHeader() (int64, int64) { return 0, 0 }
 func (r *reportMetricsReader) GetProjectBurndown() (string, [][]int) {
 	return "", nil
 }
+
 func (r *reportMetricsReader) GetBurndownParameters() (burndown.BurndownParameters, error) {
 	return burndown.BurndownParameters{}, nil
 }
+
 func (r *reportMetricsReader) GetProjectBurndownWithHeader() (burndown.BurndownHeader, string, [][]int, error) {
 	return burndown.BurndownHeader{}, "", nil, nil
 }
+
 func (r *reportMetricsReader) GetFilesBurndown() ([]readers.FileBurndown, error) {
 	return nil, fmt.Errorf("not implemented")
 }
+
 func (r *reportMetricsReader) GetPeopleBurndown() ([]readers.PeopleBurndown, error) {
 	return nil, fmt.Errorf("not implemented")
 }
+
 func (r *reportMetricsReader) GetOwnershipBurndown() ([]string, map[string][][]int, error) {
 	return nil, nil, fmt.Errorf("not implemented")
 }
+
 func (r *reportMetricsReader) GetPeopleInteraction() ([]string, [][]int, error) {
 	return nil, nil, fmt.Errorf("not implemented")
 }
+
 func (r *reportMetricsReader) GetFileCooccurrence() ([]string, [][]int, error) {
 	return nil, nil, fmt.Errorf("not implemented")
 }
+
 func (r *reportMetricsReader) GetPeopleCooccurrence() ([]string, [][]int, error) {
 	return nil, nil, fmt.Errorf("not implemented")
 }
+
 func (r *reportMetricsReader) GetShotnessCooccurrence() ([]string, [][]int, error) {
 	return []string{"main.go:funcA", "main.go:funcB", "doc.md:section"}, [][]int{
 		{4, 3, 1},
@@ -283,18 +292,22 @@ func (r *reportMetricsReader) GetShotnessCooccurrence() ([]string, [][]int, erro
 		{1, 2, 2},
 	}, nil
 }
+
 func (r *reportMetricsReader) GetShotnessRecords() ([]readers.ShotnessRecord, error) {
 	return nil, fmt.Errorf("not implemented")
 }
+
 func (r *reportMetricsReader) GetDeveloperStats() ([]readers.DeveloperStat, error) {
 	return []readers.DeveloperStat{
 		{Name: "alice", Commits: 10, LinesAdded: 100, LinesRemoved: 20, LinesModified: 30, FilesTouched: 4},
 		{Name: "bob", Commits: 5, LinesAdded: 60, LinesRemoved: 10, LinesModified: 15, FilesTouched: 2},
 	}, nil
 }
+
 func (r *reportMetricsReader) GetLanguageStats() ([]readers.LanguageStat, error) {
 	return nil, fmt.Errorf("not implemented")
 }
+
 func (r *reportMetricsReader) GetRuntimeStats() (map[string]float64, error) {
 	return map[string]float64{
 		"burndown": 20,
@@ -302,6 +315,7 @@ func (r *reportMetricsReader) GetRuntimeStats() (map[string]float64, error) {
 		"devs":     5,
 	}, nil
 }
+
 func (r *reportMetricsReader) GetDeveloperTimeSeriesData() (*readers.DeveloperTimeSeriesData, error) {
 	return nil, fmt.Errorf("not implemented")
 }

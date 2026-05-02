@@ -19,12 +19,12 @@ func NewThemeManager() *ThemeManager {
 	tm := &ThemeManager{
 		themes: make(map[string]Theme),
 	}
-	
+
 	// Load built-in themes
 	for name, theme := range BuiltinThemes {
 		tm.themes[name] = theme
 	}
-	
+
 	return tm
 }
 
@@ -34,16 +34,16 @@ func (tm *ThemeManager) LoadThemeFromFile(filepath string) error {
 	if err != nil {
 		return fmt.Errorf("failed to read theme file %s: %w", filepath, err)
 	}
-	
+
 	var theme Theme
 	if err := yaml.Unmarshal(data, &theme); err != nil {
 		return fmt.Errorf("failed to parse theme file %s: %w", filepath, err)
 	}
-	
+
 	if err := theme.Validate(); err != nil {
 		return fmt.Errorf("invalid theme in file %s: %w", filepath, err)
 	}
-	
+
 	tm.themes[theme.Name] = theme
 	return nil
 }
@@ -54,25 +54,25 @@ func (tm *ThemeManager) LoadThemesFromDirectory(dirPath string) error {
 	if err != nil {
 		return fmt.Errorf("failed to read theme directory %s: %w", dirPath, err)
 	}
-	
+
 	for _, entry := range entries {
 		if entry.IsDir() {
 			continue
 		}
-		
+
 		fileName := entry.Name()
-		if !strings.HasSuffix(strings.ToLower(fileName), ".yaml") && 
-		   !strings.HasSuffix(strings.ToLower(fileName), ".yml") {
+		if !strings.HasSuffix(strings.ToLower(fileName), ".yaml") &&
+			!strings.HasSuffix(strings.ToLower(fileName), ".yml") {
 			continue
 		}
-		
+
 		fullPath := filepath.Join(dirPath, fileName)
 		if err := tm.LoadThemeFromFile(fullPath); err != nil {
 			// Log warning but continue loading other themes
 			fmt.Printf("Warning: failed to load theme from %s: %v\n", fullPath, err)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -82,7 +82,7 @@ func (tm *ThemeManager) GetTheme(name string) (*Theme, error) {
 	if !exists {
 		return nil, fmt.Errorf("theme '%s' not found", name)
 	}
-	
+
 	return &theme, nil
 }
 
@@ -101,12 +101,12 @@ func (tm *ThemeManager) SetCurrentTheme(name string) error {
 	if err != nil {
 		return err
 	}
-	
+
 	CurrentTheme = *theme
-	
+
 	// Update the legacy ColorPalette for backwards compatibility
 	ColorPalette = theme.GetColorPalette()
-	
+
 	return nil
 }
 
@@ -116,11 +116,11 @@ func (tm *ThemeManager) SaveThemeToFile(theme *Theme, filepath string) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal theme: %w", err)
 	}
-	
-	if err := os.WriteFile(filepath, data, 0644); err != nil {
+
+	if err := os.WriteFile(filepath, data, 0o644); err != nil {
 		return fmt.Errorf("failed to write theme file %s: %w", filepath, err)
 	}
-	
+
 	return nil
 }
 
@@ -129,7 +129,7 @@ func (tm *ThemeManager) RegisterTheme(theme Theme) error {
 	if err := theme.Validate(); err != nil {
 		return fmt.Errorf("invalid theme: %w", err)
 	}
-	
+
 	tm.themes[theme.Name] = theme
 	return nil
 }
@@ -140,15 +140,15 @@ func (tm *ThemeManager) CreateCustomTheme(baseName string, customizations map[st
 	if err != nil {
 		return nil, fmt.Errorf("base theme not found: %w", err)
 	}
-	
+
 	// Create a copy of the base theme
 	custom := *base
-	
+
 	// Apply customizations (simplified version - could be expanded)
 	if name, ok := customizations["name"].(string); ok {
 		custom.Name = name
 	}
-	
+
 	if bg, ok := customizations["background"].(map[string]interface{}); ok {
 		if r, ok := bg["r"].(int); ok {
 			custom.Background.R = uint8(r)
@@ -160,7 +160,7 @@ func (tm *ThemeManager) CreateCustomTheme(baseName string, customizations map[st
 			custom.Background.B = uint8(b)
 		}
 	}
-	
+
 	return &custom, nil
 }
 
@@ -170,7 +170,7 @@ func (tm *ThemeManager) ExportTheme(themeName, outputPath string) error {
 	if err != nil {
 		return err
 	}
-	
+
 	return tm.SaveThemeToFile(theme, outputPath)
 }
 
@@ -185,7 +185,7 @@ func LoadUserThemes() error {
 			fmt.Printf("Warning: failed to load themes from ./themes: %v\n", err)
 		}
 	}
-	
+
 	// Try to load from home directory ~/.labours-go/themes/
 	homeDir, err := os.UserHomeDir()
 	if err == nil {
@@ -196,7 +196,7 @@ func LoadUserThemes() error {
 			}
 		}
 	}
-	
+
 	return nil
 }
 

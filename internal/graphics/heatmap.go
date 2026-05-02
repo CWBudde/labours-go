@@ -6,11 +6,11 @@ import (
 	"math"
 	"sync"
 
+	matcolor "github.com/cwbudde/matplotlib-go/color"
+	"github.com/cwbudde/matplotlib-go/render"
 	"gonum.org/v1/plot"
 	"gonum.org/v1/plot/vg"
 	"gonum.org/v1/plot/vg/draw"
-	matcolor "matplotlib-go/color"
-	"matplotlib-go/render"
 )
 
 var registerHeatmapColormapsOnce sync.Once
@@ -119,7 +119,7 @@ func ValidateHeatMap(matrix [][]float64, rows, cols []string) error {
 
 // Plot draws the heatmap onto the plot canvas.
 func (hm *HeatMap) Plot(c draw.Canvas, p *plot.Plot) {
-	r := c.Rectangle.Size()
+	r := c.Size()
 	cellWidth := r.X / vg.Length(len(hm.Cols))
 	cellHeight := r.Y / vg.Length(len(hm.Rows))
 
@@ -132,9 +132,9 @@ func (hm *HeatMap) Plot(c draw.Canvas, p *plot.Plot) {
 			clr := hm.Palette.At(value)
 
 			// Define the coordinates for the cell.
-			xMin := c.Rectangle.Min.X + x
+			xMin := c.Min.X + x
 			xMax := xMin + cellWidth
-			yMin := c.Rectangle.Min.Y + y
+			yMin := c.Min.Y + y
 			yMax := yMin + cellHeight
 
 			// Create a path for the rectangle.

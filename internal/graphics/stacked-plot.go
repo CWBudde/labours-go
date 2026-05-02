@@ -5,6 +5,8 @@ import (
 	"image/color"
 	"math"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/spf13/viper"
@@ -14,8 +16,6 @@ import (
 	vgdraw "gonum.org/v1/plot/vg/draw"
 	"gonum.org/v1/plot/vg/vgimg"
 	"labours-go/internal/progress"
-	"path/filepath"
-	"strings"
 )
 
 // PlotStackedBurndown generates a proper stacked area chart for burndown analysis
@@ -350,9 +350,7 @@ func PlotBarChart(values []float64, labels []string, output string, title string
 
 	// Create bar chart data
 	bars := make(plotter.Values, len(values))
-	for i, v := range values {
-		bars[i] = v
-	}
+	copy(bars, values)
 
 	// Create bar chart
 	barChart, err := plotter.NewBarChart(bars, vg.Points(20))

@@ -9,15 +9,15 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/cwbudde/matplotlib-go/backends"
+	"github.com/cwbudde/matplotlib-go/core"
+	"github.com/cwbudde/matplotlib-go/render"
+	"github.com/cwbudde/matplotlib-go/style"
 	"gonum.org/v1/plot"
 	"gonum.org/v1/plot/vg"
 	"gonum.org/v1/plot/vg/draw"
 	"labours-go/internal/graphics"
 	"labours-go/internal/readers"
-	"matplotlib-go/backends"
-	"matplotlib-go/core"
-	"matplotlib-go/render"
-	"matplotlib-go/style"
 )
 
 func OverwritesMatrix(reader readers.Reader, output string) error {

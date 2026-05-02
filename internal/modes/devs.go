@@ -7,11 +7,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cwbudde/matplotlib-go/core"
 	"github.com/spf13/viper"
 	"labours-go/internal/graphics"
 	"labours-go/internal/progress"
 	"labours-go/internal/readers"
-	"matplotlib-go/core"
 )
 
 // Python labours highlights per-developer summary stats with a green or red
@@ -153,8 +153,8 @@ func plotDevsPythonStyle(timeSeries *readers.DeveloperTimeSeriesData, startUnix,
 			graphics.MatplotlibTextLabel{
 				X:               float64(dates[len(dates)-1].Unix()),
 				Y:               labelY,
-				Text:             fmt.Sprintf("%5d %8s %8s", row.Commits, formatNumber(netDelta), formatNumber(row.LinesChange)),
-				HAlign:           core.TextAlignRight,
+				Text:            fmt.Sprintf("%5d %8s %8s", row.Commits, formatNumber(netDelta), formatNumber(row.LinesChange)),
+				HAlign:          core.TextAlignRight,
 				BackgroundColor: statBackground,
 			},
 		)

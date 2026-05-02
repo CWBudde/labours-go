@@ -6,24 +6,24 @@
 set -e
 
 # Quick usage check
-if [[ $# -eq 0 ]] || [[ "$1" == "-h" ]] || [[ "$1" == "--help" ]]; then
-    echo "Quick Git Analysis with Hercules + Labours-Go"
-    echo ""
-    echo "Usage: $0 <repository-path> [output-dir]"
-    echo ""
-    echo "This script will:"
-    echo "  1. Analyze the repository with Hercules (burndown & developer stats)"
-    echo "  2. Generate visualizations with Labours-Go"
-    echo "  3. Save results to output directory"
-    echo ""
-    echo "Examples:"
-    echo "  $0 /path/to/my-repo"
-    echo "  $0 /path/to/my-repo ./analysis-results"
-    echo ""
-    echo "Requirements:"
-    echo "  - Hercules binary at /home/christian/Code/hercules/hercules"
-    echo "  - Labours-Go built in current directory"
-    exit 0
+if [[ $# -eq 0 ]] || [[ $1 == "-h" ]] || [[ $1 == "--help" ]]; then
+	echo "Quick Git Analysis with Hercules + Labours-Go"
+	echo ""
+	echo "Usage: $0 <repository-path> [output-dir]"
+	echo ""
+	echo "This script will:"
+	echo "  1. Analyze the repository with Hercules (burndown & developer stats)"
+	echo "  2. Generate visualizations with Labours-Go"
+	echo "  3. Save results to output directory"
+	echo ""
+	echo "Examples:"
+	echo "  $0 /path/to/my-repo"
+	echo "  $0 /path/to/my-repo ./analysis-results"
+	echo ""
+	echo "Requirements:"
+	echo "  - Hercules binary at /home/christian/Code/hercules/hercules"
+	echo "  - Labours-Go built in current directory"
+	exit 0
 fi
 
 REPO_PATH="$1"
@@ -35,8 +35,8 @@ echo "📊 Output: $OUTPUT_DIR"
 
 # Check if repo exists
 if [[ ! -d "$REPO_PATH/.git" ]]; then
-    echo "❌ Error: $REPO_PATH is not a git repository"
-    exit 1
+	echo "❌ Error: $REPO_PATH is not a git repository"
+	exit 1
 fi
 
 # Create output directory
@@ -44,26 +44,26 @@ mkdir -p "$OUTPUT_DIR"
 
 # Check for hercules
 HERCULES="/home/christian/Code/hercules/hercules"
-if [[ ! -x "$HERCULES" ]]; then
-    echo "❌ Error: Hercules not found at $HERCULES"
-    exit 1
+if [[ ! -x $HERCULES ]]; then
+	echo "❌ Error: Hercules not found at $HERCULES"
+	exit 1
 fi
 
 # Build labours-go if needed
 if [[ ! -x "./labours-go" ]]; then
-    echo "🔨 Building labours-go..."
-    go build -o labours-go
+	echo "🔨 Building labours-go..."
+	go build -o labours-go
 fi
 
 echo "📈 Analyzing with Hercules..."
 
 # Generate burndown analysis
 echo "  → Burndown analysis..."
-"$HERCULES" --burndown --burndown-files --burndown-people "$REPO_PATH" > "$OUTPUT_DIR/burndown.yaml" 2>/dev/null
+"$HERCULES" --burndown --burndown-files --burndown-people "$REPO_PATH" >"$OUTPUT_DIR/burndown.yaml" 2>/dev/null
 
 # Generate developer stats
 echo "  → Developer statistics..."
-"$HERCULES" --devs "$REPO_PATH" > "$OUTPUT_DIR/devs.yaml" 2>/dev/null
+"$HERCULES" --devs "$REPO_PATH" >"$OUTPUT_DIR/devs.yaml" 2>/dev/null
 
 echo "🎨 Creating visualizations with Labours-Go..."
 
