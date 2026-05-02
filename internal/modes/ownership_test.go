@@ -406,5 +406,5 @@ func mockGenerateOwnershipPlot(name string, people []string, ownership map[strin
 
 	// Create a simple test file to simulate chart generation
 	content := fmt.Sprintf("Mock ownership chart for %s with %d people and %d files", name, len(people), len(ownership))
-	return os.WriteFile(outputPath, []byte(content), 0o644)
+	return os.WriteFile(outputPath, []byte(content), 0o600)
 }

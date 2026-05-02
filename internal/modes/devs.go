@@ -75,7 +75,7 @@ func Devs(reader readers.Reader, output string, maxPeople int) error {
 
 	// Phase 5: Plot the developer contributions
 	progEstimator.NextOperation("Generating visualization")
-	if err := plotDevs(developerStats, devSeries, clusters, output); err != nil {
+	if err := plotDevs(developerStats, devSeries, output); err != nil {
 		progEstimator.FinishMultiOperation()
 		return fmt.Errorf("failed to generate developer plots: %v", err)
 	}
@@ -279,23 +279,6 @@ func selectTopDevelopers(stats []readers.DeveloperStat, maxPeople int) []readers
 	return stats
 }
 
-// generateTimeSeries generates synthetic time series data for each developer.
-func generateTimeSeries(stats []readers.DeveloperStat) map[string][]float64 {
-	devSeries := make(map[string][]float64)
-	for _, stat := range stats {
-		// Generate a synthetic time series based on commit activity
-		// In a real implementation, this would come from daily or weekly data
-		series := make([]float64, 52) // 52 weeks in a year
-		commitsPerWeek := float64(stat.Commits) / 52.0
-		for i := 0; i < len(series); i++ {
-			// Add random variation to simulate real activity
-			series[i] = commitsPerWeek + float64(i%5)*0.1*commitsPerWeek
-		}
-		devSeries[stat.Name] = series
-	}
-	return devSeries
-}
-
 // generateTimeSeriesWithProgress generates synthetic time series data with progress tracking
 func generateTimeSeriesWithProgress(stats []readers.DeveloperStat, progEstimator *progress.ProgressEstimator) map[string][]float64 {
 	// Start detailed progress for time series generation
@@ -333,7 +316,7 @@ func clusterDevelopers(devSeries map[string][]float64) map[string]int {
 }
 
 // plotDevs generates plots for developers' contributions.
-func plotDevs(developerStats []readers.DeveloperStat, devSeries map[string][]float64, clusters map[string]int, output string) error {
+func plotDevs(developerStats []readers.DeveloperStat, devSeries map[string][]float64, output string) error {
 	if len(developerStats) == 0 {
 		return fmt.Errorf("no developer stats to plot")
 	}

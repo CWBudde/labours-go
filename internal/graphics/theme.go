@@ -311,7 +311,8 @@ func (t *Theme) GetHeatColor(ratio float64) color.Color {
 	cold := t.HeatMap.ColdColor
 	hot := t.HeatMap.HotColor
 
-	if t.HeatMap.UseMidPoint && ratio <= 0.5 {
+	switch {
+	case t.HeatMap.UseMidPoint && ratio <= 0.5:
 		// Interpolate from cold to mid
 		mid := t.HeatMap.MidColor
 		ratio *= 2 // Scale to 0-1 for cold->mid
@@ -319,7 +320,7 @@ func (t *Theme) GetHeatColor(ratio float64) color.Color {
 		g := uint8(float64(cold.G) + ratio*(float64(mid.G)-float64(cold.G)))
 		b := uint8(float64(cold.B) + ratio*(float64(mid.B)-float64(cold.B)))
 		return color.RGBA{R: r, G: g, B: b, A: 255}
-	} else if t.HeatMap.UseMidPoint {
+	case t.HeatMap.UseMidPoint:
 		// Interpolate from mid to hot
 		mid := t.HeatMap.MidColor
 		ratio = (ratio - 0.5) * 2 // Scale to 0-1 for mid->hot
@@ -327,7 +328,7 @@ func (t *Theme) GetHeatColor(ratio float64) color.Color {
 		g := uint8(float64(mid.G) + ratio*(float64(hot.G)-float64(mid.G)))
 		b := uint8(float64(mid.B) + ratio*(float64(hot.B)-float64(mid.B)))
 		return color.RGBA{R: r, G: g, B: b, A: 255}
-	} else {
+	default:
 		// Direct interpolation from cold to hot
 		r := uint8(float64(cold.R) + ratio*(float64(hot.R)-float64(cold.R)))
 		g := uint8(float64(cold.G) + ratio*(float64(hot.G)-float64(cold.G)))

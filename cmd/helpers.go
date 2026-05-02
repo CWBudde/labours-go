@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sort"
 	"strings"
 	"time"
 
@@ -172,15 +171,6 @@ func splitModeValues(rawModes []string) []string {
 func isValidMode(mode string) bool {
 	_, ok := validModeNames[mode]
 	return ok
-}
-
-func formatAvailableModes() string {
-	modes := make([]string, 0, len(validModeNames))
-	for mode := range validModeNames {
-		modes = append(modes, mode)
-	}
-	sort.Strings(modes)
-	return "  " + strings.Join(modes, "\n  ")
 }
 
 func normalizeInputFormat(inputFormat string) (string, error) {
@@ -529,7 +519,7 @@ func runHerculesAndVisualize(herculesPath, repoPath, analysis string) error {
 	fmt.Printf("Running hercules %s analysis...\n", analysis)
 
 	// Execute hercules
-	cmd := exec.Command(herculesPath, herculesFlags...)
+	cmd := exec.Command(herculesPath, herculesFlags...) // #nosec G204 - user-configured Hercules executable is the purpose of this helper.
 	output, err := cmd.Output()
 	if err != nil {
 		return fmt.Errorf("hercules command failed: %v", err)
@@ -562,7 +552,9 @@ func runHerculesAndVisualize(herculesPath, repoPath, analysis string) error {
 
 		if outputPath == "" {
 			// Default to centralized analysis_results directory
-			os.MkdirAll("analysis_results", 0o755)
+			if err := os.MkdirAll("analysis_results", 0o750); err != nil {
+				return fmt.Errorf("failed to create analysis_results directory: %v", err)
+			}
 			format = detectOutputFormat("") // Will use backend flag or default to PNG
 			basePath := fmt.Sprintf("analysis_results/%s_%s", analysis, mode)
 			outputPath = generateOutputPath(basePath, format)
@@ -591,7 +583,9 @@ func runHerculesAndVisualize(herculesPath, repoPath, analysis string) error {
 	}
 
 	// Clean up temporary file
-	os.Remove(outputFile)
+	if err := os.Remove(outputFile); err != nil {
+		return fmt.Errorf("failed to remove temporary output file: %v", err)
+	}
 
 	return nil
 }

@@ -19,6 +19,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 )
 
 const rerenderAllButtonPlaceholder = "__RERENDER_ALL_BUTTON__"
@@ -185,7 +186,11 @@ func main() {
 
 	addr := ":" + *port
 	log.Printf("Labours parity viewer running at http://localhost%s", addr)
-	log.Fatal(http.ListenAndServe(addr, nil))
+	server := &http.Server{
+		Addr:              addr,
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+	log.Fatal(server.ListenAndServe())
 }
 
 func buildViewOptions(useParity bool, repoRoot, artifactDir, artifactPrefix string) viewOptions {
@@ -501,7 +506,7 @@ func newLaboursReferenceUpdateCommand(repoRoot string, recipe referenceRecipe) (
 	}
 	args = append(args, recipe.ExtraArgs...)
 
-	cmd := exec.Command("go", args...)
+	cmd := exec.Command("go", args...) // #nosec G204 - args are built from fixed test command options.
 	cmd.Dir = repoRoot
 
 	cmd.Env = os.Environ()
@@ -532,9 +537,9 @@ func copyFile(src, dst string) error {
 	if err != nil {
 		return err
 	}
-	defer in.Close()
+	defer func() { _ = in.Close() }()
 
-	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(dst), 0o750); err != nil {
 		return err
 	}
 	out, err := os.Create(dst)
@@ -556,9 +561,9 @@ func loadCases(useParity bool, parityDir, baselineDir, artifactDir, baselineFile
 }
 
 func printCases(w io.Writer, result loadResult) {
-	fmt.Fprintf(w, "found=%d artifact_only=%d skipped=%d\n", result.ComparedCount, result.ArtifactOnlyCount, result.SkippedCount)
+	_, _ = fmt.Fprintf(w, "found=%d artifact_only=%d skipped=%d\n", result.ComparedCount, result.ArtifactOnlyCount, result.SkippedCount)
 	for _, c := range result.Cases {
-		fmt.Fprintf(
+		_, _ = fmt.Fprintf(
 			w,
 			"%s\t%s\t%s\trmse=%.4f\tavg=%.4f\tmax=%d\tdiff_pixels=%d\tdiff_ratio=%.6f\tsize=%dx%d->%dx%d\n",
 			c.Suite,
@@ -1013,7 +1018,7 @@ func readPNGAsRGBA(path string) (*image.RGBA, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	img, err := png.Decode(f)
 	if err != nil {
@@ -1113,40 +1118,43 @@ func checkerboardColor(x, y int) color.RGBA {
 func compositePixel(r, g, b, a uint8, bg color.RGBA) color.RGBA {
 	srcA := int(a)
 	invA := 255 - srcA
+	blend := func(fg, bg uint8) uint8 {
+		return uint8((int(fg)*srcA + int(bg)*invA) / 255) // #nosec G115 - weighted uint8 average stays in [0,255].
+	}
 	return color.RGBA{
-		R: uint8((int(r)*srcA + int(bg.R)*invA) / 255),
-		G: uint8((int(g)*srcA + int(bg.G)*invA) / 255),
-		B: uint8((int(b)*srcA + int(bg.B)*invA) / 255),
+		R: blend(r, bg.R),
+		G: blend(g, bg.G),
+		B: blend(b, bg.B),
 		A: 255,
 	}
 }
 
 func renderPage(w io.Writer, result loadResult, opts viewOptions) {
-	fmt.Fprint(w, strings.Replace(pageHeader, rerenderAllButtonPlaceholder, buildRerenderAllButton(opts), 1))
-	fmt.Fprintf(
+	_, _ = fmt.Fprint(w, strings.Replace(pageHeader, rerenderAllButtonPlaceholder, buildRerenderAllButton(opts), 1))
+	_, _ = fmt.Fprintf(
 		w,
 		`<div class="header-meta">%d comparisons loaded`,
 		result.ComparedCount,
 	)
 	if result.ArtifactOnlyCount > 0 {
-		fmt.Fprintf(w, `, %d artifact-only plots loaded`, result.ArtifactOnlyCount)
+		_, _ = fmt.Fprintf(w, `, %d artifact-only plots loaded`, result.ArtifactOnlyCount)
 	}
 	if result.SkippedCount > 0 {
-		fmt.Fprintf(w, `, %d baselines skipped because no matching artifact exists`, result.SkippedCount)
+		_, _ = fmt.Fprintf(w, `, %d baselines skipped because no matching artifact exists`, result.SkippedCount)
 	}
 	if !opts.CanRerender && opts.RerenderDisabledMsg != "" {
-		fmt.Fprintf(w, ` <span class="header-warning">%s</span>`, htmlEscape(opts.RerenderDisabledMsg))
+		_, _ = fmt.Fprintf(w, ` <span class="header-warning">%s</span>`, htmlEscape(opts.RerenderDisabledMsg))
 	}
-	fmt.Fprint(w, `.</div></div>`)
+	_, _ = fmt.Fprint(w, `.</div></div>`)
 
-	fmt.Fprint(w, `<div class="container" id="cards-container">`)
+	_, _ = fmt.Fprint(w, `<div class="container" id="cards-container">`)
 	for i := range result.Cases {
 		renderCard(w, &result.Cases[i], opts)
 	}
 	if len(result.Cases) == 0 {
-		fmt.Fprint(w, `<div class="empty-state">No parity comparisons found. Point --baseline-dir/--artifact-dir at existing PNG sets.</div>`)
+		_, _ = fmt.Fprint(w, `<div class="empty-state">No parity comparisons found. Point --baseline-dir/--artifact-dir at existing PNG sets.</div>`)
 	}
-	fmt.Fprint(w, pageFooter)
+	_, _ = fmt.Fprint(w, pageFooter)
 }
 
 func buildRerenderAllButton(opts viewOptions) string {
@@ -1163,9 +1171,14 @@ func renderCard(w io.Writer, entry *caseEntry, opts viewOptions) {
 	if entry == nil {
 		return
 	}
+	write := func(format string, args ...any) {
+		_, _ = fmt.Fprintf(w, format, args...)
+	}
+	raw := func(s string) {
+		_, _ = fmt.Fprint(w, s)
+	}
 
-	fmt.Fprintf(
-		w,
+	write(
 		`<div class="card" data-name="%s" data-suite="%s" data-baseline="%s" data-rmse="%.4f" data-avg-diff="%.4f" data-max-diff="%d" data-diff-pixels="%d" data-diff-ratio="%.6f">`,
 		htmlEscape(entry.Name),
 		htmlEscape(entry.Suite),
@@ -1176,82 +1189,80 @@ func renderCard(w io.Writer, entry *caseEntry, opts viewOptions) {
 		entry.DiffPixels,
 		entry.DiffRatio,
 	)
-	fmt.Fprint(w, `<div class="card-header">`)
-	fmt.Fprint(w, `<span class="badge badge-neutral sort-metric-badge" style="display:none"></span>`)
-	fmt.Fprintf(w, `<span class="card-title">%s</span>`, htmlEscape(entry.Name))
+	raw(`<div class="card-header">`)
+	raw(`<span class="badge badge-neutral sort-metric-badge" style="display:none"></span>`)
+	write(`<span class="card-title">%s</span>`, htmlEscape(entry.Name))
 	if opts.CanRerender {
-		fmt.Fprintf(
-			w,
+		write(
 			`<button class="rerender-btn" data-suite="%s" data-name="%s" type="button">Re-render Artifact</button>`,
 			htmlEscape(entry.Suite),
 			htmlEscape(entry.Name),
 		)
 	} else {
-		fmt.Fprintf(
-			w,
+		write(
 			`<button class="rerender-btn" data-suite="%s" data-name="%s" type="button" disabled title="%s">Re-render Artifact</button>`,
 			htmlEscape(entry.Suite),
 			htmlEscape(entry.Name),
 			htmlEscape(opts.RerenderDisabledMsg),
 		)
 	}
-	fmt.Fprint(w, `<div class="right-badges">`)
-	fmt.Fprintf(w, `<span class="badge badge-neutral">%s</span>`, htmlEscape(entry.Suite))
-	fmt.Fprintf(w, `<span class="badge badge-neutral">%s</span>`, htmlEscape(entry.Baseline))
-	fmt.Fprintf(w, `<span class="badge %s">RMSE %.2f</span>`, badgeClassRMSE(entry.RMSE), entry.RMSE)
-	fmt.Fprintf(w, `<span class="badge %s">avg %.2f</span>`, badgeClassAvgDiff(entry.AvgDiff), entry.AvgDiff)
-	fmt.Fprintf(w, `<span class="badge %s">max %d</span>`, badgeClassMaxDiff(entry.MaxDiff), entry.MaxDiff)
-	fmt.Fprintf(w, `<span class="badge %s">diff %.2f%%</span>`, badgeClassDiffRatio(entry.DiffRatio), entry.DiffRatio*100)
-	fmt.Fprint(w, `</div></div>`)
+	raw(`<div class="right-badges">`)
+	write(`<span class="badge badge-neutral">%s</span>`, htmlEscape(entry.Suite))
+	write(`<span class="badge badge-neutral">%s</span>`, htmlEscape(entry.Baseline))
+	write(`<span class="badge %s">RMSE %.2f</span>`, badgeClassRMSE(entry.RMSE), entry.RMSE)
+	write(`<span class="badge %s">avg %.2f</span>`, badgeClassAvgDiff(entry.AvgDiff), entry.AvgDiff)
+	write(`<span class="badge %s">max %d</span>`, badgeClassMaxDiff(entry.MaxDiff), entry.MaxDiff)
+	write(`<span class="badge %s">diff %.2f%%</span>`, badgeClassDiffRatio(entry.DiffRatio), entry.DiffRatio*100)
+	raw(`</div></div>`)
 
-	fmt.Fprint(w, `<div class="card-body"><div class="card-meta">`)
-	fmt.Fprintf(w, `size baseline %dx%d, artifact %dx%d`, entry.RefWidth, entry.RefHeight, entry.ActWidth, entry.ActHeight)
-	fmt.Fprint(w, `</div><div class="img-grid">`)
+	raw(`<div class="card-body"><div class="card-meta">`)
+	write(`size baseline %dx%d, artifact %dx%d`, entry.RefWidth, entry.RefHeight, entry.ActWidth, entry.ActHeight)
+	raw(`</div><div class="img-grid">`)
 
-	fmt.Fprint(w, `<div class="img-col col-ref">`)
-	fmt.Fprint(w, `<label>Baseline</label>`)
-	fmt.Fprint(w, `<div class="zoom-surface">`)
-	fmt.Fprint(w, `<div class="zoom-transform">`)
-	fmt.Fprintf(w, `<img class="parity-image" src="data:image/png;base64,%s" alt="baseline">`, entry.RefB64)
-	fmt.Fprint(w, `</div><div class="zoom-selection"></div></div>`)
-	fmt.Fprint(w, `</div>`)
+	raw(`<div class="img-col col-ref">`)
+	raw(`<label>Baseline</label>`)
+	raw(`<div class="zoom-surface">`)
+	raw(`<div class="zoom-transform">`)
+	write(`<img class="parity-image" src="data:image/png;base64,%s" alt="baseline">`, entry.RefB64)
+	raw(`</div><div class="zoom-selection"></div></div>`)
+	raw(`</div>`)
 
-	fmt.Fprint(w, `<div class="img-col col-artifact">`)
-	fmt.Fprint(w, `<label>Artifact</label>`)
-	fmt.Fprint(w, `<div class="zoom-surface">`)
-	fmt.Fprint(w, `<div class="zoom-transform">`)
-	fmt.Fprintf(w, `<img class="parity-image" src="data:image/png;base64,%s" alt="artifact">`, entry.ActB64)
-	fmt.Fprint(w, `</div><div class="zoom-selection"></div></div>`)
-	fmt.Fprint(w, `</div>`)
+	raw(`<div class="img-col col-artifact">`)
+	raw(`<label>Artifact</label>`)
+	raw(`<div class="zoom-surface">`)
+	raw(`<div class="zoom-transform">`)
+	write(`<img class="parity-image" src="data:image/png;base64,%s" alt="artifact">`, entry.ActB64)
+	raw(`</div><div class="zoom-selection"></div></div>`)
+	raw(`</div>`)
 
-	fmt.Fprint(w, `<div class="img-col col-overlay">`)
-	fmt.Fprint(w, `<label>Overlay</label>`)
-	fmt.Fprint(w, `<div class="slider-wrap zoom-surface">`)
-	fmt.Fprint(w, `<div class="zoom-transform zoom-base-layer">`)
-	fmt.Fprintf(w, `<img class="base" src="data:image/png;base64,%s" alt="base">`, entry.RefB64)
-	fmt.Fprint(w, `</div>`)
-	fmt.Fprint(w, `<div class="slider-overlay">`)
-	fmt.Fprint(w, `<div class="zoom-transform zoom-overlay-layer">`)
-	fmt.Fprintf(w, `<img src="data:image/png;base64,%s" alt="overlay">`, entry.ActB64)
-	fmt.Fprint(w, `</div></div><div class="slider-divider"></div><div class="zoom-selection"></div></div></div>`)
+	raw(`<div class="img-col col-overlay">`)
+	raw(`<label>Overlay</label>`)
+	raw(`<div class="slider-wrap zoom-surface">`)
+	raw(`<div class="zoom-transform zoom-base-layer">`)
+	write(`<img class="base" src="data:image/png;base64,%s" alt="base">`, entry.RefB64)
+	raw(`</div>`)
+	raw(`<div class="slider-overlay">`)
+	raw(`<div class="zoom-transform zoom-overlay-layer">`)
+	write(`<img src="data:image/png;base64,%s" alt="overlay">`, entry.ActB64)
+	raw(`</div></div><div class="slider-divider"></div><div class="zoom-selection"></div></div></div>`)
 
-	fmt.Fprint(w, `<div class="img-col col-amp">`)
-	fmt.Fprint(w, `<label>Diff amplified</label>`)
-	fmt.Fprint(w, `<div class="zoom-surface">`)
-	fmt.Fprint(w, `<div class="zoom-transform">`)
-	fmt.Fprintf(w, `<img class="parity-image" src="data:image/png;base64,%s" alt="amplified-diff">`, entry.AmpDiffB64)
-	fmt.Fprint(w, `</div><div class="zoom-selection"></div></div>`)
-	fmt.Fprint(w, `</div>`)
+	raw(`<div class="img-col col-amp">`)
+	raw(`<label>Diff amplified</label>`)
+	raw(`<div class="zoom-surface">`)
+	raw(`<div class="zoom-transform">`)
+	write(`<img class="parity-image" src="data:image/png;base64,%s" alt="amplified-diff">`, entry.AmpDiffB64)
+	raw(`</div><div class="zoom-selection"></div></div>`)
+	raw(`</div>`)
 
-	fmt.Fprint(w, `<div class="img-col col-raw">`)
-	fmt.Fprint(w, `<label>Diff raw</label>`)
-	fmt.Fprint(w, `<div class="zoom-surface">`)
-	fmt.Fprint(w, `<div class="zoom-transform">`)
-	fmt.Fprintf(w, `<img class="parity-image" src="data:image/png;base64,%s" alt="raw-diff">`, entry.RawDiffB64)
-	fmt.Fprint(w, `</div><div class="zoom-selection"></div></div>`)
-	fmt.Fprint(w, `</div>`)
+	raw(`<div class="img-col col-raw">`)
+	raw(`<label>Diff raw</label>`)
+	raw(`<div class="zoom-surface">`)
+	raw(`<div class="zoom-transform">`)
+	write(`<img class="parity-image" src="data:image/png;base64,%s" alt="raw-diff">`, entry.RawDiffB64)
+	raw(`</div><div class="zoom-selection"></div></div>`)
+	raw(`</div>`)
 
-	fmt.Fprint(w, `</div></div></div>`)
+	raw(`</div></div></div>`)
 }
 
 func htmlEscape(s string) string {

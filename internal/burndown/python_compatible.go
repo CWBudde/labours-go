@@ -5,14 +5,6 @@ import (
 	"time"
 )
 
-// min returns the minimum of two integers
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
 // BurndownParameters matches Python's burndown parameters structure
 type BurndownParameters struct {
 	Sampling    int     // Sampling interval
@@ -120,7 +112,8 @@ func InterpolateBurndownMatrix(matrix [][]int, granularity, sampling int, progre
 			}
 
 			// Main interpolation logic with complex conditional structure for smooth curves
-			if (y+1)*granularity >= (x+1)*sampling {
+			switch {
+			case (y+1)*granularity >= (x+1)*sampling:
 				// Case: Current age band extends beyond current time sampling
 				if y*granularity <= x*sampling {
 					grow((x+1)*sampling, float64(matrix[y][x]))
@@ -134,7 +127,7 @@ func InterpolateBurndownMatrix(matrix [][]int, granularity, sampling int, progre
 						}
 					}
 				}
-			} else if (y+1)*granularity >= x*sampling {
+			case (y+1)*granularity >= x*sampling:
 				// Complex peak calculation case for smooth curves
 				var v1, v2 float64
 				if x > 0 {
@@ -170,11 +163,9 @@ func InterpolateBurndownMatrix(matrix [][]int, granularity, sampling int, progre
 				}
 				grow((y+1)*granularity, peak)
 				decay((y+1)*granularity, peak)
-			} else {
+			case x > 0:
 				// Case: Age band is completely in the past
-				if x > 0 {
-					decay(x*sampling, float64(matrix[y][x-1]))
-				}
+				decay(x*sampling, float64(matrix[y][x-1]))
 			}
 		}
 	}

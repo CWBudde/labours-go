@@ -33,7 +33,7 @@ func GenerateBurndownProjectPython(reader readers.Reader, output string, relativ
 	}
 
 	outputDir := filepath.Dir(output)
-	if err := os.MkdirAll(outputDir, os.ModePerm); err != nil {
+	if err := os.MkdirAll(outputDir, 0o755); err != nil {
 		progEstimator.FinishMultiOperation()
 		return fmt.Errorf("failed to create output directory %s: %v", outputDir, err)
 	}
@@ -135,7 +135,7 @@ func GenerateBurndownFilePython(reader readers.Reader, output string, relative b
 		}
 
 		// Generate output filename
-		fileOutput := output
+		var fileOutput string
 		if output == "" {
 			fileOutput = fmt.Sprintf("burndown_file_%s.png", sanitizeFilename(file.Filename))
 		} else {
@@ -186,7 +186,7 @@ func GenerateBurndownRepositoryPython(reader readers.Reader, output string, rela
 	if output == "" {
 		output = "."
 	}
-	if err := os.MkdirAll(output, os.ModePerm); err != nil {
+	if err := os.MkdirAll(output, 0o755); err != nil {
 		return fmt.Errorf("failed to create output directory %s: %v", output, err)
 	}
 	if resample == "" {
@@ -262,7 +262,7 @@ func GenerateBurndownReposCombinedPython(reader readers.Reader, output string, r
 	if output == "" {
 		output = "burndown-repos-combined.png"
 	}
-	if err := os.MkdirAll(filepath.Dir(output), os.ModePerm); err != nil {
+	if err := os.MkdirAll(filepath.Dir(output), 0o755); err != nil {
 		return fmt.Errorf("failed to create output directory %s: %v", filepath.Dir(output), err)
 	}
 

@@ -71,7 +71,7 @@ func writeTestPNG(t *testing.T, path string, c color.RGBA) {
 	if err != nil {
 		t.Fatalf("create test png: %v", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	if err := png.Encode(file, img); err != nil {
 		t.Fatalf("encode test png: %v", err)
 	}

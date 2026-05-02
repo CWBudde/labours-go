@@ -59,7 +59,7 @@ func TestTestDataReadme(t *testing.T) {
 		t.Skipf("README file not found: %s", readmePath)
 	}
 
-	content, err := os.ReadFile(readmePath)
+	content, err := os.ReadFile(readmePath) // #nosec G304 - test fixture path is fixed above.
 	if err != nil {
 		t.Fatalf("Failed to read README: %v", err)
 	}

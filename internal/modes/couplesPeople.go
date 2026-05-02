@@ -26,7 +26,7 @@ func CouplesPeople(reader readers.Reader, output string) error {
 	peopleNames, couplingMatrix, err := reader.GetPeopleCooccurrence()
 	if err != nil {
 		progEstimator.FinishMultiOperation()
-		return fmt.Errorf("Coupling stats were not collected. Re-run hercules with --couples.")
+		return fmt.Errorf("coupling stats were not collected; re-run hercules with --couples")
 	}
 
 	if len(peopleNames) == 0 {
@@ -205,11 +205,11 @@ func writeEmbeddings(prefix, outputDir string, index []string, matrix [][]float6
 
 // writeVocabularyFile writes the vocabulary file for TensorFlow Projector
 func writeVocabularyFile(filename string, embeddings []EmbeddingVector) error {
-	file, err := os.Create(filename)
+	file, err := os.Create(filename) // #nosec G304 - output path is explicitly requested by the caller.
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	for _, emb := range embeddings {
 		if _, err := file.WriteString(emb.Label + "\n"); err != nil {
@@ -222,11 +222,11 @@ func writeVocabularyFile(filename string, embeddings []EmbeddingVector) error {
 
 // writeVectorFile writes the vectors file for TensorFlow Projector
 func writeVectorFile(filename string, embeddings []EmbeddingVector) error {
-	file, err := os.Create(filename)
+	file, err := os.Create(filename) // #nosec G304 - output path is explicitly requested by the caller.
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	for _, emb := range embeddings {
 		vectorStrs := make([]string, len(emb.Vector))
@@ -243,11 +243,11 @@ func writeVectorFile(filename string, embeddings []EmbeddingVector) error {
 
 // writeMetadataFile writes the metadata file for TensorFlow Projector
 func writeMetadataFile(filename string, embeddings []EmbeddingVector, matrix [][]float64) error {
-	file, err := os.Create(filename)
+	file, err := os.Create(filename) // #nosec G304 - output path is explicitly requested by the caller.
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	// Write header
 	if _, err := file.WriteString("Name\tDiagonal\n"); err != nil {

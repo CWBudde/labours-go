@@ -60,11 +60,12 @@ func (pe *ProgressEstimator) EstimateMatrixSteps(rows, cols int) int {
 	// Base estimation on matrix size - more complex matrices take longer
 	totalElements := rows * cols
 
-	if totalElements < 1000 {
+	switch {
+	case totalElements < 1000:
 		return 1
-	} else if totalElements < 10000 {
+	case totalElements < 10000:
 		return totalElements / 100
-	} else {
+	default:
 		return totalElements / 1000
 	}
 }
@@ -106,7 +107,7 @@ func (pe *ProgressEstimator) UpdateProgress(increment int) {
 	if !pe.enabled || pe.currentBar == nil {
 		return
 	}
-	pe.currentBar.Add(increment)
+	_ = pe.currentBar.Add(increment)
 }
 
 // SetProgress sets the absolute progress value
@@ -114,7 +115,7 @@ func (pe *ProgressEstimator) SetProgress(current int) {
 	if !pe.enabled || pe.currentBar == nil {
 		return
 	}
-	pe.currentBar.Set(current)
+	_ = pe.currentBar.Set(current)
 }
 
 // FinishOperation completes the current operation
@@ -122,7 +123,7 @@ func (pe *ProgressEstimator) FinishOperation() {
 	if !pe.enabled || pe.currentBar == nil {
 		return
 	}
-	pe.currentBar.Finish()
+	_ = pe.currentBar.Finish()
 	pe.currentBar = nil
 }
 
@@ -157,7 +158,7 @@ func (pe *ProgressEstimator) NextOperation(operationName string) {
 
 	pe.currentOperation++
 	if pe.currentBar != nil {
-		pe.currentBar.Set(pe.currentOperation)
+		_ = pe.currentBar.Set(pe.currentOperation)
 		// Update description to show current operation
 		description := fmt.Sprintf("%s (%d/%d)", operationName, pe.currentOperation, pe.totalOperations)
 		pe.currentBar.Describe(description)
@@ -169,7 +170,7 @@ func (pe *ProgressEstimator) FinishMultiOperation() {
 	if !pe.enabled || pe.currentBar == nil {
 		return
 	}
-	pe.currentBar.Finish()
+	_ = pe.currentBar.Finish()
 	pe.currentBar = nil
 	pe.totalOperations = 0
 	pe.currentOperation = 0

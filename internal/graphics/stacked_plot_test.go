@@ -403,7 +403,7 @@ func saveImagePNG(img image.Image, path string) error {
 
 func hsvToRGB(h, s, v float64) color.Color {
 	// Simple HSV to RGB conversion for testing
-	h = h / 60.0
+	h /= 60.0
 	i := int(h)
 	f := h - float64(i)
 	p := v * (1 - s)
@@ -454,7 +454,7 @@ func mockCreateStackedPlot(data [][]float64, labels []string, timePoints []time.
 
 	// Create mock output file
 	content := fmt.Sprintf("Mock stacked plot: %s with %d series and %d time points", title, len(data), len(timePoints))
-	return os.WriteFile(outputPath, []byte(content), 0o644)
+	return os.WriteFile(outputPath, []byte(content), 0o600)
 }
 
 func mockCreateBarChart(values []float64, labels []string, title, yLabel, outputPath string) error {
@@ -468,5 +468,5 @@ func mockCreateBarChart(values []float64, labels []string, title, yLabel, output
 
 	// Create mock output file
 	content := fmt.Sprintf("Mock bar chart: %s with %d bars", title, len(values))
-	return os.WriteFile(outputPath, []byte(content), 0o644)
+	return os.WriteFile(outputPath, []byte(content), 0o600)
 }

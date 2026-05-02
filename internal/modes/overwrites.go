@@ -313,22 +313,6 @@ func saveMatrixAsJSON(output string, people []string, matrix [][]float64) error 
 	return encoder.Encode(data)
 }
 
-func truncateMatrix(matrix [][]int, indices []int) [][]int {
-	truncated := make([][]int, len(indices))
-	for i, idx := range indices {
-		if idx >= len(matrix) {
-			continue // Skip invalid indices
-		}
-		truncated[i] = make([]int, len(indices))
-		for j, jdx := range indices {
-			if jdx < len(matrix[idx]) {
-				truncated[i][j] = matrix[idx][jdx]
-			}
-		}
-	}
-	return truncated
-}
-
 func truncateOverwritesMatrix(matrix [][]int, indices []int) [][]int {
 	truncated := make([][]int, len(indices))
 	for i, idx := range indices {
@@ -362,14 +346,6 @@ func truncatePeople(people []string, indices []int) []string {
 	return truncated
 }
 
-func sumRow(row []int) int {
-	sum := 0
-	for _, val := range row {
-		sum += val
-	}
-	return sum
-}
-
 func argsort(matrix [][]int) []int {
 	scores := make([]int, len(matrix))
 	for i, row := range matrix {
@@ -388,12 +364,4 @@ func argsort(matrix [][]int) []int {
 	})
 
 	return indices
-}
-
-func reverseStrings(values []string) []string {
-	result := make([]string, len(values))
-	for i, value := range values {
-		result[len(values)-1-i] = value
-	}
-	return result
 }

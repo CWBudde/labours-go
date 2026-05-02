@@ -182,104 +182,6 @@ func generateBurndownColorPalette(n int) []color.Color {
 	return GetBurndownColors(n)
 }
 
-// generateColorPaletteFromTheme creates a set of distinct colors from the current theme
-func generateColorPaletteFromTheme(n int) []color.Color {
-	if n <= 0 {
-		return []color.Color{}
-	}
-
-	themePalette := CurrentTheme.GetColorPalette()
-	opacity := uint8(float64(255) * CurrentTheme.Chart.FillOpacity)
-
-	colors := make([]color.Color, n)
-	for i := 0; i < n; i++ {
-		if i < len(themePalette) {
-			// Use theme color with chart opacity
-			if rgba, ok := themePalette[i].(color.RGBA); ok {
-				colors[i] = color.RGBA{R: rgba.R, G: rgba.G, B: rgba.B, A: opacity}
-			} else {
-				colors[i] = themePalette[i]
-			}
-		} else {
-			// Generate additional colors using HSV if we need more than theme provides
-			colors[i] = generateHSVColorWithOpacity(i, n, opacity)
-		}
-	}
-
-	return colors
-}
-
-// generateColorPalette creates a set of distinct colors for the chart (legacy function)
-func generateColorPalette(n int) []color.Color {
-	if n <= 0 {
-		return []color.Color{}
-	}
-
-	// Use predefined colors for better visibility
-	baseColors := []color.Color{
-		color.RGBA{R: 31, G: 119, B: 180, A: 150},  // Blue
-		color.RGBA{R: 255, G: 127, B: 14, A: 150},  // Orange
-		color.RGBA{R: 44, G: 160, B: 44, A: 150},   // Green
-		color.RGBA{R: 214, G: 39, B: 40, A: 150},   // Red
-		color.RGBA{R: 148, G: 103, B: 189, A: 150}, // Purple
-		color.RGBA{R: 140, G: 86, B: 75, A: 150},   // Brown
-		color.RGBA{R: 227, G: 119, B: 194, A: 150}, // Pink
-		color.RGBA{R: 127, G: 127, B: 127, A: 150}, // Gray
-		color.RGBA{R: 188, G: 189, B: 34, A: 150},  // Olive
-		color.RGBA{R: 23, G: 190, B: 207, A: 150},  // Cyan
-	}
-
-	colors := make([]color.Color, n)
-	for i := 0; i < n; i++ {
-		if i < len(baseColors) {
-			colors[i] = baseColors[i]
-		} else {
-			// Generate additional colors using HSV
-			colors[i] = generateHSVColor(i, n)
-		}
-	}
-
-	return colors
-}
-
-// generateHSVColor generates colors using HSV color space for better distribution
-func generateHSVColor(index, total int) color.Color {
-	// Use golden angle for better color distribution
-	goldenAngle := 137.508 // degrees
-	hue := math.Mod(float64(index)*goldenAngle, 360)
-
-	// Convert HSV to RGB
-	saturation := 0.7
-	value := 0.9
-
-	c := value * saturation
-	x := c * (1 - math.Abs(math.Mod(hue/60, 2)-1))
-	m := value - c
-
-	var r, g, b float64
-	switch {
-	case hue < 60:
-		r, g, b = c, x, 0
-	case hue < 120:
-		r, g, b = x, c, 0
-	case hue < 180:
-		r, g, b = 0, c, x
-	case hue < 240:
-		r, g, b = 0, x, c
-	case hue < 300:
-		r, g, b = x, 0, c
-	default:
-		r, g, b = c, 0, x
-	}
-
-	return color.RGBA{
-		R: uint8((r + m) * 255),
-		G: uint8((g + m) * 255),
-		B: uint8((b + m) * 255),
-		A: 180, // Semi-transparent
-	}
-}
-
 // TimeTicker implements plot.Ticker for time-based axes
 type TimeTicker struct {
 	Format string
@@ -394,7 +296,7 @@ func SavePlotWithFormat(p *plot.Plot, width, height vg.Length, output string) er
 
 	// If no extension, default to PNG
 	if ext == "" {
-		output = output + ".png"
+		output += ".png"
 	}
 
 	// Save the plot - gonum/plot automatically detects format from extension
@@ -430,11 +332,11 @@ func SavePNGWithBackground(p *plot.Plot, width, height vg.Length, output string,
 	}
 	p.Draw(vgdraw.New(canvas))
 
-	file, err := os.Create(output)
+	file, err := os.Create(output) // #nosec G304 - output path is explicitly requested by caller.
 	if err != nil {
 		return fmt.Errorf("failed to create plot file %s: %v", output, err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	if _, err := canvas.WriteTo(file); err != nil {
 		return fmt.Errorf("failed to save plot to %s: %v", output, err)
@@ -469,43 +371,5 @@ func applyThemeToPlot(p *plot.Plot) {
 	if CurrentTheme.Chart.LegendShow {
 		p.Legend.TextStyle.Font.Size = vg.Points(CurrentTheme.Text.Size)
 		p.Legend.TextStyle.Color = CurrentTheme.Text.Color.ToColor()
-	}
-}
-
-// generateHSVColorWithOpacity generates colors using HSV color space with custom opacity
-func generateHSVColorWithOpacity(index, total int, opacity uint8) color.Color {
-	// Use golden angle for better color distribution
-	goldenAngle := 137.508 // degrees
-	hue := math.Mod(float64(index)*goldenAngle, 360)
-
-	// Convert HSV to RGB
-	saturation := 0.7
-	value := 0.9
-
-	c := value * saturation
-	x := c * (1 - math.Abs(math.Mod(hue/60, 2)-1))
-	m := value - c
-
-	var r, g, b float64
-	switch {
-	case hue < 60:
-		r, g, b = c, x, 0
-	case hue < 120:
-		r, g, b = x, c, 0
-	case hue < 180:
-		r, g, b = 0, c, x
-	case hue < 240:
-		r, g, b = 0, x, c
-	case hue < 300:
-		r, g, b = x, 0, c
-	default:
-		r, g, b = c, 0, x
-	}
-
-	return color.RGBA{
-		R: uint8((r + m) * 255),
-		G: uint8((g + m) * 255),
-		B: uint8((b + m) * 255),
-		A: opacity,
 	}
 }

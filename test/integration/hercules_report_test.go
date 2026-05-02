@@ -36,13 +36,13 @@ func TestHerculesReportWithLocalLaboursStrict(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	laboursBin := filepath.Join(tmpDir, "labours")
-	build := exec.Command("go", "build", "-o", laboursBin, repoRoot)
+	build := exec.Command("go", "build", "-o", laboursBin, repoRoot) // #nosec G204 - test builds this repository with fixed arguments.
 	if output, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("Failed to build local labours binary: %v\n%s", err, output)
 	}
 
 	reportDir := filepath.Join(tmpDir, "report")
-	report := exec.Command(
+	report := exec.Command( // #nosec G204 - integration test intentionally runs configured Hercules binary.
 		herculesBin,
 		"report",
 		"--labours-cmd", laboursBin,
@@ -55,7 +55,7 @@ func TestHerculesReportWithLocalLaboursStrict(t *testing.T) {
 	}
 
 	indexPath := filepath.Join(reportDir, "index.html")
-	index, err := os.ReadFile(indexPath)
+	index, err := os.ReadFile(indexPath) // #nosec G304 - path is inside t.TempDir report output.
 	if err != nil {
 		t.Fatalf("Report index was not generated at %s: %v", indexPath, err)
 	}

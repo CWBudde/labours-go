@@ -74,13 +74,17 @@ func GetBurndownColors(numColors int) []color.Color {
 		} else {
 			// Generate additional colors using simple fallback
 			colors[i] = color.RGBA{
-				R: uint8((i*60 + 120) % 255),
-				G: uint8((i*80 + 80) % 255),
-				B: uint8((i*40 + 180) % 255),
+				R: boundedByte(i*60 + 120),
+				G: boundedByte(i*80 + 80),
+				B: boundedByte(i*40 + 180),
 				A: opacity,
 			}
 		}
 	}
 
 	return colors
+}
+
+func boundedByte(value int) uint8 {
+	return uint8(value % 255) // #nosec G115 - modulo bounds value to [0,254].
 }

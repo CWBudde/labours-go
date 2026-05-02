@@ -235,17 +235,18 @@ func hsvToRGBA(h, s, v float64) color.RGBA {
 	m := v - c
 
 	var r, g, b float64
-	if h < 60 {
+	switch {
+	case h < 60:
 		r, g, b = c, x, 0
-	} else if h < 120 {
+	case h < 120:
 		r, g, b = x, c, 0
-	} else if h < 180 {
+	case h < 180:
 		r, g, b = 0, c, x
-	} else if h < 240 {
+	case h < 240:
 		r, g, b = 0, x, c
-	} else if h < 300 {
+	case h < 300:
 		r, g, b = x, 0, c
-	} else {
+	default:
 		r, g, b = c, 0, x
 	}
 

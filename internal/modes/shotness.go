@@ -82,7 +82,7 @@ func processShotnessRecords(records []readers.ShotnessRecord) []ShotnessResult {
 			}
 		}
 
-		timeSpan := int32(len(record.Counters))
+		timeSpan := safeInt32(len(record.Counters))
 		var avgHits float64
 		if timeSpan > 0 {
 			avgHits = float64(totalHits) / float64(timeSpan)
@@ -119,6 +119,14 @@ func processShotnessRecords(records []readers.ShotnessRecord) []ShotnessResult {
 	})
 
 	return results
+}
+
+func safeInt32(value int) int32 {
+	const maxInt32 = int(^uint32(0) >> 1)
+	if value > maxInt32 {
+		return int32(maxInt32)
+	}
+	return int32(value) // #nosec G115 - value is bounded above and non-negative len input.
 }
 
 // plotShotness creates a bar chart showing the hottest code spots by modification frequency

@@ -14,63 +14,15 @@ import (
 )
 
 func TestReportMetricModesCreateOutputFiles(t *testing.T) {
-	reader := &reportMetricsReader{}
-	tests := []struct {
-		name   string
-		run    func(string) error
-		extras []string
-	}{
-		{
-			name: "temporal-activity",
-			run: func(output string) error {
-				return TemporalActivity(reader, output, 32, 10, nil, nil)
-			},
-		},
-		{
-			name: "bus-factor",
-			run: func(output string) error {
-				return BusFactor(reader, output)
-			},
-			extras: []string{"bus-factor_subsystems.png"},
-		},
-		{
-			name: "ownership-concentration",
-			run: func(output string) error {
-				return OwnershipConcentration(reader, output)
-			},
-		},
-		{
-			name: "knowledge-diffusion",
-			run: func(output string) error {
-				return KnowledgeDiffusion(reader, output)
-			},
-			extras: []string{"knowledge-diffusion_silos.png", "knowledge-diffusion_trend.png"},
-		},
-		{
-			name: "hotspot-risk",
-			run: func(output string) error {
-				return HotspotRisk(reader, output)
-			},
-			extras: []string{"hotspot-risk_table.tsv"},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			dir := t.TempDir()
-			output := filepath.Join(dir, tt.name+".png")
-			if err := tt.run(output); err != nil {
-				t.Fatalf("%s() unexpected error: %v", tt.name, err)
-			}
-			assertNonEmptyFile(t, output)
-			for _, extra := range tt.extras {
-				assertNonEmptyFile(t, filepath.Join(dir, extra))
-			}
-		})
-	}
+	testReportMetricModesCreateOutputFiles(t, "png")
 }
 
 func TestReportMetricModesCreateSVGOutputFiles(t *testing.T) {
+	testReportMetricModesCreateOutputFiles(t, "svg")
+}
+
+func testReportMetricModesCreateOutputFiles(t *testing.T, ext string) {
+	t.Helper()
 	reader := &reportMetricsReader{}
 	tests := []struct {
 		name   string
@@ -88,7 +40,7 @@ func TestReportMetricModesCreateSVGOutputFiles(t *testing.T) {
 			run: func(output string) error {
 				return BusFactor(reader, output)
 			},
-			extras: []string{"bus-factor_subsystems.svg"},
+			extras: []string{"bus-factor_subsystems." + ext},
 		},
 		{
 			name: "ownership-concentration",
@@ -101,7 +53,7 @@ func TestReportMetricModesCreateSVGOutputFiles(t *testing.T) {
 			run: func(output string) error {
 				return KnowledgeDiffusion(reader, output)
 			},
-			extras: []string{"knowledge-diffusion_silos.svg", "knowledge-diffusion_trend.svg"},
+			extras: []string{"knowledge-diffusion_silos." + ext, "knowledge-diffusion_trend." + ext},
 		},
 		{
 			name: "hotspot-risk",
@@ -115,7 +67,7 @@ func TestReportMetricModesCreateSVGOutputFiles(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			dir := t.TempDir()
-			output := filepath.Join(dir, tt.name+".svg")
+			output := filepath.Join(dir, tt.name+"."+ext)
 			if err := tt.run(output); err != nil {
 				t.Fatalf("%s() unexpected error: %v", tt.name, err)
 			}
@@ -138,7 +90,7 @@ func TestBusFactorSubsystemOutputPreservesTransparentBackground(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open subsystem png: %v", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	img, err := png.Decode(file)
 	if err != nil {
 		t.Fatalf("decode subsystem png: %v", err)

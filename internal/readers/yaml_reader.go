@@ -147,103 +147,60 @@ func (r *YamlReader) GetPeopleInteraction() ([]string, [][]int, error) {
 }
 
 func (r *YamlReader) GetFileCooccurrence() ([]string, [][]int, error) {
-	couplesData, ok := r.data["Couples"].(map[string]interface{})
-	if !ok {
-		return nil, nil, fmt.Errorf("missing Couples data in YAML")
-	}
-
-	// Try Python-style nested structure first: files_coocc["index"] and files_coocc["matrix"]
-	if filesCoocc, exists := couplesData["files_coocc"].(map[string]interface{}); exists {
-		fileIndex, indexOk := filesCoocc["index"].([]string)
-		if !indexOk {
-			// Try []interface{} and convert to []string
-			if indexIntf, ok := filesCoocc["index"].([]interface{}); ok {
-				fileIndex = make([]string, len(indexIntf))
-				for i, v := range indexIntf {
-					if str, ok := v.(string); ok {
-						fileIndex[i] = str
-					}
-				}
-				indexOk = true
-			}
-		}
-
-		if indexOk {
-			// Handle both string matrix and map-based sparse matrix format
-			if matrixStr, ok := filesCoocc["matrix"].(string); ok {
-				// Dense matrix as string
-				matrix := parseBurndownMatrix(matrixStr)
-				return fileIndex, matrix, nil
-			} else if matrixData, ok := filesCoocc["matrix"].([]interface{}); ok {
-				// Sparse matrix as array of maps (Python format)
-				matrix := parseCoooccurrenceMatrix(matrixData)
-				return fileIndex, matrix, nil
-			}
-		}
-	}
-
-	// Fallback to flat structure (original Go format)
-	fileIndex, ok := couplesData["file_couples_index"].([]string)
-	if !ok {
-		return nil, nil, fmt.Errorf("missing file_couples_index in Couples")
-	}
-	matrixData, ok := couplesData["file_couples_matrix"].(string)
-	if !ok {
-		return nil, nil, fmt.Errorf("missing file_couples_matrix in Couples")
-	}
-
-	matrix := parseBurndownMatrix(matrixData)
-	return fileIndex, matrix, nil
+	return r.getCouplesCooccurrence("files_coocc", "file_couples_index", "file_couples_matrix")
 }
 
 func (r *YamlReader) GetPeopleCooccurrence() ([]string, [][]int, error) {
+	return r.getCouplesCooccurrence("people_coocc", "people_couples_index", "people_couples_matrix")
+}
+
+func (r *YamlReader) getCouplesCooccurrence(nestedKey, flatIndexKey, flatMatrixKey string) ([]string, [][]int, error) {
 	couplesData, ok := r.data["Couples"].(map[string]interface{})
 	if !ok {
 		return nil, nil, fmt.Errorf("missing Couples data in YAML")
 	}
 
-	// Try Python-style nested structure first: people_coocc["index"] and people_coocc["matrix"]
-	if peopleCoocc, exists := couplesData["people_coocc"].(map[string]interface{}); exists {
-		peopleIndex, indexOk := peopleCoocc["index"].([]string)
-		if !indexOk {
-			// Try []interface{} and convert to []string
-			if indexIntf, ok := peopleCoocc["index"].([]interface{}); ok {
-				peopleIndex = make([]string, len(indexIntf))
-				for i, v := range indexIntf {
-					if str, ok := v.(string); ok {
-						peopleIndex[i] = str
-					}
+	if nested, exists := couplesData[nestedKey].(map[string]interface{}); exists {
+		if index, matrix, ok := parseNestedCooccurrence(nested); ok {
+			return index, matrix, nil
+		}
+	}
+
+	index, ok := couplesData[flatIndexKey].([]string)
+	if !ok {
+		return nil, nil, fmt.Errorf("missing %s in Couples", flatIndexKey)
+	}
+	matrixData, ok := couplesData[flatMatrixKey].(string)
+	if !ok {
+		return nil, nil, fmt.Errorf("missing %s in Couples", flatMatrixKey)
+	}
+
+	return index, parseBurndownMatrix(matrixData), nil
+}
+
+func parseNestedCooccurrence(data map[string]interface{}) ([]string, [][]int, bool) {
+	index, indexOk := data["index"].([]string)
+	if !indexOk {
+		if indexIntf, ok := data["index"].([]interface{}); ok {
+			index = make([]string, len(indexIntf))
+			for i, v := range indexIntf {
+				if str, ok := v.(string); ok {
+					index[i] = str
 				}
-				indexOk = true
 			}
-		}
-
-		if indexOk {
-			// Handle both string matrix and map-based sparse matrix format
-			if matrixStr, ok := peopleCoocc["matrix"].(string); ok {
-				// Dense matrix as string
-				matrix := parseBurndownMatrix(matrixStr)
-				return peopleIndex, matrix, nil
-			} else if matrixData, ok := peopleCoocc["matrix"].([]interface{}); ok {
-				// Sparse matrix as array of maps (Python format)
-				matrix := parseCoooccurrenceMatrix(matrixData)
-				return peopleIndex, matrix, nil
-			}
+			indexOk = true
 		}
 	}
-
-	// Fallback to flat structure (original Go format)
-	peopleIndex, ok := couplesData["people_couples_index"].([]string)
-	if !ok {
-		return nil, nil, fmt.Errorf("missing people_couples_index in Couples")
+	if !indexOk {
+		return nil, nil, false
 	}
-	matrixData, ok := couplesData["people_couples_matrix"].(string)
-	if !ok {
-		return nil, nil, fmt.Errorf("missing people_couples_matrix in Couples")
+	if matrixStr, ok := data["matrix"].(string); ok {
+		return index, parseBurndownMatrix(matrixStr), true
 	}
-
-	matrix := parseBurndownMatrix(matrixData)
-	return peopleIndex, matrix, nil
+	if matrixData, ok := data["matrix"].([]interface{}); ok {
+		return index, parseCoooccurrenceMatrix(matrixData), true
+	}
+	return nil, nil, false
 }
 
 func (r *YamlReader) GetShotnessCooccurrence() ([]string, [][]int, error) {
@@ -271,14 +228,6 @@ func shotnessCounterMatrix(records []ShotnessRecord) ([]string, [][]int) {
 	return index, matrix
 }
 
-// min32 returns the minimum of two int32 values
-func min32(a, b int32) int32 {
-	if a < b {
-		return a
-	}
-	return b
-}
-
 func (r *YamlReader) GetShotnessRecords() ([]ShotnessRecord, error) {
 	shotnessData, ok := r.data["Shotness"].([]interface{})
 	if !ok {
@@ -301,22 +250,38 @@ func (r *YamlReader) GetShotnessRecords() ([]ShotnessRecord, error) {
 
 				switch t := timeKey.(type) {
 				case int:
-					timeInt = int32(t)
+					converted, ok := checkedInt32(int64(t))
+					if !ok {
+						continue
+					}
+					timeInt = converted
 				case int32:
 					timeInt = t
 				case int64:
-					timeInt = int32(t)
+					converted, ok := checkedInt32(t)
+					if !ok {
+						continue
+					}
+					timeInt = converted
 				default:
 					continue // Skip invalid time keys
 				}
 
 				switch c := count.(type) {
 				case int:
-					countInt = int32(c)
+					converted, ok := checkedInt32(int64(c))
+					if !ok {
+						continue
+					}
+					countInt = converted
 				case int32:
 					countInt = c
 				case int64:
-					countInt = int32(c)
+					converted, ok := checkedInt32(c)
+					if !ok {
+						continue
+					}
+					countInt = converted
 				default:
 					continue // Skip invalid counts
 				}
@@ -345,6 +310,17 @@ func (r *YamlReader) GetShotnessRecords() ([]ShotnessRecord, error) {
 		})
 	}
 	return records, nil
+}
+
+func checkedInt32(value int64) (int32, bool) {
+	const (
+		minInt32 = -1 << 31
+		maxInt32 = 1<<31 - 1
+	)
+	if value < minInt32 || value > maxInt32 {
+		return 0, false
+	}
+	return int32(value), true
 }
 
 func (r *YamlReader) GetDeveloperStats() ([]DeveloperStat, error) {

@@ -288,8 +288,8 @@ func analyzeDeveloperSentiment(reader readers.Reader) ([]SentimentResult, error)
 		if neutral < 0 {
 			// Normalize if we went over 1.0
 			total := positive + negative
-			positive = positive / total
-			negative = negative / total
+			positive /= total
+			negative /= total
 			neutral = 0.0
 		}
 

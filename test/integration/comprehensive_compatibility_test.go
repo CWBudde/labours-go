@@ -19,7 +19,7 @@ func TestComprehensiveCompatibility(t *testing.T) {
 	for dataType, testFile := range testFiles {
 		t.Run(dataType, func(t *testing.T) {
 			reader := &readers.ProtobufReader{}
-			file, err := os.Open(testFile)
+			file, err := os.Open(testFile) // #nosec G304 - test fixture paths are fixed above.
 			require.NoError(t, err, "Test file should be accessible")
 			defer func() { _ = file.Close() }()
 

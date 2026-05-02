@@ -84,70 +84,28 @@ type ShotnessCouplingStatistics struct {
 
 // analyzeShotnessCoupling performs analysis on shotness coupling data
 func analyzeShotnessCoupling(entityNames []string, couplingMatrix [][]int) ShotnessCouplingAnalysis {
+	pairs, stats := analyzeCouplingPairs(entityNames, couplingMatrix, 25)
+	shotnessPairs := make([]ShotnessCouplingPair, len(pairs))
+	for i, pair := range pairs {
+		shotnessPairs[i] = ShotnessCouplingPair{
+			Entity1:          pair.Name1,
+			Entity2:          pair.Name2,
+			CouplingScore:    pair.Score,
+			CooccuranceCount: pair.Count,
+		}
+	}
+
 	analysis := ShotnessCouplingAnalysis{
 		EntityNames:    entityNames,
 		CouplingMatrix: couplingMatrix,
-	}
-
-	// Calculate coupling pairs and statistics
-	var pairs []ShotnessCouplingPair
-	totalCoupling := 0
-	maxCoupling := 0
-	minCoupling := int(^uint(0) >> 1) // Max int
-
-	for i := 0; i < len(entityNames); i++ {
-		for j := i + 1; j < len(entityNames); j++ {
-			if i < len(couplingMatrix) && j < len(couplingMatrix[i]) {
-				coupling := couplingMatrix[i][j]
-				totalCoupling += coupling
-
-				if coupling > maxCoupling {
-					maxCoupling = coupling
-				}
-				if coupling < minCoupling && coupling > 0 {
-					minCoupling = coupling
-				}
-
-				if coupling > 0 {
-					pairs = append(pairs, ShotnessCouplingPair{
-						Entity1:          entityNames[i],
-						Entity2:          entityNames[j],
-						CouplingScore:    float64(coupling),
-						CooccuranceCount: coupling,
-					})
-				}
-			}
-		}
-	}
-
-	// Sort pairs by coupling score (descending)
-	for i := 0; i < len(pairs)-1; i++ {
-		for j := i + 1; j < len(pairs); j++ {
-			if pairs[i].CouplingScore < pairs[j].CouplingScore {
-				pairs[i], pairs[j] = pairs[j], pairs[i]
-			}
-		}
-	}
-
-	// Take top 25 couples for visualization (shotness can be more detailed)
-	if len(pairs) > 25 {
-		analysis.TopCoupling = pairs[:25]
-	} else {
-		analysis.TopCoupling = pairs
-	}
-
-	// Calculate statistics
-	avgCoupling := 0.0
-	if len(pairs) > 0 {
-		avgCoupling = float64(totalCoupling) / float64(len(pairs))
-	}
-
-	analysis.Statistics = ShotnessCouplingStatistics{
-		TotalEntities:   len(entityNames),
-		TotalCouplings:  totalCoupling,
-		AverageCoupling: avgCoupling,
-		MaxCoupling:     maxCoupling,
-		MinCoupling:     minCoupling,
+		TopCoupling:    shotnessPairs,
+		Statistics: ShotnessCouplingStatistics{
+			TotalEntities:   len(entityNames),
+			TotalCouplings:  stats.Total,
+			AverageCoupling: stats.Average,
+			MaxCoupling:     stats.Max,
+			MinCoupling:     stats.Min,
+		},
 	}
 
 	return analysis

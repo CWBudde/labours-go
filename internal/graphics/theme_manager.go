@@ -117,7 +117,7 @@ func (tm *ThemeManager) SaveThemeToFile(theme *Theme, filepath string) error {
 		return fmt.Errorf("failed to marshal theme: %w", err)
 	}
 
-	if err := os.WriteFile(filepath, data, 0o644); err != nil {
+	if err := os.WriteFile(filepath, data, 0o600); err != nil {
 		return fmt.Errorf("failed to write theme file %s: %w", filepath, err)
 	}
 
@@ -151,17 +151,27 @@ func (tm *ThemeManager) CreateCustomTheme(baseName string, customizations map[st
 
 	if bg, ok := customizations["background"].(map[string]interface{}); ok {
 		if r, ok := bg["r"].(int); ok {
-			custom.Background.R = uint8(r)
+			custom.Background.R = colorByte(r)
 		}
 		if g, ok := bg["g"].(int); ok {
-			custom.Background.G = uint8(g)
+			custom.Background.G = colorByte(g)
 		}
 		if b, ok := bg["b"].(int); ok {
-			custom.Background.B = uint8(b)
+			custom.Background.B = colorByte(b)
 		}
 	}
 
 	return &custom, nil
+}
+
+func colorByte(value int) uint8 {
+	if value < 0 {
+		return 0
+	}
+	if value > 255 {
+		return 255
+	}
+	return uint8(value)
 }
 
 // ExportTheme exports a built-in theme to a file for customization

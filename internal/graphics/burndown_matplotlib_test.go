@@ -58,7 +58,7 @@ func TestSavePNGWithBackgroundPreservesTransparency(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open transparent png: %v", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	img, err := png.Decode(file)
 	if err != nil {
@@ -109,7 +109,7 @@ func TestPlotBurndownMatplotlibUsesBackends(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open png: %v", err)
 	}
-	defer pngFile.Close()
+	defer func() { _ = pngFile.Close() }()
 	img, err := png.Decode(pngFile)
 	if err != nil {
 		t.Fatalf("decode png: %v", err)

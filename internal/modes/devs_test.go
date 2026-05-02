@@ -300,5 +300,5 @@ func mockGenerateDevsPlot(name string, devStats []readers.DeveloperStat, outputP
 
 	// Create a simple test file to simulate chart generation
 	content := fmt.Sprintf("Mock developer chart for %s with %d developers", name, len(devStats))
-	return os.WriteFile(outputPath, []byte(content), 0o644)
+	return os.WriteFile(outputPath, []byte(content), 0o600)
 }

@@ -436,11 +436,12 @@ func verifyTransposeLogic(t *testing.T, matrix [][]int, name string) {
 	// - Consistent column count across all rows
 	// - Non-negative values only
 
-	if cols > rows {
+	switch {
+	case cols > rows:
 		t.Logf("    ✓ %s has more time points (%d) than metrics (%d) - expected for time series", name, cols, rows)
-	} else if cols == rows {
+	case cols == rows:
 		t.Logf("    ? %s has equal dimensions (%dx%d) - may be co-occurrence matrix", name, rows, cols)
-	} else {
+	default:
 		t.Logf("    ? %s has more metrics (%d) than time points (%d) - unusual for burndown", name, rows, cols)
 	}
 

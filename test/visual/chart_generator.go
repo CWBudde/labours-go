@@ -28,7 +28,7 @@ func (cg *ChartGenerator) GenerateChart(t *testing.T, mode, inputFile string) (s
 	t.Helper()
 
 	// Ensure output directory exists
-	if err := os.MkdirAll(cg.OutputDir, 0o755); err != nil {
+	if err := os.MkdirAll(cg.OutputDir, 0o750); err != nil {
 		return "", fmt.Errorf("failed to create output directory: %w", err)
 	}
 
@@ -47,7 +47,7 @@ func (cg *ChartGenerator) GenerateChart(t *testing.T, mode, inputFile string) (s
 	if err != nil {
 		return "", fmt.Errorf("failed to open input file %s: %w", inputFile, err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	err = reader.Read(file)
 	if err != nil {

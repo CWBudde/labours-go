@@ -112,7 +112,7 @@ func loadImage(path string) (image.Image, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	img, err := png.Decode(file)
 	if err != nil {
@@ -297,20 +297,22 @@ func calculateOverallSimilarity(m *SimilarityMetrics) float64 {
 // getAssessment provides human-readable assessment of the similarity result
 func getAssessment(m *SimilarityMetrics, passed bool) string {
 	if passed {
-		if m.OverallSimilarity >= 0.98 {
+		switch {
+		case m.OverallSimilarity >= 0.98:
 			return "Images are nearly identical - excellent compatibility"
-		} else if m.OverallSimilarity >= 0.95 {
+		case m.OverallSimilarity >= 0.95:
 			return "Images are very similar - minor rendering differences only"
-		} else {
+		default:
 			return "Images are adequately similar - functional compatibility maintained"
 		}
-	} else {
-		if m.OverallSimilarity >= 0.80 {
-			return "Images are similar but below threshold - review for acceptable differences"
-		} else if m.OverallSimilarity >= 0.60 {
-			return "Images show significant differences - investigate chart generation logic"
-		} else {
-			return "Images are substantially different - major compatibility issues detected"
-		}
+	}
+
+	switch {
+	case m.OverallSimilarity >= 0.80:
+		return "Images are similar but below threshold - review for acceptable differences"
+	case m.OverallSimilarity >= 0.60:
+		return "Images show significant differences - investigate chart generation logic"
+	default:
+		return "Images are substantially different - major compatibility issues detected"
 	}
 }

@@ -88,73 +88,97 @@ type CouplingStatistics struct {
 
 // analyzeFileCoupling performs analysis on file coupling data
 func analyzeFileCoupling(fileNames []string, couplingMatrix [][]int) FileCouplingAnalysis {
+	pairs, stats := analyzeCouplingPairs(fileNames, couplingMatrix, 20)
+	filePairs := make([]FileCouplingPair, len(pairs))
+	for i, pair := range pairs {
+		filePairs[i] = FileCouplingPair{
+			File1:            pair.Name1,
+			File2:            pair.Name2,
+			CouplingScore:    pair.Score,
+			CooccuranceCount: pair.Count,
+		}
+	}
+
 	analysis := FileCouplingAnalysis{
 		FileNames:      fileNames,
 		CouplingMatrix: couplingMatrix,
+		TopCoupling:    filePairs,
+		Statistics: CouplingStatistics{
+			TotalFiles:      len(fileNames),
+			TotalCoupling:   stats.Total,
+			AverageCoupling: stats.Average,
+			MaxCoupling:     stats.Max,
+			MinCoupling:     stats.Min,
+		},
 	}
 
-	// Calculate coupling pairs and statistics
-	var pairs []FileCouplingPair
+	return analysis
+}
+
+type commonCouplingPair struct {
+	Name1 string
+	Name2 string
+	Score float64
+	Count int
+}
+
+type commonCouplingStats struct {
+	Total   int
+	Average float64
+	Max     int
+	Min     int
+}
+
+func analyzeCouplingPairs(names []string, matrix [][]int, limit int) ([]commonCouplingPair, commonCouplingStats) {
+	var pairs []commonCouplingPair
 	totalCoupling := 0
 	maxCoupling := 0
-	minCoupling := int(^uint(0) >> 1) // Max int
+	minCoupling := int(^uint(0) >> 1)
 
-	for i := 0; i < len(fileNames); i++ {
-		for j := i + 1; j < len(fileNames); j++ {
-			if i < len(couplingMatrix) && j < len(couplingMatrix[i]) {
-				coupling := couplingMatrix[i][j]
-				totalCoupling += coupling
-
-				if coupling > maxCoupling {
-					maxCoupling = coupling
-				}
-				if coupling < minCoupling && coupling > 0 {
-					minCoupling = coupling
-				}
-
-				if coupling > 0 {
-					pairs = append(pairs, FileCouplingPair{
-						File1:            fileNames[i],
-						File2:            fileNames[j],
-						CouplingScore:    float64(coupling),
-						CooccuranceCount: coupling,
-					})
-				}
+	for i := 0; i < len(names); i++ {
+		for j := i + 1; j < len(names); j++ {
+			if i >= len(matrix) || j >= len(matrix[i]) {
+				continue
+			}
+			coupling := matrix[i][j]
+			totalCoupling += coupling
+			if coupling > maxCoupling {
+				maxCoupling = coupling
+			}
+			if coupling < minCoupling && coupling > 0 {
+				minCoupling = coupling
+			}
+			if coupling > 0 {
+				pairs = append(pairs, commonCouplingPair{
+					Name1: names[i],
+					Name2: names[j],
+					Score: float64(coupling),
+					Count: coupling,
+				})
 			}
 		}
 	}
 
-	// Sort pairs by coupling score (descending)
 	for i := 0; i < len(pairs)-1; i++ {
 		for j := i + 1; j < len(pairs); j++ {
-			if pairs[i].CouplingScore < pairs[j].CouplingScore {
+			if pairs[i].Score < pairs[j].Score {
 				pairs[i], pairs[j] = pairs[j], pairs[i]
 			}
 		}
 	}
-
-	// Take top 20 couples for visualization
-	if len(pairs) > 20 {
-		analysis.TopCoupling = pairs[:20]
-	} else {
-		analysis.TopCoupling = pairs
-	}
-
-	// Calculate statistics
 	avgCoupling := 0.0
 	if len(pairs) > 0 {
 		avgCoupling = float64(totalCoupling) / float64(len(pairs))
 	}
-
-	analysis.Statistics = CouplingStatistics{
-		TotalFiles:      len(fileNames),
-		TotalCoupling:   totalCoupling,
-		AverageCoupling: avgCoupling,
-		MaxCoupling:     maxCoupling,
-		MinCoupling:     minCoupling,
+	if len(pairs) > limit {
+		pairs = pairs[:limit]
 	}
-
-	return analysis
+	return pairs, commonCouplingStats{
+		Total:   totalCoupling,
+		Average: avgCoupling,
+		Max:     maxCoupling,
+		Min:     minCoupling,
+	}
 }
 
 // plotFileCoupling generates coupling visualization plots

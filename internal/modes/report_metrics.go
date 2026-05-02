@@ -234,7 +234,9 @@ func plotKnowledgeDistribution(labels []string, values []int, output string) err
 	maxValue := 0.0
 	for i, value := range values {
 		editorCount := float64(i)
-		fmt.Sscanf(labels[i], "%f", &editorCount)
+		if _, err := fmt.Sscanf(labels[i], "%f", &editorCount); err != nil {
+			editorCount = float64(i)
+		}
 		ticks[i] = editorCount
 		y[i] = float64(value)
 		if y[i] > maxValue {
@@ -652,40 +654,6 @@ func truncateKnowledgeSiloLabel(path string) string {
 	return path
 }
 
-type namedValues struct {
-	Name   string
-	Values plotter.Values
-}
-
-func plotGroupedBars(title, xLabel, yLabel string, labels []string, groups []namedValues, output, defaultOutput string) error {
-	output, err := resolveReportOutput(output, defaultOutput)
-	if err != nil {
-		return err
-	}
-	series := make([]graphics.MatplotlibGroupedBarSeries, len(groups))
-	for i, group := range groups {
-		values := make([]float64, len(group.Values))
-		for j, value := range group.Values {
-			values[j] = float64(value)
-		}
-		series[i] = graphics.MatplotlibGroupedBarSeries{Name: group.Name, Values: values}
-	}
-	width, height := reportPlotInches(defaultOutput)
-	if err := graphics.PlotGroupedBarChartMatplotlib(labels, series, graphics.MatplotlibGroupedBarOptions{
-		Title:        title,
-		XLabel:       xLabel,
-		YLabel:       yLabel,
-		Output:       output,
-		WidthInches:  width,
-		HeightInches: height,
-		RotateX:      len(labels) > 8,
-	}); err != nil {
-		return err
-	}
-	fmt.Printf("Saved %s\n", output)
-	return nil
-}
-
 func writeHotspotRiskTable(files []readers.HotspotRiskFile, output string) error {
 	var buffer bytes.Buffer
 	buffer.WriteString("rank\trisk_score\tsize\tchurn\tcoupling_degree\townership_gini\tfile\n")
@@ -699,7 +667,7 @@ func writeHotspotRiskTable(files []readers.HotspotRiskFile, output string) error
 	if err := os.MkdirAll(filepath.Dir(output), 0o755); err != nil && filepath.Dir(output) != "." {
 		return fmt.Errorf("failed to create output directory: %v", err)
 	}
-	if err := os.WriteFile(output, buffer.Bytes(), 0o644); err != nil {
+	if err := os.WriteFile(output, buffer.Bytes(), 0o600); err != nil {
 		return fmt.Errorf("failed to write hotspot risk table: %v", err)
 	}
 	fmt.Printf("Saved %s\n", output)

@@ -33,7 +33,7 @@ func generateBurndownPlot(name string, matrix [][]int, output string, relative b
 	}
 
 	outputDir := filepath.Dir(output)
-	if err := os.MkdirAll(outputDir, os.ModePerm); err != nil {
+	if err := os.MkdirAll(outputDir, 0o755); err != nil {
 		progEstimator.FinishMultiOperation()
 		return fmt.Errorf("failed to create output directory %s: %v", outputDir, err)
 	}
@@ -74,7 +74,7 @@ func generateBurndownPlot(name string, matrix [][]int, output string, relative b
 	progEstimator.NextOperation("Generating visualization")
 
 	// Survival analysis
-	survivalRatios := calculateSurvivalRatios(interpolatedMatrix, *startTime)
+	survivalRatios := calculateSurvivalRatios(interpolatedMatrix)
 	if !quiet {
 		printSurvivalRatios(survivalRatios)
 	}
@@ -164,74 +164,6 @@ func resampleDateRange(start, end time.Time, resample string) []time.Time {
 	return dates
 }
 
-// interpolateBurndownMatrix interpolates and resamples the matrix according to the specified interval
-func interpolateBurndownMatrix(matrix [][]int, startTime, endTime time.Time, resample string) ([][]float64, []time.Time) {
-	if len(matrix) == 0 || len(matrix[0]) == 0 {
-		return [][]float64{}, []time.Time{}
-	}
-
-	numBands := len(matrix)
-	originalTicks := len(matrix[0])
-
-	// Generate the target date range based on resampling
-	dateRange := resampleDateRange(startTime, endTime, resample)
-	targetTicks := len(dateRange)
-
-	// Create interpolated matrix
-	interpolated := make([][]float64, numBands)
-	for i := range interpolated {
-		interpolated[i] = make([]float64, targetTicks)
-	}
-
-	// Note: This function is kept for compatibility but interpolateBurndownMatrixWithProgress is preferred
-	// Create a basic progress estimator for backward compatibility
-	progEstimator := progress.NewProgressEstimator(!viper.GetBool("quiet"))
-	progEstimator.StartOperation("Interpolating burndown data", numBands)
-
-	// Interpolate each band (developer/file/etc)
-	for band := 0; band < numBands; band++ {
-		progEstimator.UpdateProgress(1)
-
-		// If target resolution matches original, direct copy
-		if targetTicks == originalTicks {
-			for tick := 0; tick < originalTicks; tick++ {
-				interpolated[band][tick] = float64(matrix[band][tick])
-			}
-			continue
-		}
-
-		// Interpolate between original data points
-		for targetTick := 0; targetTick < targetTicks; targetTick++ {
-			// Map target tick to original tick space
-			originalPos := float64(targetTick) * float64(originalTicks-1) / float64(targetTicks-1)
-
-			// Find surrounding original ticks
-			leftTick := int(originalPos)
-			rightTick := leftTick + 1
-
-			// Handle boundary cases
-			if leftTick >= originalTicks-1 {
-				interpolated[band][targetTick] = float64(matrix[band][originalTicks-1])
-				continue
-			}
-			if rightTick >= originalTicks {
-				interpolated[band][targetTick] = float64(matrix[band][leftTick])
-				continue
-			}
-
-			// Linear interpolation
-			fraction := originalPos - float64(leftTick)
-			leftValue := float64(matrix[band][leftTick])
-			rightValue := float64(matrix[band][rightTick])
-
-			interpolated[band][targetTick] = leftValue + fraction*(rightValue-leftValue)
-		}
-	}
-
-	progEstimator.FinishOperation()
-	return interpolated, dateRange
-}
-
 // interpolateBurndownMatrixWithProgress interpolates and resamples the matrix with progress tracking
 func interpolateBurndownMatrixWithProgress(matrix [][]int, startTime, endTime time.Time, resample string, progEstimator *progress.ProgressEstimator) ([][]float64, []time.Time) {
 	if len(matrix) == 0 || len(matrix[0]) == 0 {
@@ -299,7 +231,7 @@ func interpolateBurndownMatrixWithProgress(matrix [][]int, startTime, endTime ti
 }
 
 // calculateSurvivalRatios computes survival ratios for the matrix.
-func calculateSurvivalRatios(matrix [][]float64, startTime time.Time) map[int]float64 {
+func calculateSurvivalRatios(matrix [][]float64) map[int]float64 {
 	survival := make(map[int]float64)
 	total := 0.0
 

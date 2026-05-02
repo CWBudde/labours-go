@@ -20,7 +20,7 @@ func DetectAndReadInput(input string, format string) (Reader, error) {
 		if err != nil {
 			return nil, fmt.Errorf("error opening file %s: %v", input, err)
 		}
-		defer f.Close()
+		defer func() { _ = f.Close() }()
 		file = f
 	}
 

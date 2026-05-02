@@ -338,13 +338,13 @@ func copyFile(t *testing.T, src, dst string) {
 	if err != nil {
 		t.Fatalf("Failed to open source file: %v", err)
 	}
-	defer srcFile.Close()
+	defer func() { _ = srcFile.Close() }()
 
 	dstFile, err := os.Create(dst)
 	if err != nil {
 		t.Fatalf("Failed to create destination file: %v", err)
 	}
-	defer dstFile.Close()
+	defer func() { _ = dstFile.Close() }()
 
 	_, err = dstFile.ReadFrom(srcFile)
 	if err != nil {

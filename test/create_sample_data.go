@@ -14,7 +14,7 @@ func main() {
 	testDir := "test/testdata"
 
 	// Ensure testdata directory exists
-	err := os.MkdirAll(testDir, 0o755)
+	err := os.MkdirAll(testDir, 0o750)
 	if err != nil {
 		fmt.Printf("Failed to create testdata directory: %v\n", err)
 		os.Exit(1)
@@ -30,7 +30,7 @@ func main() {
 	}
 
 	simplePath := filepath.Join(testDir, "simple_burndown.pb")
-	err = os.WriteFile(simplePath, simpleData, 0o644)
+	err = os.WriteFile(simplePath, simpleData, 0o600)
 	if err != nil {
 		fmt.Printf("Failed to write simple data: %v\n", err)
 		os.Exit(1)
@@ -47,7 +47,7 @@ func main() {
 	}
 
 	realisticPath := filepath.Join(testDir, "realistic_burndown.pb")
-	err = os.WriteFile(realisticPath, realisticData, 0o644)
+	err = os.WriteFile(realisticPath, realisticData, 0o600)
 	if err != nil {
 		fmt.Printf("Failed to write realistic data: %v\n", err)
 		os.Exit(1)
@@ -93,7 +93,7 @@ go run test/create_sample_data.go
 ` + "```" + `
 `
 
-	err = os.WriteFile(readmePath, []byte(readme), 0o644)
+	err = os.WriteFile(readmePath, []byte(readme), 0o600)
 	if err != nil {
 		fmt.Printf("Failed to write README: %v\n", err)
 	} else {
@@ -232,56 +232,12 @@ func generateRealisticBurndownData() *pb.AnalysisResults {
 	}
 }
 
-func generateSequentialData(count int) []int64 {
-	data := make([]int64, count)
-	for i := 0; i < count; i++ {
-		data[i] = int64(1000 - i*5) // Decreasing pattern
-		if data[i] < 0 {
-			data[i] = 0
-		}
-	}
-	return data
-}
-
-func generateSequentialIndices(count int) []int32 {
-	indices := make([]int32, count)
-	for i := 0; i < count; i++ {
-		indices[i] = int32(i % 50) // Cycle through columns
-	}
-	return indices
-}
-
-func generateIndptr(rows, cols int) []int64 {
-	indptr := make([]int64, rows+1)
-	for i := 0; i <= rows; i++ {
-		indptr[i] = int64(i * cols)
-	}
-	return indptr
-}
-
-func generateFileOwnership(numFiles int) map[string]int32 {
-	ownership := make(map[string]int32)
-	for i := 0; i < numFiles; i++ {
-		filename := fmt.Sprintf("file_%d.go", i)
-		ownership[filename] = int32(i % 5) // Assign to one of 5 people
-	}
-	return ownership
-}
-
-func generateFileNames(count int) []string {
-	names := make([]string, count)
-	for i := 0; i < count; i++ {
-		names[i] = fmt.Sprintf("file_%d.go", i)
-	}
-	return names
-}
-
 // New helper functions for correct protobuf structure
 
 func generateUint32Data(count int) []uint32 {
 	data := make([]uint32, count)
 	for i := 0; i < count; i++ {
-		data[i] = uint32(1000 - i*5) // Decreasing pattern
+		data[i] = uint32(1000 - i*5) // #nosec G115 - negative values are detected and clamped below.
 		if data[i] > 10000 {         // Prevent overflow
 			data[i] = 0
 		}
@@ -326,7 +282,7 @@ func generateMultiplePeopleBurndown(count int) []*pb.BurndownSparseMatrix {
 func generateRealisticFileOwnership(numFiles int) map[int32]int32 {
 	ownership := make(map[int32]int32)
 	for i := 0; i < numFiles; i++ {
-		ownership[int32(i)] = int32(i % 5) // Assign to one of 5 people
+		ownership[int32(i)] = int32(i % 5) // #nosec G115 - fixture sizes keep i in int32 range and modulo bounds owner ids.
 	}
 	return ownership
 }

@@ -441,7 +441,9 @@ func requireShotnessCooccurrenceMatchesPythonCounterMatrix(t *testing.T, records
 		require.Len(t, matrix[i], len(records))
 		for j := range records {
 			expected := int32(0)
-			if count, ok := record.Counters[int32(j)]; ok {
+			j32, ok := checkedInt32(int64(j))
+			require.True(t, ok, "record index %d overflows int32", j)
+			if count, ok := record.Counters[j32]; ok {
 				expected = count
 			}
 			require.Equalf(t, int(expected), matrix[i][j], "cooccurrence[%d][%d]", i, j)

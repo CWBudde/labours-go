@@ -108,7 +108,7 @@ func TestReferenceGeneration(t *testing.T) {
 
 	// Create reference output directory
 	refDir := "../golden"
-	if err := os.MkdirAll(refDir, 0o755); err != nil {
+	if err := os.MkdirAll(refDir, 0o750); err != nil {
 		t.Fatalf("Failed to create reference directory: %v", err)
 	}
 

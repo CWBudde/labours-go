@@ -83,7 +83,7 @@ func TestSentiment(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	// Create mock reader with test data
 	reader := &MockSentimentReader{}
@@ -128,7 +128,7 @@ func TestSentimentUsesCollectedSentimentWithoutFallback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	reader := &CollectedSentimentReader{NoDataReader: &NoDataReader{}}
 	if err := Sentiment(reader, tempDir, false); err != nil {
@@ -223,7 +223,7 @@ func TestSentimentWithNoData(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	// This should return an error when no data is available
 	err = Sentiment(noDataReader, tempDir, false)
@@ -252,7 +252,7 @@ func TestSentimentWithZeroActivityDoesNotCreateNaNBars(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	reader := &ZeroActivitySentimentReader{NoDataReader: &NoDataReader{}}
 	if err := Sentiment(reader, tempDir, true); err != nil {
