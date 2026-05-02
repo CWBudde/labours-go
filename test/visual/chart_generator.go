@@ -43,7 +43,7 @@ func (cg *ChartGenerator) GenerateChart(t *testing.T, mode, inputFile string) (s
 		reader = &readers.ProtobufReader{}
 	}
 
-	file, err := os.Open(inputFile)
+	file, err := os.Open(inputFile) // #nosec G304 - visual test input path is provided by test setup.
 	if err != nil {
 		return "", fmt.Errorf("failed to open input file %s: %w", inputFile, err)
 	}

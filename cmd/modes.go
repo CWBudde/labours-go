@@ -545,7 +545,7 @@ func extractModeDataForJSON(reader readers.Reader, mode string) (interface{}, er
 
 // saveJSONResults saves the analysis results as JSON
 func saveJSONResults(results map[string]interface{}, outputPath string) error {
-	file, err := os.Create(outputPath)
+	file, err := os.Create(outputPath) // #nosec G304 - JSON output path is explicitly requested by caller.
 	if err != nil {
 		return fmt.Errorf("failed to create JSON output file: %v", err)
 	}

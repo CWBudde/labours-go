@@ -36,7 +36,7 @@ func TestMatrixParsingCompatibility(t *testing.T) {
 func testBurndownMatrixParsing(t *testing.T, testFile string) {
 	t.Run("BurndownSparseMatrix", func(t *testing.T) {
 		reader := &ProtobufReader{}
-		file, err := os.Open(testFile)
+		file, err := os.Open(testFile) // #nosec G304 - test fixture path is passed by table setup.
 		require.NoError(t, err)
 		defer func() { _ = file.Close() }()
 
@@ -85,7 +85,7 @@ func testBurndownMatrixParsing(t *testing.T, testFile string) {
 func testCompressedSparseRowMatrixParsing(t *testing.T, testFile string) {
 	t.Run("CompressedSparseRowMatrix", func(t *testing.T) {
 		reader := &ProtobufReader{}
-		file, err := os.Open(testFile)
+		file, err := os.Open(testFile) // #nosec G304 - test fixture path is passed by table setup.
 		require.NoError(t, err)
 		defer func() { _ = file.Close() }()
 
@@ -129,7 +129,7 @@ func testCompressedSparseRowMatrixParsing(t *testing.T, testFile string) {
 func testMatrixFormatSelection(t *testing.T, testFile string) {
 	t.Run("FormatSelection", func(t *testing.T) {
 		// Load raw protobuf data to inspect structure
-		allBytes, err := os.ReadFile(testFile)
+		allBytes, err := os.ReadFile(testFile) // #nosec G304 - test fixture path is passed by table setup.
 		require.NoError(t, err)
 
 		var results pb.AnalysisResults
@@ -251,7 +251,7 @@ func testContentsAccessPattern(t *testing.T, testFile string) {
 		// produces the same results as Python's PB_MESSAGES dynamic parsing
 
 		reader := &ProtobufReader{}
-		file, err := os.Open(testFile)
+		file, err := os.Open(testFile) // #nosec G304 - test fixture path is passed by table setup.
 		require.NoError(t, err)
 		defer func() { _ = file.Close() }()
 
@@ -371,7 +371,7 @@ func TestTransposeOperationCompatibility(t *testing.T) {
 	for _, testFile := range testFiles {
 		t.Run(testFile, func(t *testing.T) {
 			reader := &ProtobufReader{}
-			file, err := os.Open(testFile)
+			file, err := os.Open(testFile) // #nosec G304 - test fixture path is passed by table setup.
 			require.NoError(t, err)
 			defer func() { _ = file.Close() }()
 

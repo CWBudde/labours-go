@@ -319,7 +319,7 @@ func writeSolidPNG(t *testing.T, path string, width, height int, c color.RGBA) {
 		}
 	}
 
-	file, err := os.Create(path)
+	file, err := os.Create(path) // #nosec G304 - visual test path is provided by test setup.
 	if err != nil {
 		t.Fatalf("Failed to create PNG: %v", err)
 	}
@@ -334,13 +334,13 @@ func writeSolidPNG(t *testing.T, path string, width, height int, c color.RGBA) {
 func copyFile(t *testing.T, src, dst string) {
 	t.Helper()
 
-	srcFile, err := os.Open(src)
+	srcFile, err := os.Open(src) // #nosec G304 - visual test path is provided by test setup.
 	if err != nil {
 		t.Fatalf("Failed to open source file: %v", err)
 	}
 	defer func() { _ = srcFile.Close() }()
 
-	dstFile, err := os.Create(dst)
+	dstFile, err := os.Create(dst) // #nosec G304 - visual test path is provided by test setup.
 	if err != nil {
 		t.Fatalf("Failed to create destination file: %v", err)
 	}

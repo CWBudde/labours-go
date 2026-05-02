@@ -135,7 +135,7 @@ func plotCollectedSentimentTimeline(name string, startUnix int64, ticks map[int]
 	if output == "" {
 		output = "."
 	}
-	if err := os.MkdirAll(output, 0o755); err != nil {
+	if err := os.MkdirAll(output, 0o750); err != nil {
 		return fmt.Errorf("failed to create output directory %s: %v", output, err)
 	}
 

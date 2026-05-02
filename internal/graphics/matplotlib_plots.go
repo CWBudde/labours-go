@@ -288,7 +288,7 @@ func PlotHeatmapMatplotlib(matrix [][]float64, rowLabels, colLabels []string, op
 	fig.RC.XTickLabelFontSize = 8
 	fig.RC.YTickLabelFontSize = 8
 	gs := fig.GridSpec(1, 1,
-		core.WithGridSpecPadding(0.125, 0.965, 0.087, 0.970),
+		core.WithGridSpecPadding(0.125, 0.893, 0.087, 0.970),
 		core.WithGridSpecSpacing(0, 0),
 	)
 	ax := gs.Cell(0, 0).AddAxes()
@@ -315,9 +315,48 @@ func PlotHeatmapMatplotlib(matrix [][]float64, rowLabels, colLabels []string, op
 	}
 
 	configureMatplotlibHeatmapTicks(ax, rowLabels, colLabels, opts)
-	fig.AddColorbar(ax, img, core.ColorbarOptions{Width: 0.038, Padding: 0.034})
+	addMatplotlibHeatmapColorbar(fig, cmap, vmin, vmax)
 
 	return saveMatplotlibFigureWithoutTightLayout(fig, opts.Output, width, height, render.Color{R: 1, G: 1, B: 1, A: 1})
+}
+
+func addMatplotlibHeatmapColorbar(fig *core.Figure, colormap string, vmin, vmax float64) {
+	// These bounds match matplotlib's fig.colorbar(...); fig.tight_layout()
+	// output for the Python labours parity heatmaps.
+	gs := fig.GridSpec(1, 1,
+		core.WithGridSpecPadding(0.927, 0.965, 0.142, 0.915),
+		core.WithGridSpecSpacing(0, 0),
+	)
+	ax := gs.Cell(0, 0).AddAxes()
+	if ax == nil {
+		return
+	}
+
+	ax.ShowFrame = false
+	ax.SetXLim(0, 1)
+	ax.SetYLim(vmin, vmax)
+	if ax.XAxis != nil {
+		ax.XAxis.ShowSpine = false
+		ax.XAxis.ShowTicks = false
+		ax.XAxis.ShowLabels = false
+	}
+	if ax.YAxis != nil {
+		ax.YAxis.ShowSpine = false
+		ax.YAxis.ShowTicks = false
+		ax.YAxis.ShowLabels = false
+		ax.YAxis.MinorLocator = nil
+	}
+	if right := ax.RightAxis(); right != nil {
+		right.MinorLocator = nil
+	}
+	_ = ax.SetYTickLabelPosition("right")
+	_ = ax.SetYLabelPosition("right")
+	ax.Add(&core.Colorbar{
+		Colormap:    colormap,
+		Alpha:       1,
+		BorderColor: render.Color{R: 0.2, G: 0.2, B: 0.2, A: 0.9},
+		BorderWidth: 1,
+	})
 }
 
 func PlotBarChartMatplotlib(labels []string, values []float64, opts MatplotlibBarOptions) error {

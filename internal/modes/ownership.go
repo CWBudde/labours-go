@@ -604,7 +604,7 @@ func saveOwnershipBurndownAsJSON(output string, names []string, people [][]float
 		Last:      lastTime,
 	}
 
-	file, err := os.Create(output)
+	file, err := os.Create(output) // #nosec G304 - output path is explicitly requested by caller.
 	if err != nil {
 		return fmt.Errorf("failed to create JSON output file: %v", err)
 	}

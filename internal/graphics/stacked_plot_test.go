@@ -392,7 +392,7 @@ func normalizeData(data [][]float64) [][]float64 {
 }
 
 func saveImagePNG(img image.Image, path string) error {
-	file, err := os.Create(path)
+	file, err := os.Create(path) // #nosec G304 - test helper writes caller-provided temp path.
 	if err != nil {
 		return err
 	}

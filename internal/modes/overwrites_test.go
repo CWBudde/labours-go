@@ -58,7 +58,7 @@ func TestPlotOverwritesMatrixWritesOutput(t *testing.T) {
 		t.Fatal("expected non-empty output file")
 	}
 
-	file, err := os.Open(output)
+	file, err := os.Open(output) // #nosec G304 - test output path is under t.TempDir.
 	if err != nil {
 		t.Fatalf("open output: %v", err)
 	}

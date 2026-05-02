@@ -175,7 +175,7 @@ func TestExecuteModesJSONWritesReaderData(t *testing.T) {
 
 	executeModes([]string{"devs"}, reader, outputPath, nil, nil)
 
-	raw, err := os.ReadFile(outputPath)
+	raw, err := os.ReadFile(outputPath) // #nosec G304 - test path is under t.TempDir.
 	if err != nil {
 		t.Fatalf("failed to read JSON output: %v", err)
 	}

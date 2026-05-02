@@ -108,7 +108,7 @@ Assessment: %s
 
 // loadImage loads an image from file path
 func loadImage(path string) (image.Image, error) {
-	file, err := os.Open(path)
+	file, err := os.Open(path) // #nosec G304 - visual test path is provided by test setup.
 	if err != nil {
 		return nil, err
 	}

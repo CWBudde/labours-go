@@ -93,7 +93,7 @@ func TestYamlReaderGetLanguageStatsFromCompactDevsTicks(t *testing.T) {
 
 func TestProtobufReaderGetLanguageStatsFromRealHerculesFixture(t *testing.T) {
 	path := filepath.Join("..", "..", "test", "testdata", "hercules", "report_default.pb")
-	file, err := os.Open(path)
+	file, err := os.Open(path) // #nosec G304 - test fixture path is fixed above.
 	if err != nil {
 		t.Fatalf("open fixture: %v", err)
 	}

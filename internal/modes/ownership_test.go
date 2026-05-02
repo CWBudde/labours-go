@@ -98,7 +98,7 @@ func TestSaveOwnershipMatplotlibFigurePreservesTransparency(t *testing.T) {
 		t.Fatalf("save ownership figure: %v", err)
 	}
 
-	file, err := os.Open(outputPath)
+	file, err := os.Open(outputPath) // #nosec G304 - test output path is under t.TempDir.
 	if err != nil {
 		t.Fatalf("open ownership png: %v", err)
 	}

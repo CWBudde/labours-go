@@ -131,7 +131,7 @@ func TestLanguagesSingleLanguage(t *testing.T) {
 
 func TestBuildLanguageEvolutionIncludesLastTickAcrossDST(t *testing.T) {
 	path := filepath.Join("..", "..", "example_data", "hercules_devs.yaml")
-	file, err := os.Open(path)
+	file, err := os.Open(path) // #nosec G304 - test fixture path is fixed above.
 	if err != nil {
 		t.Fatalf("open fixture: %v", err)
 	}

@@ -86,7 +86,7 @@ func TestBusFactorSubsystemOutputPreservesTransparentBackground(t *testing.T) {
 		t.Fatalf("BusFactor() unexpected error: %v", err)
 	}
 
-	file, err := os.Open(filepath.Join(dir, "bus-factor_subsystems.png"))
+	file, err := os.Open(filepath.Join(dir, "bus-factor_subsystems.png")) // #nosec G304 - test path is under t.TempDir.
 	if err != nil {
 		t.Fatalf("open subsystem png: %v", err)
 	}
