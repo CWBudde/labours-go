@@ -16,7 +16,7 @@ func DetectAndReadInput(input string, format string) (Reader, error) {
 	if input == "-" {
 		file = os.Stdin
 	} else {
-		f, err := os.Open(input)
+		f, err := os.Open(input) // #nosec G304 - CLI input path is intentionally user-provided.
 		if err != nil {
 			return nil, fmt.Errorf("error opening file %s: %v", input, err)
 		}

@@ -44,7 +44,7 @@ func TestCreateStackedPlot(t *testing.T) {
 	}
 
 	// Verify that the mock file was created and has content
-	content, err := os.ReadFile(outputPath)
+	content, err := os.ReadFile(outputPath) // #nosec G304 - test path is under t.TempDir.
 	if err != nil {
 		t.Errorf("Failed to read output file: %v", err)
 		return
@@ -287,12 +287,12 @@ func TestSaveImagePNG(t *testing.T) {
 	}
 
 	// Verify file exists and can be decoded
-	file, err := os.Open(outputPath)
+	file, err := os.Open(outputPath) // #nosec G304 - test path is under t.TempDir.
 	if err != nil {
 		t.Errorf("Failed to open saved image: %v", err)
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	_, err = png.Decode(file)
 	if err != nil {
@@ -396,7 +396,7 @@ func saveImagePNG(img image.Image, path string) error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	return png.Encode(file, img)
 }

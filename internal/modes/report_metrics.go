@@ -664,7 +664,7 @@ func writeHotspotRiskTable(files []readers.HotspotRiskFile, output string) error
 	if output == "" {
 		output = "hotspot-risk-table.tsv"
 	}
-	if err := os.MkdirAll(filepath.Dir(output), 0o755); err != nil && filepath.Dir(output) != "." {
+	if err := os.MkdirAll(filepath.Dir(output), 0o750); err != nil && filepath.Dir(output) != "." {
 		return fmt.Errorf("failed to create output directory: %v", err)
 	}
 	if err := os.WriteFile(output, buffer.Bytes(), 0o600); err != nil {
@@ -1009,7 +1009,7 @@ func resolveReportOutput(output, defaultOutput string) (string, error) {
 		output = defaultOutput
 	}
 	if dir := filepath.Dir(output); dir != "." {
-		if err := os.MkdirAll(dir, 0o755); err != nil {
+		if err := os.MkdirAll(dir, 0o750); err != nil {
 			return "", fmt.Errorf("failed to create output directory %s: %v", dir, err)
 		}
 	}

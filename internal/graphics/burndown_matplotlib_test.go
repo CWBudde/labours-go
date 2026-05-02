@@ -54,7 +54,7 @@ func TestSavePNGWithBackgroundPreservesTransparency(t *testing.T) {
 		t.Fatalf("save transparent png: %v", err)
 	}
 
-	file, err := os.Open(output)
+	file, err := os.Open(output) // #nosec G304 - test path is under t.TempDir.
 	if err != nil {
 		t.Fatalf("open transparent png: %v", err)
 	}
@@ -105,7 +105,7 @@ func TestPlotBurndownMatplotlibUsesBackends(t *testing.T) {
 	if err := PlotBurndownMatplotlib(data, pngPath, false); err != nil {
 		t.Fatalf("plot png: %v", err)
 	}
-	pngFile, err := os.Open(pngPath)
+	pngFile, err := os.Open(pngPath) // #nosec G304 - test path is under t.TempDir.
 	if err != nil {
 		t.Fatalf("open png: %v", err)
 	}
@@ -122,7 +122,7 @@ func TestPlotBurndownMatplotlibUsesBackends(t *testing.T) {
 	if err := PlotBurndownMatplotlib(data, svgPath, true); err != nil {
 		t.Fatalf("plot svg: %v", err)
 	}
-	svgBytes, err := os.ReadFile(svgPath)
+	svgBytes, err := os.ReadFile(svgPath) // #nosec G304 - test path is under t.TempDir.
 	if err != nil {
 		t.Fatalf("read svg: %v", err)
 	}

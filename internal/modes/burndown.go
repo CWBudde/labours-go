@@ -33,7 +33,7 @@ func generateBurndownPlot(name string, matrix [][]int, output string, relative b
 	}
 
 	outputDir := filepath.Dir(output)
-	if err := os.MkdirAll(outputDir, 0o755); err != nil {
+	if err := os.MkdirAll(outputDir, 0o750); err != nil {
 		progEstimator.FinishMultiOperation()
 		return fmt.Errorf("failed to create output directory %s: %v", outputDir, err)
 	}

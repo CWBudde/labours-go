@@ -13,7 +13,7 @@ func savePlotPNGAndSVG(p *plot.Plot, width, height vg.Length, outputDir, baseNam
 	if outputDir == "" {
 		outputDir = "."
 	}
-	if err := os.MkdirAll(outputDir, 0o755); err != nil {
+	if err := os.MkdirAll(outputDir, 0o750); err != nil {
 		return "", "", fmt.Errorf("failed to create output directory %s: %v", outputDir, err)
 	}
 

@@ -213,13 +213,19 @@ func saveOverwritesMatplotlibFigure(fig *core.Figure, output string, width, heig
 	if output == "" {
 		output = "overwrites.png"
 	}
-	if err := os.MkdirAll(filepath.Dir(output), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(output), 0o750); err != nil {
 		return fmt.Errorf("failed to create output directory for %s: %v", output, err)
 	}
 
 	transparentBackground := background
 	transparentBackground.A = 0
-	config := backends.Config{Width: width, Height: height, Background: transparentBackground, DPI: 100}
+	config := backends.Config{
+		Width:       width,
+		Height:      height,
+		Background:  transparentBackground,
+		DPI:         100,
+		Transparent: transparentBackground.A == 0,
+	}
 	switch strings.ToLower(filepath.Ext(output)) {
 	case ".svg":
 		renderer, _, err := backends.NewRenderer("svg", config, nil)
@@ -232,7 +238,13 @@ func saveOverwritesMatplotlibFigure(fig *core.Figure, output string, width, heig
 		if err != nil {
 			return fmt.Errorf("failed to create AGG renderer: %v", err)
 		}
-		return core.SavePNG(fig, renderer, output)
+		if err := core.SavePNG(fig, renderer, output); err != nil {
+			return err
+		}
+		if transparentBackground.A == 0 {
+			return graphics.SetTransparentPNGRGB(output, transparentBackground)
+		}
+		return nil
 	}
 }
 
@@ -306,7 +318,7 @@ func saveMatrixAsJSON(output string, people []string, matrix [][]float64) error 
 	if err != nil {
 		return fmt.Errorf("failed to create JSON output file: %v", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	encoder := json.NewEncoder(file)
 	encoder.SetIndent("", "  ")

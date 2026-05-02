@@ -116,7 +116,7 @@ func TestProtobufReader_ShotnessExtractionGolden(t *testing.T) {
 func readProtobufFixture(t *testing.T, name string) *ProtobufReader {
 	t.Helper()
 
-	data, err := os.ReadFile(filepath.Join("../../test/testdata/hercules", name))
+	data, err := os.ReadFile(filepath.Join("../../test/testdata/hercules", name)) // #nosec G304 - test fixture directory is fixed.
 	require.NoError(t, err)
 
 	reader := &ProtobufReader{}
@@ -230,10 +230,10 @@ func requireGoldenJSON(t *testing.T, name string, actual any) {
 
 	path := filepath.Join("../../test/testdata/hercules", name)
 	if os.Getenv("LABOURS_GO_UPDATE_GOLDENS") == "1" {
-		require.NoError(t, os.WriteFile(path, actualJSON, 0o644))
+		require.NoError(t, os.WriteFile(path, actualJSON, 0o600))
 	}
 
-	expectedJSON, err := os.ReadFile(path)
+	expectedJSON, err := os.ReadFile(path) // #nosec G304 - golden path is built by this test helper.
 	require.NoError(t, err)
 	require.JSONEq(t, string(expectedJSON), string(actualJSON))
 }

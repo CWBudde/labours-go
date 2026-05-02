@@ -161,7 +161,7 @@ func writeEmbeddings(prefix, outputDir string, index []string, matrix [][]float6
 	}
 
 	// Create output directory if it doesn't exist
-	if err := os.MkdirAll(outputDir, 0o755); err != nil {
+	if err := os.MkdirAll(outputDir, 0o750); err != nil {
 		return fmt.Errorf("failed to create output directory: %v", err)
 	}
 

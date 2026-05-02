@@ -67,7 +67,7 @@ func writeTestPNG(t *testing.T, path string, c color.RGBA) {
 			img.SetRGBA(x, y, c)
 		}
 	}
-	file, err := os.Create(path)
+	file, err := os.Create(path) // #nosec G304 - test helper writes caller-provided temp path.
 	if err != nil {
 		t.Fatalf("create test png: %v", err)
 	}

@@ -43,7 +43,7 @@ func OwnershipBurndown(reader readers.Reader, output string) error {
 	}
 
 	outputDir := filepath.Dir(output)
-	if err := os.MkdirAll(outputDir, os.ModePerm); err != nil {
+	if err := os.MkdirAll(outputDir, 0o750); err != nil {
 		progEstimator.FinishMultiOperation()
 		return fmt.Errorf("failed to create output directory %s: %v", outputDir, err)
 	}
@@ -113,7 +113,7 @@ func OwnershipBurndown(reader readers.Reader, output string) error {
 }
 
 func processOwnershipBurndown(
-	start, last time.Time, sampling int, tickSize float64,
+	start, _ time.Time, sampling int, tickSize float64,
 	sequence []string, data map[string][][]int,
 	maxPeople int, orderByTime bool,
 ) ([]string, [][]float64, []time.Time) {
@@ -205,7 +205,7 @@ func processOwnershipBurndown(
 
 // processOwnershipBurndownWithProgress processes ownership data with progress tracking
 func processOwnershipBurndownWithProgress(
-	start, last time.Time, sampling int, tickSize float64,
+	start, _ time.Time, sampling int, tickSize float64,
 	sequence []string, data map[string][][]int,
 	maxPeople int, orderByTime bool,
 	progEstimator *progress.ProgressEstimator,
@@ -567,7 +567,7 @@ func saveOwnershipMatplotlibFigure(fig *core.Figure, output string, width, heigh
 	if output == "" {
 		output = "ownership.png"
 	}
-	if err := os.MkdirAll(filepath.Dir(output), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(output), 0o750); err != nil {
 		return fmt.Errorf("failed to create output directory for %s: %v", output, err)
 	}
 
@@ -608,7 +608,7 @@ func saveOwnershipBurndownAsJSON(output string, names []string, people [][]float
 	if err != nil {
 		return fmt.Errorf("failed to create JSON output file: %v", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	encoder := json.NewEncoder(file)
 	encoder.SetIndent("", "  ")

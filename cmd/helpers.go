@@ -526,7 +526,7 @@ func runHerculesAndVisualize(herculesPath, repoPath, analysis string) error {
 	}
 
 	// Write output to temporary file
-	if err := os.WriteFile(outputFile, output, 0o644); err != nil {
+	if err := os.WriteFile(outputFile, output, 0o600); err != nil {
 		return fmt.Errorf("failed to write hercules output: %v", err)
 	}
 

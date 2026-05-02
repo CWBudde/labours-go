@@ -533,7 +533,7 @@ func setEnv(env []string, key, value string) []string {
 }
 
 func copyFile(src, dst string) error {
-	in, err := os.Open(src)
+	in, err := os.Open(src) // #nosec G304 - copy source is selected from parity fixture paths.
 	if err != nil {
 		return err
 	}
@@ -542,7 +542,7 @@ func copyFile(src, dst string) error {
 	if err := os.MkdirAll(filepath.Dir(dst), 0o750); err != nil {
 		return err
 	}
-	out, err := os.Create(dst)
+	out, err := os.Create(dst) // #nosec G304 - copy destination is under the generated artifact directory.
 	if err != nil {
 		return err
 	}
@@ -1014,7 +1014,7 @@ func pngToBase64(img image.Image) (string, error) {
 }
 
 func readPNGAsRGBA(path string) (*image.RGBA, error) {
-	f, err := os.Open(path)
+	f, err := os.Open(path) // #nosec G304 - PNG path is loaded from parity fixture/artifact directories.
 	if err != nil {
 		return nil, err
 	}

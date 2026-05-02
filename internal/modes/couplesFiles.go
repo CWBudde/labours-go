@@ -21,42 +21,43 @@ import (
 
 // CouplesFiles generates file coupling analysis and visualization
 func CouplesFiles(reader readers.Reader, output string) error {
+	return runCouplingMode(
+		"File Coupling Analysis",
+		"file coupling",
+		output,
+		reader.GetFileCooccurrence,
+		func(names []string, matrix [][]int, output string) error {
+			return plotFileCoupling(analyzeFileCoupling(names, matrix), output)
+		},
+	)
+}
+
+func runCouplingMode(title, label, output string, read func() ([]string, [][]int, error), plot func([]string, [][]int, string) error) error {
 	quiet := viper.GetBool("quiet")
 	progEstimator := progress.NewProgressEstimator(!quiet)
-
-	totalPhases := 3 // data extraction, analysis, plotting
-	progEstimator.StartMultiOperation(totalPhases, "File Coupling Analysis")
-
-	// Phase 1: Extract file coupling data
-	progEstimator.NextOperation("Extracting file coupling data")
-	fileNames, couplingMatrix, err := reader.GetFileCooccurrence()
+	progEstimator.StartMultiOperation(3, title)
+	progEstimator.NextOperation("Extracting " + label + " data")
+	names, matrix, err := read()
 	if err != nil {
 		progEstimator.FinishMultiOperation()
-		return fmt.Errorf("failed to get file coupling data: %v", err)
+		return fmt.Errorf("failed to get %s data: %v", label, err)
 	}
-
-	if len(fileNames) == 0 {
+	if len(names) == 0 {
 		progEstimator.FinishMultiOperation()
 		if !quiet {
-			fmt.Println("No file coupling data available")
+			fmt.Printf("No %s data available\n", label)
 		}
 		return nil
 	}
-
-	// Phase 2: Analyze coupling patterns
 	progEstimator.NextOperation("Analyzing coupling patterns")
-	couplingAnalysis := analyzeFileCoupling(fileNames, couplingMatrix)
-
-	// Phase 3: Generate visualizations
 	progEstimator.NextOperation("Generating visualization")
-	if err := plotFileCoupling(couplingAnalysis, output); err != nil {
+	if err := plot(names, matrix, output); err != nil {
 		progEstimator.FinishMultiOperation()
-		return fmt.Errorf("failed to generate file coupling plots: %v", err)
+		return fmt.Errorf("failed to generate %s plots: %v", label, err)
 	}
-
 	progEstimator.FinishMultiOperation()
 	if !quiet {
-		fmt.Println("File coupling analysis completed successfully.")
+		fmt.Printf("%s completed successfully.\n", title)
 	}
 	return nil
 }

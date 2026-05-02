@@ -102,7 +102,7 @@ func TestSaveOwnershipMatplotlibFigurePreservesTransparency(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open ownership png: %v", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	img, err := png.Decode(file)
 	if err != nil {
 		t.Fatalf("decode ownership png: %v", err)

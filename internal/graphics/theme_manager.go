@@ -30,7 +30,7 @@ func NewThemeManager() *ThemeManager {
 
 // LoadThemeFromFile loads a theme from a YAML file
 func (tm *ThemeManager) LoadThemeFromFile(filepath string) error {
-	data, err := os.ReadFile(filepath)
+	data, err := os.ReadFile(filepath) // #nosec G304 - theme config path is caller-provided by design.
 	if err != nil {
 		return fmt.Errorf("failed to read theme file %s: %w", filepath, err)
 	}

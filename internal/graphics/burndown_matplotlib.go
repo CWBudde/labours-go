@@ -382,7 +382,7 @@ func chooseDateTicks(dates []time.Time, resampleMode string, includeEndpoints bo
 // the natural ticks leave a meaningful gap, mirroring Python burndown.py.
 func buildDailyTicks(start, end time.Time, includeEndpoints bool) ([]float64, []string) {
 	days := int(math.Ceil(end.Sub(start).Hours() / 24))
-	step := max(1, int(math.Ceil(float64(max(1, days))/10)))
+	step := atLeastOne(int(math.Ceil(float64(atLeastOne(days)) / 10)))
 	first := start.Truncate(24 * time.Hour)
 	if first.Before(start) {
 		first = first.AddDate(0, 0, 1)
@@ -400,7 +400,7 @@ func buildDailyTicks(start, end time.Time, includeEndpoints bool) ([]float64, []
 // avoiding the overlapping-label artifact Python's locator does not produce.
 func buildMonthlyTicks(start, end time.Time, includeEndpoints bool) ([]float64, []string) {
 	months := (end.Year()-start.Year())*12 + int(end.Month()-start.Month()) + 1
-	step := max(1, int(math.Ceil(float64(max(1, months))/10)))
+	step := atLeastOne(int(math.Ceil(float64(atLeastOne(months)) / 10)))
 	first := time.Date(start.Year(), start.Month(), 1, 0, 0, 0, 0, start.Location())
 	if first.Before(start) {
 		first = first.AddDate(0, step, 0)
@@ -417,8 +417,8 @@ func buildMonthlyTicks(start, end time.Time, includeEndpoints bool) ([]float64, 
 // matplotlib's YearLocator selection used by Python labours when sampling is
 // yearly.
 func buildYearlyTicks(start, end time.Time, includeEndpoints bool) ([]float64, []string) {
-	years := max(1, end.Year()-start.Year()+1)
-	step := max(1, int(math.Ceil(float64(years)/10)))
+	years := atLeastOne(end.Year() - start.Year() + 1)
+	step := atLeastOne(int(math.Ceil(float64(years) / 10)))
 	natural := make([]time.Time, 0, years)
 	for year := start.Year(); year <= end.Year(); year += step {
 		t := time.Date(year, 1, 1, 0, 0, 0, 0, start.Location())
@@ -560,14 +560,14 @@ func pythonPlotPixelSize(defaultWidth, defaultHeight float64) (int, int) {
 			fmt.Printf("Warning: %v, using default size\n", err)
 		}
 	}
-	return max(1, int(math.Round(width*100))), max(1, int(math.Round(height*100)))
+	return atLeastOne(int(math.Round(width * 100))), atLeastOne(int(math.Round(height * 100)))
 }
 
-func max(a, b int) int {
-	if a > b {
-		return a
+func atLeastOne(value int) int {
+	if value < 1 {
+		return 1
 	}
-	return b
+	return value
 }
 
 func clampFloat(v, minVal, maxVal float64) float64 {
@@ -613,6 +613,12 @@ func setTransparentPNGRGB(path string, background render.Color) error {
 	}
 	defer func() { _ = file.Close() }()
 	return png.Encode(file, rgba)
+}
+
+// SetTransparentPNGRGB rewrites fully transparent PNG pixels so their hidden
+// RGB channels match the intended matte/background color.
+func SetTransparentPNGRGB(path string, background render.Color) error {
+	return setTransparentPNGRGB(path, background)
 }
 
 func imageToNRGBA(img image.Image) *image.NRGBA {

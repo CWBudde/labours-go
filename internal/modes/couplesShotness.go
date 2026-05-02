@@ -6,55 +6,24 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"github.com/spf13/viper"
 	"gonum.org/v1/plot"
 	"gonum.org/v1/plot/plotter"
 	"gonum.org/v1/plot/vg"
 	"gonum.org/v1/plot/vg/draw"
-	"labours-go/internal/progress"
 	"labours-go/internal/readers"
 )
 
 // CouplesShotness generates shotness-based coupling analysis and visualization
 func CouplesShotness(reader readers.Reader, output string) error {
-	quiet := viper.GetBool("quiet")
-	progEstimator := progress.NewProgressEstimator(!quiet)
-
-	totalPhases := 3 // data extraction, analysis, plotting
-	progEstimator.StartMultiOperation(totalPhases, "Shotness Coupling Analysis")
-
-	// Phase 1: Extract shotness coupling data
-	progEstimator.NextOperation("Extracting shotness coupling data")
-	entityNames, couplingMatrix, err := reader.GetShotnessCooccurrence()
-	if err != nil {
-		progEstimator.FinishMultiOperation()
-		return fmt.Errorf("failed to get shotness coupling data: %v", err)
-	}
-
-	if len(entityNames) == 0 {
-		progEstimator.FinishMultiOperation()
-		if !quiet {
-			fmt.Println("No shotness coupling data available")
-		}
-		return nil
-	}
-
-	// Phase 2: Analyze coupling patterns
-	progEstimator.NextOperation("Analyzing shotness coupling patterns")
-	couplingAnalysis := analyzeShotnessCoupling(entityNames, couplingMatrix)
-
-	// Phase 3: Generate visualizations
-	progEstimator.NextOperation("Generating visualization")
-	if err := plotShotnessCoupling(couplingAnalysis, output); err != nil {
-		progEstimator.FinishMultiOperation()
-		return fmt.Errorf("failed to generate shotness coupling plots: %v", err)
-	}
-
-	progEstimator.FinishMultiOperation()
-	if !quiet {
-		fmt.Println("Shotness coupling analysis completed successfully.")
-	}
-	return nil
+	return runCouplingMode(
+		"Shotness Coupling Analysis",
+		"shotness coupling",
+		output,
+		reader.GetShotnessCooccurrence,
+		func(names []string, matrix [][]int, output string) error {
+			return plotShotnessCoupling(analyzeShotnessCoupling(names, matrix), output)
+		},
+	)
 }
 
 // ShotnessCouplingPair represents a coupling relationship between two shotness entities

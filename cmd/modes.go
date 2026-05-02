@@ -352,6 +352,7 @@ func refactoringProxy(reader readers.Reader, output string, _ *time.Time, _ *tim
 	return modes.RefactoringProxy(reader, output)
 }
 
+//nolint:unparam // Mode handlers share an error-returning signature.
 func runAllModes(reader readers.Reader, output string, startTime, endTime *time.Time) error {
 	if !viper.GetBool("quiet") {
 		fmt.Printf("Running 'all' mode: executing %d analysis modes\n", len(pythonAllModes))
@@ -548,7 +549,7 @@ func saveJSONResults(results map[string]interface{}, outputPath string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create JSON output file: %v", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	encoder := json.NewEncoder(file)
 	encoder.SetIndent("", "  ") // Pretty print

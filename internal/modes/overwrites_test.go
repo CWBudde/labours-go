@@ -1,6 +1,8 @@
 package modes
 
 import (
+	"image"
+	"image/png"
 	"math"
 	"os"
 	"path/filepath"
@@ -54,6 +56,27 @@ func TestPlotOverwritesMatrixWritesOutput(t *testing.T) {
 	}
 	if info.Size() == 0 {
 		t.Fatal("expected non-empty output file")
+	}
+
+	file, err := os.Open(output)
+	if err != nil {
+		t.Fatalf("open output: %v", err)
+	}
+	defer func() { _ = file.Close() }()
+	img, err := png.Decode(file)
+	if err != nil {
+		t.Fatalf("decode output: %v", err)
+	}
+	if _, _, _, alpha := img.At(0, 0).RGBA(); alpha != 0 {
+		t.Fatalf("corner alpha = %d, want transparent", alpha)
+	}
+	nrgba, ok := img.(*image.NRGBA)
+	if !ok {
+		t.Fatalf("decoded output type = %T, want *image.NRGBA", img)
+	}
+	offset := nrgba.PixOffset(0, 0)
+	if got := nrgba.Pix[offset : offset+4]; got[0] != 255 || got[1] != 255 || got[2] != 255 || got[3] != 0 {
+		t.Fatalf("corner RGBA = %#v, want transparent white", got)
 	}
 }
 

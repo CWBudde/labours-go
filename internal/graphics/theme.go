@@ -65,221 +65,52 @@ type HeatStyle struct {
 
 // Default themes
 var (
-	DefaultTheme = Theme{
-		Name: "default",
-		ColorPalette: []ColorRGB{
-			{R: 31, G: 119, B: 180, A: 255},  // Blue
-			{R: 255, G: 127, B: 14, A: 255},  // Orange
-			{R: 44, G: 160, B: 44, A: 255},   // Green
-			{R: 214, G: 39, B: 40, A: 255},   // Red
-			{R: 148, G: 103, B: 189, A: 255}, // Purple
-			{R: 140, G: 86, B: 75, A: 255},   // Brown
-			{R: 227, G: 119, B: 194, A: 255}, // Pink
-			{R: 127, G: 127, B: 127, A: 255}, // Gray
-			{R: 188, G: 189, B: 34, A: 255},  // Olive
-			{R: 23, G: 190, B: 207, A: 255},  // Cyan
-		},
-		Background: ColorRGB{R: 255, G: 255, B: 255, A: 255}, // White
-		Grid: GridStyle{
-			Show:  true,
-			Color: ColorRGB{R: 224, G: 224, B: 224, A: 255},
-			Width: 0.5,
-		},
-		Text: TextStyle{
-			Font:      "Arial",
-			Size:      10,
-			Color:     ColorRGB{R: 0, G: 0, B: 0, A: 255},
-			TitleSize: 14,
-			LabelSize: 10,
-		},
-		Chart: ChartStyle{
-			LineWidth:   1.0,
-			BorderWidth: 1.0,
-			BorderColor: ColorRGB{R: 0, G: 0, B: 0, A: 255},
-			FillOpacity: 0.7,
-			LegendShow:  true,
-			LegendPos:   "right",
-		},
-		HeatMap: HeatStyle{
-			ColdColor:   ColorRGB{R: 31, G: 119, B: 180, A: 255},  // Blue
-			HotColor:    ColorRGB{R: 214, G: 39, B: 40, A: 255},   // Red
-			MidColor:    ColorRGB{R: 148, G: 103, B: 189, A: 255}, // Purple
-			UseMidPoint: false,
-		},
-	}
-
-	DarkTheme = Theme{
-		Name: "dark",
-		ColorPalette: []ColorRGB{
-			{R: 99, G: 165, B: 255, A: 255},  // Light Blue
-			{R: 255, G: 159, B: 64, A: 255},  // Light Orange
-			{R: 75, G: 192, B: 75, A: 255},   // Light Green
-			{R: 255, G: 99, B: 132, A: 255},  // Light Red
-			{R: 186, G: 148, B: 255, A: 255}, // Light Purple
-			{R: 200, G: 150, B: 130, A: 255}, // Light Brown
-			{R: 255, G: 159, B: 226, A: 255}, // Light Pink
-			{R: 180, G: 180, B: 180, A: 255}, // Light Gray
-			{R: 220, G: 220, B: 100, A: 255}, // Light Olive
-			{R: 100, G: 220, B: 240, A: 255}, // Light Cyan
-		},
-		Background: ColorRGB{R: 35, G: 39, B: 42, A: 255}, // Dark Gray
-		Grid: GridStyle{
-			Show:  true,
-			Color: ColorRGB{R: 68, G: 74, B: 79, A: 255},
-			Width: 0.5,
-		},
-		Text: TextStyle{
-			Font:      "Arial",
-			Size:      10,
-			Color:     ColorRGB{R: 240, G: 240, B: 240, A: 255}, // Light Gray
-			TitleSize: 14,
-			LabelSize: 10,
-		},
-		Chart: ChartStyle{
-			LineWidth:   1.0,
-			BorderWidth: 1.0,
-			BorderColor: ColorRGB{R: 200, G: 200, B: 200, A: 255},
-			FillOpacity: 0.8,
-			LegendShow:  true,
-			LegendPos:   "right",
-		},
-		HeatMap: HeatStyle{
-			ColdColor:   ColorRGB{R: 0, G: 100, B: 200, A: 255},  // Dark Blue
-			HotColor:    ColorRGB{R: 255, G: 80, B: 80, A: 255},  // Bright Red
-			MidColor:    ColorRGB{R: 150, G: 50, B: 200, A: 255}, // Dark Purple
-			UseMidPoint: false,
-		},
-	}
-
-	MinimalTheme = Theme{
-		Name: "minimal",
-		ColorPalette: []ColorRGB{
-			{R: 70, G: 70, B: 70, A: 255},    // Dark Gray
-			{R: 150, G: 150, B: 150, A: 255}, // Medium Gray
-			{R: 200, G: 200, B: 200, A: 255}, // Light Gray
-			{R: 100, G: 100, B: 100, A: 255}, // Another Dark Gray
-			{R: 50, G: 50, B: 50, A: 255},    // Very Dark Gray
-			{R: 180, G: 180, B: 180, A: 255}, // Very Light Gray
-			{R: 120, G: 120, B: 120, A: 255}, // Mid Gray
-			{R: 80, G: 80, B: 80, A: 255},    // Dark Gray 2
-			{R: 160, G: 160, B: 160, A: 255}, // Light Gray 2
-			{R: 110, G: 110, B: 110, A: 255}, // Mid Gray 2
-		},
-		Background: ColorRGB{R: 255, G: 255, B: 255, A: 255}, // White
-		Grid: GridStyle{
-			Show:  false,
-			Color: ColorRGB{R: 240, G: 240, B: 240, A: 255},
-			Width: 0.25,
-		},
-		Text: TextStyle{
-			Font:      "Arial",
-			Size:      9,
-			Color:     ColorRGB{R: 60, G: 60, B: 60, A: 255},
-			TitleSize: 12,
-			LabelSize: 8,
-		},
-		Chart: ChartStyle{
-			LineWidth:   0.8,
-			BorderWidth: 0.5,
-			BorderColor: ColorRGB{R: 120, G: 120, B: 120, A: 255},
-			FillOpacity: 0.9,
-			LegendShow:  false,
-			LegendPos:   "bottom",
-		},
-		HeatMap: HeatStyle{
-			ColdColor:   ColorRGB{R: 240, G: 240, B: 240, A: 255}, // Very Light Gray
-			HotColor:    ColorRGB{R: 60, G: 60, B: 60, A: 255},    // Dark Gray
-			MidColor:    ColorRGB{R: 150, G: 150, B: 150, A: 255}, // Medium Gray
-			UseMidPoint: true,
-		},
-	}
-
-	VibranthColorTheme = Theme{
-		Name: "vibrant",
-		ColorPalette: []ColorRGB{
-			{R: 255, G: 0, B: 128, A: 255}, // Hot Pink
-			{R: 0, G: 255, B: 128, A: 255}, // Spring Green
-			{R: 128, G: 0, B: 255, A: 255}, // Electric Violet
-			{R: 255, G: 128, B: 0, A: 255}, // Dark Orange
-			{R: 0, G: 128, B: 255, A: 255}, // Dodger Blue
-			{R: 255, G: 255, B: 0, A: 255}, // Yellow
-			{R: 255, G: 0, B: 0, A: 255},   // Red
-			{R: 0, G: 255, B: 0, A: 255},   // Lime
-			{R: 0, G: 255, B: 255, A: 255}, // Cyan
-			{R: 255, G: 0, B: 255, A: 255}, // Magenta
-		},
-		Background: ColorRGB{R: 250, G: 250, B: 250, A: 255}, // Very Light Gray
-		Grid: GridStyle{
-			Show:  true,
-			Color: ColorRGB{R: 230, G: 230, B: 230, A: 255},
-			Width: 0.8,
-		},
-		Text: TextStyle{
-			Font:      "Arial",
-			Size:      11,
-			Color:     ColorRGB{R: 40, G: 40, B: 40, A: 255},
-			TitleSize: 16,
-			LabelSize: 11,
-		},
-		Chart: ChartStyle{
-			LineWidth:   1.5,
-			BorderWidth: 1.2,
-			BorderColor: ColorRGB{R: 80, G: 80, B: 80, A: 255},
-			FillOpacity: 0.6,
-			LegendShow:  true,
-			LegendPos:   "right",
-		},
-		HeatMap: HeatStyle{
-			ColdColor:   ColorRGB{R: 0, G: 100, B: 255, A: 255}, // Bright Blue
-			HotColor:    ColorRGB{R: 255, G: 50, B: 50, A: 255}, // Bright Red
-			MidColor:    ColorRGB{R: 255, G: 200, B: 0, A: 255}, // Bright Yellow
-			UseMidPoint: true,
-		},
-	}
-
-	MatplotlibTheme = Theme{
-		Name: "matplotlib",
-		ColorPalette: []ColorRGB{
-			{R: 31, G: 119, B: 180, A: 255},  // Blue (C0) - matplotlib default
-			{R: 255, G: 127, B: 14, A: 255},  // Orange (C1)
-			{R: 44, G: 160, B: 44, A: 255},   // Green (C2)
-			{R: 214, G: 39, B: 40, A: 255},   // Red (C3)
-			{R: 148, G: 103, B: 189, A: 255}, // Purple (C4)
-			{R: 140, G: 86, B: 75, A: 255},   // Brown (C5)
-			{R: 227, G: 119, B: 194, A: 255}, // Pink (C6)
-			{R: 127, G: 127, B: 127, A: 255}, // Gray (C7)
-			{R: 188, G: 189, B: 34, A: 255},  // Olive (C8)
-			{R: 23, G: 190, B: 207, A: 255},  // Cyan (C9)
-		},
-		Background: ColorRGB{R: 255, G: 255, B: 255, A: 255}, // White
-		Grid: GridStyle{
-			Show:  true,
-			Color: ColorRGB{R: 224, G: 224, B: 224, A: 255},
-			Width: 0.5,
-		},
-		Text: TextStyle{
-			Font:      "Arial",
-			Size:      10,
-			Color:     ColorRGB{R: 0, G: 0, B: 0, A: 255},
-			TitleSize: 14,
-			LabelSize: 10,
-		},
-		Chart: ChartStyle{
-			LineWidth:   1.0,
-			BorderWidth: 1.0,
-			BorderColor: ColorRGB{R: 0, G: 0, B: 0, A: 255},
-			FillOpacity: 0.7,
-			LegendShow:  true,
-			LegendPos:   "right",
-		},
-		HeatMap: HeatStyle{
-			ColdColor:   ColorRGB{R: 31, G: 119, B: 180, A: 255},  // Blue
-			HotColor:    ColorRGB{R: 214, G: 39, B: 40, A: 255},   // Red
-			MidColor:    ColorRGB{R: 148, G: 103, B: 189, A: 255}, // Purple
-			UseMidPoint: false,
-		},
-	}
+	DefaultTheme       = newTheme("default", matplotlibPalette(), rgba(255, 255, 255, 255), grid(true, rgba(224, 224, 224, 255), 0.5), text("Arial", 10, rgba(0, 0, 0, 255), 14, 10), chart(1.0, 1.0, rgba(0, 0, 0, 255), 0.7, true, "right"), heat(rgba(31, 119, 180, 255), rgba(214, 39, 40, 255), rgba(148, 103, 189, 255), false))
+	DarkTheme          = newTheme("dark", darkPalette(), rgba(35, 39, 42, 255), grid(true, rgba(68, 74, 79, 255), 0.5), text("Arial", 10, rgba(240, 240, 240, 255), 14, 10), chart(1.0, 1.0, rgba(200, 200, 200, 255), 0.8, true, "right"), heat(rgba(0, 100, 200, 255), rgba(255, 80, 80, 255), rgba(150, 50, 200, 255), false))
+	MinimalTheme       = newTheme("minimal", minimalPalette(), rgba(255, 255, 255, 255), grid(false, rgba(240, 240, 240, 255), 0.25), text("Arial", 9, rgba(60, 60, 60, 255), 12, 8), chart(0.8, 0.5, rgba(120, 120, 120, 255), 0.9, false, "bottom"), heat(rgba(240, 240, 240, 255), rgba(60, 60, 60, 255), rgba(150, 150, 150, 255), true))
+	VibranthColorTheme = newTheme("vibrant", vibrantPalette(), rgba(250, 250, 250, 255), grid(true, rgba(230, 230, 230, 255), 0.8), text("Arial", 11, rgba(40, 40, 40, 255), 16, 11), chart(1.5, 1.2, rgba(80, 80, 80, 255), 0.6, true, "right"), heat(rgba(0, 100, 255, 255), rgba(255, 50, 50, 255), rgba(255, 200, 0, 255), true))
+	MatplotlibTheme    = newTheme("matplotlib", matplotlibPalette(), rgba(255, 255, 255, 255), grid(true, rgba(224, 224, 224, 255), 0.5), text("Arial", 10, rgba(0, 0, 0, 255), 14, 10), chart(1.0, 1.0, rgba(0, 0, 0, 255), 0.7, true, "right"), heat(rgba(31, 119, 180, 255), rgba(214, 39, 40, 255), rgba(148, 103, 189, 255), false))
 )
+
+//nolint:unparam // Theme literals pass explicit alpha values for readability and future theme data.
+func rgba(r, g, b, a uint8) ColorRGB { return ColorRGB{R: r, G: g, B: b, A: a} }
+
+func grid(show bool, color ColorRGB, width float64) GridStyle {
+	return GridStyle{Show: show, Color: color, Width: width}
+}
+
+//nolint:unparam // Built-in themes currently share a font, but external themes do not have to.
+func text(font string, size float64, color ColorRGB, titleSize, labelSize float64) TextStyle {
+	return TextStyle{Font: font, Size: size, Color: color, TitleSize: titleSize, LabelSize: labelSize}
+}
+
+func chart(lineWidth, borderWidth float64, borderColor ColorRGB, fillOpacity float64, legendShow bool, legendPos string) ChartStyle {
+	return ChartStyle{LineWidth: lineWidth, BorderWidth: borderWidth, BorderColor: borderColor, FillOpacity: fillOpacity, LegendShow: legendShow, LegendPos: legendPos}
+}
+
+func heat(coldColor, hotColor, midColor ColorRGB, useMidPoint bool) HeatStyle {
+	return HeatStyle{ColdColor: coldColor, HotColor: hotColor, MidColor: midColor, UseMidPoint: useMidPoint}
+}
+
+func newTheme(name string, palette []ColorRGB, background ColorRGB, gridStyle GridStyle, textStyle TextStyle, chartStyle ChartStyle, heatStyle HeatStyle) Theme {
+	return Theme{Name: name, ColorPalette: palette, Background: background, Grid: gridStyle, Text: textStyle, Chart: chartStyle, HeatMap: heatStyle}
+}
+
+func matplotlibPalette() []ColorRGB {
+	return []ColorRGB{rgba(31, 119, 180, 255), rgba(255, 127, 14, 255), rgba(44, 160, 44, 255), rgba(214, 39, 40, 255), rgba(148, 103, 189, 255), rgba(140, 86, 75, 255), rgba(227, 119, 194, 255), rgba(127, 127, 127, 255), rgba(188, 189, 34, 255), rgba(23, 190, 207, 255)}
+}
+
+func darkPalette() []ColorRGB {
+	return []ColorRGB{rgba(99, 165, 255, 255), rgba(255, 159, 64, 255), rgba(75, 192, 75, 255), rgba(255, 99, 132, 255), rgba(186, 148, 255, 255), rgba(200, 150, 130, 255), rgba(255, 159, 226, 255), rgba(180, 180, 180, 255), rgba(220, 220, 100, 255), rgba(100, 220, 240, 255)}
+}
+
+func minimalPalette() []ColorRGB {
+	return []ColorRGB{rgba(70, 70, 70, 255), rgba(150, 150, 150, 255), rgba(200, 200, 200, 255), rgba(100, 100, 100, 255), rgba(50, 50, 50, 255), rgba(180, 180, 180, 255), rgba(120, 120, 120, 255), rgba(80, 80, 80, 255), rgba(160, 160, 160, 255), rgba(110, 110, 110, 255)}
+}
+
+func vibrantPalette() []ColorRGB {
+	return []ColorRGB{rgba(255, 0, 128, 255), rgba(0, 255, 128, 255), rgba(128, 0, 255, 255), rgba(255, 128, 0, 255), rgba(0, 128, 255, 255), rgba(255, 255, 0, 255), rgba(255, 0, 0, 255), rgba(0, 255, 0, 255), rgba(0, 255, 255, 255), rgba(255, 0, 255, 255)}
+}
 
 // BuiltinThemes contains all built-in themes
 var BuiltinThemes = map[string]Theme{

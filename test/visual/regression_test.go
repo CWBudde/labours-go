@@ -358,7 +358,7 @@ func saveDifferenceAnalysis(t *testing.T, testName, currentPath, expectedPath st
 
 	// Create analysis directory
 	analysisDir := filepath.Join("../analysis_output", testName)
-	if err := os.MkdirAll(analysisDir, 0o755); err != nil {
+	if err := os.MkdirAll(analysisDir, 0o750); err != nil {
 		t.Logf("Failed to create analysis directory: %v", err)
 		return
 	}
@@ -371,7 +371,7 @@ func saveDifferenceAnalysis(t *testing.T, testName, currentPath, expectedPath st
 	reportPath := filepath.Join(analysisDir, "analysis_report.txt")
 	report := metrics.GetDetailedReport(ValidationStandard)
 
-	if err := os.WriteFile(reportPath, []byte(report), 0o644); err != nil {
+	if err := os.WriteFile(reportPath, []byte(report), 0o600); err != nil {
 		t.Logf("Failed to save analysis report: %v", err)
 	} else {
 		t.Logf("📊 Detailed analysis saved to: %s", analysisDir)

@@ -67,11 +67,11 @@ func TestProtobufReaderGetLanguageStatsFromDevsTicks(t *testing.T) {
 
 func TestYamlReaderGetLanguageStatsFromCompactDevsTicks(t *testing.T) {
 	path := filepath.Join("..", "..", "data", "labours-go_devs.yaml")
-	file, err := os.Open(path)
+	file, err := os.Open(path) // #nosec G304 - test fixture path is fixed above.
 	if err != nil {
 		t.Fatalf("open fixture: %v", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	reader := &YamlReader{}
 	if err := reader.Read(file); err != nil {
@@ -97,7 +97,7 @@ func TestProtobufReaderGetLanguageStatsFromRealHerculesFixture(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open fixture: %v", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	reader := &ProtobufReader{}
 	if err := reader.Read(file); err != nil {

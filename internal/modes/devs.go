@@ -30,7 +30,7 @@ func Devs(reader readers.Reader, output string, maxPeople int) error {
 	progEstimator := progress.NewProgressEstimator(!quiet)
 
 	// Start multi-phase operation for developer analysis
-	totalPhases := 5 // data extraction, selection, time series generation, clustering, plotting
+	totalPhases := 4 // data extraction, selection, time series generation, plotting
 	progEstimator.StartMultiOperation(totalPhases, "Developer Analysis")
 
 	// Phase 1: Extract developer statistics
@@ -69,11 +69,7 @@ func Devs(reader readers.Reader, output string, maxPeople int) error {
 	progEstimator.NextOperation("Generating time series data")
 	devSeries := generateTimeSeriesWithProgress(developerStats, progEstimator)
 
-	// Phase 4: Cluster developers by contribution patterns
-	progEstimator.NextOperation("Clustering developers")
-	clusters := clusterDevelopers(devSeries)
-
-	// Phase 5: Plot the developer contributions
+	// Phase 4: Plot the developer contributions
 	progEstimator.NextOperation("Generating visualization")
 	if err := plotDevs(developerStats, devSeries, output); err != nil {
 		progEstimator.FinishMultiOperation()
@@ -301,18 +297,6 @@ func generateTimeSeriesWithProgress(stats []readers.DeveloperStat, progEstimator
 
 	progEstimator.FinishOperation()
 	return devSeries
-}
-
-// clusterDevelopers clusters developers based on their contribution patterns (placeholder logic).
-func clusterDevelopers(devSeries map[string][]float64) map[string]int {
-	// Placeholder logic: assign developers to arbitrary clusters
-	clusters := make(map[string]int)
-	i := 0
-	for dev := range devSeries {
-		clusters[dev] = i % 3 // Assign developers to 3 clusters
-		i++
-	}
-	return clusters
 }
 
 // plotDevs generates plots for developers' contributions.

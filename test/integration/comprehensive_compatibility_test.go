@@ -245,7 +245,7 @@ func TestMatrixFormatDecisionTree(t *testing.T) {
 	for _, testFile := range testFiles {
 		t.Run(testFile, func(t *testing.T) {
 			reader := &readers.ProtobufReader{}
-			file, err := os.Open(testFile)
+			file, err := os.Open(testFile) // #nosec G304 - test fixture paths are fixed above.
 			require.NoError(t, err)
 			defer func() { _ = file.Close() }()
 

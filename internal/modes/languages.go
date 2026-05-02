@@ -360,14 +360,14 @@ func languageOutputPaths(output string) ([]string, error) {
 	ext := strings.ToLower(filepath.Ext(output))
 	if ext != "" {
 		if dir := filepath.Dir(output); dir != "." {
-			if err := os.MkdirAll(dir, 0o755); err != nil {
+			if err := os.MkdirAll(dir, 0o750); err != nil {
 				return nil, fmt.Errorf("failed to create output directory %s: %v", dir, err)
 			}
 		}
 		return []string{output}, nil
 	}
 
-	if err := os.MkdirAll(output, 0o755); err != nil {
+	if err := os.MkdirAll(output, 0o750); err != nil {
 		return nil, fmt.Errorf("failed to create output directory %s: %v", output, err)
 	}
 	return []string{

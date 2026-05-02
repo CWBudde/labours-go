@@ -135,7 +135,7 @@ func TestBuildLanguageEvolutionIncludesLastTickAcrossDST(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open fixture: %v", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	reader := &readers.YamlReader{}
 	if err := reader.Read(file); err != nil {

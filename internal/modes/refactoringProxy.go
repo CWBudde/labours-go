@@ -28,7 +28,7 @@ func RefactoringProxy(reader readers.Reader, output string) error {
 }
 
 func plotRefactoringProxy(data *readers.RefactoringProxyData, output string) error {
-	if err := os.MkdirAll(filepath.Dir(output), 0o755); err != nil && filepath.Dir(output) != "." {
+	if err := os.MkdirAll(filepath.Dir(output), 0o750); err != nil && filepath.Dir(output) != "." {
 		return fmt.Errorf("failed to create output directory: %v", err)
 	}
 
