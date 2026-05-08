@@ -157,7 +157,7 @@ func KnowledgeDiffusion(reader readers.Reader, output string) error {
 	labels, values := knowledgeDistribution(data)
 	fmt.Printf("Knowledge diffusion: %d files, %d developers, window=%d months\n",
 		len(data.Files), len(data.People), data.WindowMonths)
-	if err := plotKnowledgeDistribution(labels, values, output); err != nil {
+	if err := plotKnowledgeDistribution(reader.GetName(), labels, values, output); err != nil {
 		return err
 	}
 
@@ -210,50 +210,97 @@ func HotspotRisk(reader readers.Reader, output string) error {
 	return nil
 }
 
-func plotKnowledgeDistribution(labels []string, values []int, output string) error {
+func plotKnowledgeDistribution(repoName string, labels []string, values []int, output string) error {
 	output, err := resolveReportOutput(output, "knowledge-diffusion.png")
 	if err != nil {
 		return err
 	}
 	width, height := reportPlotPixels("knowledge-diffusion.png")
 	fig := newReportFigure(width, height)
-	ax := fig.AddSubplot(1, 1, 1)
-	if ax == nil {
+	grid := fig.Subplots(1, 1, core.WithSubplotPadding(0.064, 0.989, 0.100, 0.936))
+	if len(grid) == 0 || len(grid[0]) == 0 || grid[0][0] == nil {
 		return fmt.Errorf("failed to create knowledge diffusion axes")
 	}
-	ax.SetTitle("Knowledge Diffusion")
-	ax.SetXLabel("Unique Editors")
-	ax.SetYLabel("Files")
-	ax.AddYGrid()
+	ax := grid[0][0]
+	title := "Knowledge Diffusion Distribution"
+	if repoName != "" {
+		title = fmt.Sprintf("%s - Knowledge Diffusion Distribution", repoName)
+	}
+	ax.SetTitle(title)
+	ax.SetXLabel("Number of Unique Editors")
+	ax.SetYLabel("Number of Files")
 
 	y := make([]float64, len(values))
 	ticks := make([]float64, len(labels))
+	editorCounts := make([]float64, len(labels))
 	maxValue := 0.0
+	totalFiles := 0
+	singleEditorFiles := 0
 	for i, value := range values {
 		editorCount := float64(i)
 		if _, err := fmt.Sscanf(labels[i], "%f", &editorCount); err != nil {
 			editorCount = float64(i)
 		}
+		editorCounts[i] = editorCount
 		ticks[i] = editorCount
 		y[i] = float64(value)
+		totalFiles += value
+		if int(editorCount) == 1 {
+			singleEditorFiles += value
+		}
 		if y[i] > maxValue {
 			maxValue = y[i]
 		}
 		c := renderColor(knowledgeDistributionColor(int(editorCount)))
-		ax.Bar([]float64{editorCount}, []float64{y[i]}, core.BarOptions{Color: &c})
+		edgeColor := render.Color{R: 1, G: 1, B: 1, A: 1}
+		edgeWidth := 0.5
+		ax.Bar([]float64{editorCount}, []float64{y[i]}, core.BarOptions{
+			Color:     &c,
+			EdgeColor: &edgeColor,
+			EdgeWidth: &edgeWidth,
+		})
 		ax.Text(editorCount, y[i]+0.3, fmt.Sprintf("%d", value), core.TextOptions{
-			FontSize: 9,
+			FontSize: 9.6,
 			HAlign:   core.TextAlignCenter,
 			VAlign:   core.TextVAlignBottom,
 		})
 	}
-	minX, maxX := rangeWithPadding(ticks, 0.5)
+	if totalFiles > 0 {
+		pct := float64(singleEditorFiles) / float64(totalFiles) * 100
+		riskColor := renderColor(color.RGBA{R: 244, G: 67, B: 54, A: 255})
+		boxColor := render.Color{R: 1, G: 1, B: 1, A: 0.8}
+		ax.Text(0.98, 0.95, fmt.Sprintf("Single-editor files: %d (%.0f%%)", singleEditorFiles, pct), core.TextOptions{
+			Coords:   core.Coords(core.CoordAxes),
+			FontSize: 10.8,
+			Color:    riskColor,
+			HAlign:   core.TextAlignRight,
+			VAlign:   core.TextVAlignTop,
+			BBox: &core.TextBBoxOptions{
+				FaceColor: boxColor,
+				EdgeColor: boxColor,
+				Padding:   3,
+			},
+		})
+	}
+	minX, maxX := rangeWithPadding(editorCounts, 0.5)
 	ax.SetXLim(minX, maxX)
-	ax.SetYLim(0, math.Max(maxValue+1, maxValue*1.15))
-	ax.XAxis.Locator = core.FixedLocator{TicksList: ticks}
-	ax.XAxis.Formatter = core.FixedFormatter{Labels: append([]string(nil), labels...)}
+	yMax := math.Ceil(math.Max(maxValue, 1)/15) * 15
+	ax.SetYLim(0, yMax)
+	xTicks := make([]float64, 0, int(maxX-minX)+2)
+	xLabels := make([]string, 0, cap(xTicks))
+	for tick := math.Ceil(minX); tick <= math.Floor(maxX); tick++ {
+		xTicks = append(xTicks, tick)
+		xLabels = append(xLabels, fmt.Sprintf("%.0f", tick))
+	}
+	yTicks := make([]float64, 0, int(yMax/15)+1)
+	for tick := 0.0; tick <= yMax; tick += 15 {
+		yTicks = append(yTicks, tick)
+	}
+	ax.XAxis.Locator = core.FixedLocator{TicksList: xTicks}
+	ax.XAxis.Formatter = core.FixedFormatter{Labels: xLabels}
+	ax.YAxis.Locator = core.FixedLocator{TicksList: yTicks}
 
-	if err := saveReportFigure(fig, output, width, height); err != nil {
+	if err := saveReportFigureWithoutTightLayout(fig, output, width, height); err != nil {
 		return err
 	}
 	fmt.Printf("Saved %s\n", output)
@@ -909,7 +956,7 @@ func plotHotspotRiskRanked(repoName string, files []readers.HotspotRiskFile, lab
 		left[i] += couplingNorm[i]
 	}
 	addHotspotComponentBars(axComponents, y, ownershipNorm, left, "#9b59b6", "Ownership", renderComponentAlpha)
-	axComponents.SetTitle(repoName)
+	axComponents.SetTitle("Risk Components")
 	axComponents.SetXLabel("Normalized Factors")
 	axComponents.SetXLim(0, 4)
 	axComponents.SetYLim(-0.5, float64(len(files))-0.5)
@@ -917,7 +964,8 @@ func plotHotspotRiskRanked(repoName string, files []readers.HotspotRiskFile, lab
 	axComponents.YAxis.Locator = core.FixedLocator{TicksList: ticks}
 	axComponents.YAxis.Formatter = core.NullFormatter{}
 	axComponents.YAxis.ShowTicks = false
-	axComponents.AddLegend()
+	componentLegend := axComponents.AddLegend()
+	componentLegend.Location = core.LegendLowerRight
 
 	if err := saveReportFigure(fig, output, width, height); err != nil {
 		return err

@@ -41,6 +41,9 @@ type MatplotlibTimeAreaOptions struct {
 	Legend       bool
 	LegendLeft   bool
 	LegendTop    bool
+	HideFrame    bool
+	AutoXMargin  bool
+	LegendFace   color.Color
 	Alpha        float64
 	YMin         float64
 	YMax         float64
@@ -213,6 +216,15 @@ func PlotTimeAreasMatplotlib(dates []time.Time, series []MatplotlibTimeAreaSerie
 		} else if opts.LegendLeft {
 			legend.Location = core.LegendLowerLeft
 		}
+		if opts.LegendFace != nil {
+			face := renderColor(opts.LegendFace)
+			legend.BackgroundColor = face
+			legend.BorderColor = face
+		}
+	}
+	if opts.HideFrame {
+		ax.XAxis.ShowSpine = false
+		ax.YAxis.ShowSpine = false
 	}
 
 	return saveMatplotlibFigure(fig, opts.Output, width, height)
@@ -288,7 +300,7 @@ func PlotHeatmapMatplotlib(matrix [][]float64, rowLabels, colLabels []string, op
 	fig.RC.XTickLabelFontSize = 8
 	fig.RC.YTickLabelFontSize = 8
 	gs := fig.GridSpec(1, 1,
-		core.WithGridSpecPadding(0.125, 0.893, 0.087, 0.970),
+		core.WithGridSpecPadding(0.132, 0.893, 0.087, 0.970),
 		core.WithGridSpecSpacing(0, 0),
 	)
 	ax := gs.Cell(0, 0).AddAxes()
@@ -507,6 +519,10 @@ func configureTimeAreaAxes(ax *core.Axes, dates []time.Time, opts MatplotlibTime
 	if xMin == xMax {
 		xMin = float64(dates[0].AddDate(-2, 0, 0).Unix())
 		xMax = float64(dates[0].AddDate(2, 0, 0).Unix())
+	} else if opts.AutoXMargin {
+		padding := (xMax - xMin) * 0.05
+		xMin -= padding
+		xMax += padding
 	}
 	ax.SetXLim(xMin, xMax)
 	if opts.YMax > opts.YMin {

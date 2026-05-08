@@ -250,6 +250,8 @@ func generateOldVsNewPlot(newCodeSeries, modifiedCodeSeries []float64, dates []t
 		Legend:       true,
 		LegendLeft:   true,
 		LegendTop:    true,
+		HideFrame:    true,
+		AutoXMargin:  true,
 		Alpha:        1,
 	}); err != nil {
 		return fmt.Errorf("failed to save old-vs-new plot: %v", err)
@@ -264,6 +266,8 @@ func generateOldVsNewPlot(newCodeSeries, modifiedCodeSeries []float64, dates []t
 		Legend:       true,
 		LegendLeft:   true,
 		LegendTop:    true,
+		HideFrame:    true,
+		AutoXMargin:  true,
 		Alpha:        1,
 	})
 	if svgErr != nil {
