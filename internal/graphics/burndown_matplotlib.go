@@ -661,15 +661,15 @@ func PrintSurvivalFunction(matrix [][]float64) {
 }
 
 // PythonLaboursColorPalette returns the color cycle Python labours actually
-// produces. Python labours runs `pyplot.style.use("ggplot")` before plotting,
-// so its `axes.prop_cycle` is the ggplot palette below — not matplotlib's
-// default tab10/tab20. Matching this palette is what makes burndown layers,
-// devs spikes and old-vs-new fills look right relative to the Python baseline.
+// produces. Python labours applies the requested matplotlib style and then
+// overrides axes.prop_cycle with pyplot.cm.tab20.colors in plotting.import_pyplot.
+// Matching this palette is what makes burndown layers, devs spikes and
+// old-vs-new fills look right relative to the Python baseline.
 //
 // When more series are needed than palette entries, callers cycle modulo
 // length, which mirrors matplotlib's `axes.prop_cycle` wrap-around.
 func PythonLaboursColorPalette(n int) []color.Color {
-	palette := ggplotPalette()
+	palette := tab20Palette()
 	colors := make([]color.Color, n)
 	for i := 0; i < n; i++ {
 		colors[i] = palette[i%len(palette)]
@@ -677,19 +677,27 @@ func PythonLaboursColorPalette(n int) []color.Color {
 	return colors
 }
 
-// ggplotPalette returns the color list that matplotlib's "ggplot" style
-// installs into `axes.prop_cycle`. Hex codes lifted from
-// `matplotlib/mpl-data/stylelib/ggplot.mplstyle`:
-//
-//	#E24A33 #348ABD #988ED5 #777777 #FBC15E #8EBA42 #FFB5B8
-func ggplotPalette() []color.Color {
+func tab20Palette() []color.Color {
 	return []color.Color{
-		color.RGBA{R: 0xE2, G: 0x4A, B: 0x33, A: 255}, // red
-		color.RGBA{R: 0x34, G: 0x8A, B: 0xBD, A: 255}, // blue
-		color.RGBA{R: 0x98, G: 0x8E, B: 0xD5, A: 255}, // purple
-		color.RGBA{R: 0x77, G: 0x77, B: 0x77, A: 255}, // gray
-		color.RGBA{R: 0xFB, G: 0xC1, B: 0x5E, A: 255}, // yellow
-		color.RGBA{R: 0x8E, G: 0xBA, B: 0x42, A: 255}, // green
-		color.RGBA{R: 0xFF, G: 0xB5, B: 0xB8, A: 255}, // pink
+		color.RGBA{R: 0x1F, G: 0x77, B: 0xB4, A: 255},
+		color.RGBA{R: 0xAE, G: 0xC7, B: 0xE8, A: 255},
+		color.RGBA{R: 0xFF, G: 0x7F, B: 0x0E, A: 255},
+		color.RGBA{R: 0xFF, G: 0xBB, B: 0x78, A: 255},
+		color.RGBA{R: 0x2C, G: 0xA0, B: 0x2C, A: 255},
+		color.RGBA{R: 0x98, G: 0xDF, B: 0x8A, A: 255},
+		color.RGBA{R: 0xD6, G: 0x27, B: 0x28, A: 255},
+		color.RGBA{R: 0xFF, G: 0x98, B: 0x96, A: 255},
+		color.RGBA{R: 0x94, G: 0x67, B: 0xBD, A: 255},
+		color.RGBA{R: 0xC5, G: 0xB0, B: 0xD5, A: 255},
+		color.RGBA{R: 0x8C, G: 0x56, B: 0x4B, A: 255},
+		color.RGBA{R: 0xC4, G: 0x9C, B: 0x94, A: 255},
+		color.RGBA{R: 0xE3, G: 0x77, B: 0xC2, A: 255},
+		color.RGBA{R: 0xF7, G: 0xB6, B: 0xD2, A: 255},
+		color.RGBA{R: 0x7F, G: 0x7F, B: 0x7F, A: 255},
+		color.RGBA{R: 0xC7, G: 0xC7, B: 0xC7, A: 255},
+		color.RGBA{R: 0xBC, G: 0xBD, B: 0x22, A: 255},
+		color.RGBA{R: 0xDB, G: 0xDB, B: 0x8D, A: 255},
+		color.RGBA{R: 0x17, G: 0xBE, B: 0xCF, A: 255},
+		color.RGBA{R: 0x9E, G: 0xDA, B: 0xE5, A: 255},
 	}
 }

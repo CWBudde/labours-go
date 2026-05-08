@@ -16,6 +16,20 @@ func TestCouplingPairGeometryMatchesMatplotlibDefaults(t *testing.T) {
 		t.Fatalf("couplingFilePairBarWidth(15) = %v, want %v", width, wantWidth)
 	}
 
+	shotnessWidth := couplingBarWidth(20)
+	wantShotnessWidth := vg.Points(800.0 / 20.0)
+	if math.Abs(float64(shotnessWidth-wantShotnessWidth)) > 1e-9 {
+		t.Fatalf("couplingBarWidth(20) = %v, want %v", shotnessWidth, wantShotnessWidth)
+	}
+
+	shotnessMinX, shotnessMaxX := shotnessCouplingPairXRange(20)
+	if math.Abs(shotnessMinX-(-1.39)) > 1e-9 {
+		t.Fatalf("shotnessCouplingPairXRange(20) min = %v, want -1.39", shotnessMinX)
+	}
+	if math.Abs(shotnessMaxX-20.39) > 1e-9 {
+		t.Fatalf("shotnessCouplingPairXRange(20) max = %v, want 20.39", shotnessMaxX)
+	}
+
 	minX, maxX := couplingPairXRange(15)
 	if math.Abs(minX-(-1.2)) > 1e-9 {
 		t.Fatalf("couplingPairXRange(15) min = %v, want -1.2", minX)

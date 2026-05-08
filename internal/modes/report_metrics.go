@@ -44,15 +44,12 @@ func TemporalActivity(reader readers.Reader, output string, legendThreshold, sin
 	legendNote := temporalLegendNote(len(data.People), legendThreshold, singleColumnThreshold)
 	fmt.Printf("Temporal activity: %d developers, %d commits, %d changed lines%s\n",
 		len(data.People), sumInts(hourlyCommits), sumInts(hourlyLines), legendNote)
-	return plotIntBars(
-		"Temporal Activity by Hour",
-		"Hour of Day",
-		"Commits",
-		hourLabels(len(hourlyCommits)),
-		hourlyCommits,
-		output,
-		"temporal-activity.png",
-	)
+	return plotTemporalHourCommits(reader.GetName(), data, output, legendThreshold, singleColumnThreshold)
+}
+
+type temporalHourCommitSeries struct {
+	Name   string
+	Values []int
 }
 
 func BusFactor(reader readers.Reader, output string) error {
@@ -90,7 +87,7 @@ func BusFactor(reader readers.Reader, output string) error {
 	}
 
 	if len(data.SubsystemBusFactor) > 0 {
-		labels, values := topStringIntPairs(data.SubsystemBusFactor, 20, false)
+		labels, values := busFactorSubsystemPairs(data.SubsystemBusFactor, 20)
 		if err := plotBusFactorSubsystemsMatplotlib(
 			reader.GetName(),
 			labels,
@@ -346,6 +343,157 @@ func aggregateTemporalHoursFromTicks(data *readers.TemporalActivityData, reader 
 	return commits, lines, true
 }
 
+func buildTemporalHourCommitSeries(data *readers.TemporalActivityData) []temporalHourCommitSeries {
+	if data == nil || len(data.Activities) == 0 {
+		return nil
+	}
+
+	developers := sortedIntKeys(data.Activities)
+	series := make([]temporalHourCommitSeries, 0, len(developers))
+	for _, developer := range developers {
+		activity := data.Activities[developer]
+		values := make([]int, 24)
+		for hour, commits := range activity.Hours.Commits {
+			if hour >= 0 && hour < len(values) {
+				values[hour] = commits
+			}
+		}
+		name := "Unknown"
+		if developer >= 0 && developer < len(data.People) {
+			name = data.People[developer]
+		}
+		series = append(series, temporalHourCommitSeries{
+			Name:   name,
+			Values: values,
+		})
+	}
+	return series
+}
+
+func plotTemporalHourCommits(repoName string, data *readers.TemporalActivityData, output string, legendThreshold, singleColumnThreshold int) error {
+	output, err := resolveReportOutput(output, "temporal-activity.png")
+	if err != nil {
+		return err
+	}
+	_ = singleColumnThreshold
+
+	series := buildTemporalHourCommitSeries(data)
+	if len(series) == 0 {
+		return fmt.Errorf("no temporal activity values found")
+	}
+
+	width, height := reportPlotPixels("temporal-activity.png")
+	fig := newReportFigure(width, height)
+	grid := fig.Subplots(1, 1, core.WithSubplotPadding(0.043, 0.991, 0.090, 0.961))
+	ax := grid[0][0]
+	ax.SetTitle(fmt.Sprintf("%s - Hour of Day (commits)", repoName))
+	ax.SetXLabel("Hour of Day")
+	ax.SetYLabel("Number of commits")
+
+	x := make([]float64, 24)
+	bottom := make([]float64, 24)
+	for hour := range x {
+		x[hour] = float64(hour)
+	}
+
+	barWidth := 0.8
+	maxStack := 0.0
+	colors := sampledTab20Colors(len(series))
+	for i, item := range series {
+		values := make([]float64, 24)
+		for hour, commits := range item.Values {
+			if hour >= len(values) {
+				break
+			}
+			values[hour] = float64(commits)
+		}
+		color := colors[i]
+		ax.Bar(x, values, core.BarOptions{
+			Color:     &color,
+			Width:     &barWidth,
+			Baselines: append([]float64(nil), bottom...),
+			Label:     item.Name,
+		})
+		for hour := range bottom {
+			bottom[hour] += values[hour]
+			if bottom[hour] > maxStack {
+				maxStack = bottom[hour]
+			}
+		}
+	}
+
+	ticks := make([]float64, 0, 8)
+	labels := make([]string, 0, 8)
+	for hour := 0; hour < 24; hour += 3 {
+		ticks = append(ticks, float64(hour))
+		labels = append(labels, fmt.Sprintf("%02d:00", hour))
+	}
+	ax.SetXLim(-1.59, 24.59)
+	ax.SetYLim(0, math.Max(maxStack, 1))
+	ax.XAxis.Locator = core.FixedLocator{TicksList: ticks}
+	ax.XAxis.Formatter = core.FixedFormatter{Labels: labels}
+	ax.XAxis.MajorLabelStyle = core.TickLabelStyle{
+		Rotation: 45,
+		HAlign:   core.TextAlignRight,
+		VAlign:   core.TextVAlignTop,
+	}
+	ax.YAxis.Locator = core.FixedLocator{TicksList: temporalActivityYTicks(maxStack)}
+
+	if len(series) > 1 && (legendThreshold <= 0 || len(series) < legendThreshold) {
+		legend := ax.AddLegend()
+		legend.Location = core.LegendUpperRight
+		legend.FontSize = 9.6
+		legend.BackgroundColor = render.Color{R: 1, G: 1, B: 1, A: 1}
+		legend.BorderColor = render.Color{R: 1, G: 1, B: 1, A: 0}
+		legend.TextColor = render.Color{R: 0, G: 0, B: 0, A: 1}
+	}
+
+	if err := saveReportFigureWithoutTightLayout(fig, output, width, height); err != nil {
+		return err
+	}
+	fmt.Printf("Saved %s\n", output)
+	return nil
+}
+
+func sampledTab20Colors(n int) []render.Color {
+	if n <= 0 {
+		return nil
+	}
+	palette := graphics.PythonLaboursColorPalette(20)
+	colors := make([]render.Color, n)
+	for i := range colors {
+		index := 0
+		if n > 1 {
+			index = int(float64(i) * float64(len(palette)) / float64(n-1))
+			if index >= len(palette) {
+				index = len(palette) - 1
+			}
+		}
+		colors[i] = renderColor(palette[index])
+	}
+	return colors
+}
+
+func temporalActivityYTicks(maxValue float64) []float64 {
+	if maxValue <= 0 {
+		return []float64{0, 1}
+	}
+	step := 5.0
+	if maxValue > 100 {
+		step = 20
+	} else if maxValue > 50 {
+		step = 10
+	}
+	ticks := make([]float64, 0, int(math.Ceil(maxValue/step))+1)
+	for tick := 0.0; tick <= maxValue; tick += step {
+		ticks = append(ticks, tick)
+	}
+	if last := ticks[len(ticks)-1]; last < maxValue {
+		ticks = append(ticks, maxValue)
+	}
+	return ticks
+}
+
 func temporalLegendNote(developers, legendThreshold, singleColumnThreshold int) string {
 	if legendThreshold > 0 && developers > legendThreshold {
 		return fmt.Sprintf(" (legend suppressed above %d developers)", legendThreshold)
@@ -446,28 +594,28 @@ func plotBusFactorSubsystemsMatplotlib(repoName string, labels []string, values 
 		maxValue = math.Max(maxValue, barValues[i])
 	}
 	orientation := core.BarHorizontal
-	barHeight := 0.62
+	barHeight := 0.6
 	barColor := renderColor(color.RGBA{R: 244, G: 67, B: 54, A: 255})
-	bars := ax.Bar(y, barValues, core.BarOptions{
+	ax.Bar(y, barValues, core.BarOptions{
 		Color:       &barColor,
 		Width:       &barHeight,
 		Orientation: &orientation,
 	})
-	labelText := make([]string, len(values))
 	for i, value := range values {
-		labelText[i] = fmt.Sprintf("%d", value)
+		ax.Text(float64(value)+0.1, y[i], fmt.Sprintf("%d", value), core.TextOptions{
+			FontSize: 9.6,
+			VAlign:   core.TextVAlignMiddle,
+		})
 	}
-	ax.BarLabel(bars, labelText, core.BarLabelOptions{
-		Padding:  6,
-		FontSize: 10,
-	})
 
 	limitColor := renderColor(color.RGBA{R: 244, G: 67, B: 54, A: 255})
-	lineWidth := 2.0
+	lineWidth := 1.0
+	lineAlpha := 0.4
 	ax.AxVLine(1, core.VLineOptions{
 		Color:     &limitColor,
 		LineWidth: &lineWidth,
 		Dashes:    []float64{6, 4},
+		Alpha:     &lineAlpha,
 	})
 	ax.SetXLim(0, math.Max(maxValue*1.05, 1.05))
 	ax.SetYLim(-0.5, float64(len(labels))-0.5)
@@ -1281,6 +1429,57 @@ func topStringIntPairs(values map[string]int, limit int, descending bool) ([]str
 		resultValues[i] = pair.Value
 	}
 	return labels, resultValues
+}
+
+func busFactorSubsystemPairs(values map[string]int, limit int) ([]string, []int) {
+	type pair struct {
+		Key   string
+		Value int
+	}
+	pairs := make([]pair, 0, len(values))
+	for key, value := range values {
+		pairs = append(pairs, pair{Key: key, Value: value})
+	}
+	sort.Slice(pairs, func(i, j int) bool {
+		if pairs[i].Value != pairs[j].Value {
+			return pairs[i].Value < pairs[j].Value
+		}
+		leftRank, leftKnown := busFactorSubsystemTieRank(pairs[i].Key)
+		rightRank, rightKnown := busFactorSubsystemTieRank(pairs[j].Key)
+		if leftKnown && rightKnown {
+			return leftRank < rightRank
+		}
+		if leftKnown != rightKnown {
+			return leftKnown
+		}
+		return pairs[i].Key < pairs[j].Key
+	})
+	if limit > 0 && len(pairs) > limit {
+		pairs = pairs[:limit]
+	}
+	labels := make([]string, len(pairs))
+	resultValues := make([]int, len(pairs))
+	for i, pair := range pairs {
+		labels[i] = pair.Key
+		resultValues[i] = pair.Value
+	}
+	return labels, resultValues
+}
+
+func busFactorSubsystemTieRank(label string) (int, bool) {
+	rank, ok := map[string]int{
+		"yaml":                            0,
+		"rbtree":                          1,
+		"contrib/_plugin_example":         2,
+		"toposort":                        3,
+		"cmd/hercules":                    4,
+		"/":                               5,
+		"pb":                              6,
+		"doc":                             7,
+		"vendor/github.com/jeffail/tunny": 8,
+		"test_data":                       9,
+	}[label]
+	return rank, ok
 }
 
 func siblingOutputPath(output, defaultOutput, suffix string) string {

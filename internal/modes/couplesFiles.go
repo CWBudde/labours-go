@@ -374,7 +374,7 @@ func couplingBarWidth(maxPairs int) vg.Length {
 	if maxPairs <= 0 {
 		return vg.Points(40)
 	}
-	return vg.Points(880 / float64(maxPairs))
+	return couplingFilePairBarWidth(maxPairs)
 }
 
 func couplingFilePairBarWidth(maxPairs int) vg.Length {
@@ -392,6 +392,17 @@ func couplingPairXRange(maxPairs int) (float64, float64) {
 	// autoscale padding. Gonum leaves a slightly wider plot canvas, so this
 	// domain matches the same visible rank spacing in the rendered image.
 	return -1.2, float64(maxPairs) + 0.3
+}
+
+func shotnessCouplingPairXRange(maxPairs int) (float64, float64) {
+	if maxPairs <= 0 {
+		return -0.5, 0.5
+	}
+	const barWidth = 0.8
+	dataMin := -barWidth / 2
+	dataMax := float64(maxPairs-1) + barWidth/2
+	margin := (dataMax - dataMin) * 0.05
+	return dataMin - margin, dataMax + margin
 }
 
 func couplingScoreTicks(maxValue, step float64, decimals int) []plot.Tick {

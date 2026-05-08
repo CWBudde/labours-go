@@ -184,6 +184,44 @@ func TestTopStringIntPairsPreservesPathLabels(t *testing.T) {
 	}
 }
 
+func TestBuildTemporalHourCommitSeriesPreservesDeveloperStacks(t *testing.T) {
+	data := &readers.TemporalActivityData{
+		People: []string{"alice", "bob"},
+		Activities: map[int]readers.TemporalDeveloperActivity{
+			1: {
+				Hours: readers.TemporalDimensionData{
+					Commits: []int{3, 0, 5},
+				},
+			},
+			0: {
+				Hours: readers.TemporalDimensionData{
+					Commits: []int{2, 4},
+				},
+			},
+		},
+	}
+
+	series := buildTemporalHourCommitSeries(data)
+	if len(series) != 2 {
+		t.Fatalf("series length = %d, want 2", len(series))
+	}
+	if series[0].Name != "alice" || series[1].Name != "bob" {
+		t.Fatalf("series names = %q, %q; want alice, bob", series[0].Name, series[1].Name)
+	}
+	if got, want := series[0].Values[0], 2; got != want {
+		t.Fatalf("alice hour 0 = %d, want %d", got, want)
+	}
+	if got, want := series[0].Values[1], 4; got != want {
+		t.Fatalf("alice hour 1 = %d, want %d", got, want)
+	}
+	if got, want := series[1].Values[0], 3; got != want {
+		t.Fatalf("bob hour 0 = %d, want %d", got, want)
+	}
+	if got, want := series[1].Values[2], 5; got != want {
+		t.Fatalf("bob hour 2 = %d, want %d", got, want)
+	}
+}
+
 func assertNonEmptyFile(t *testing.T, path string) {
 	t.Helper()
 

@@ -15,23 +15,35 @@ import (
 	"labours-go/internal/burndown"
 )
 
-func TestPythonLaboursColorPaletteMatchesGGPlotCycle(t *testing.T) {
-	// Python labours runs `pyplot.style.use("ggplot")` before plotting, so the
-	// palette we produce must match `axes.prop_cycle` from
-	// `matplotlib/mpl-data/stylelib/ggplot.mplstyle`.
-	colors := PythonLaboursColorPalette(7)
-	if len(colors) != 7 {
-		t.Fatalf("palette length = %d, want 7", len(colors))
+func TestPythonLaboursColorPaletteMatchesTab20Cycle(t *testing.T) {
+	// Python labours applies the requested matplotlib style and then overrides
+	// axes.prop_cycle with pyplot.cm.tab20.colors in plotting.import_pyplot().
+	colors := PythonLaboursColorPalette(20)
+	if len(colors) != 20 {
+		t.Fatalf("palette length = %d, want 20", len(colors))
 	}
 
 	want := []color.Color{
-		color.RGBA{R: 0xE2, G: 0x4A, B: 0x33, A: 255},
-		color.RGBA{R: 0x34, G: 0x8A, B: 0xBD, A: 255},
-		color.RGBA{R: 0x98, G: 0x8E, B: 0xD5, A: 255},
-		color.RGBA{R: 0x77, G: 0x77, B: 0x77, A: 255},
-		color.RGBA{R: 0xFB, G: 0xC1, B: 0x5E, A: 255},
-		color.RGBA{R: 0x8E, G: 0xBA, B: 0x42, A: 255},
-		color.RGBA{R: 0xFF, G: 0xB5, B: 0xB8, A: 255},
+		color.RGBA{R: 0x1F, G: 0x77, B: 0xB4, A: 255},
+		color.RGBA{R: 0xAE, G: 0xC7, B: 0xE8, A: 255},
+		color.RGBA{R: 0xFF, G: 0x7F, B: 0x0E, A: 255},
+		color.RGBA{R: 0xFF, G: 0xBB, B: 0x78, A: 255},
+		color.RGBA{R: 0x2C, G: 0xA0, B: 0x2C, A: 255},
+		color.RGBA{R: 0x98, G: 0xDF, B: 0x8A, A: 255},
+		color.RGBA{R: 0xD6, G: 0x27, B: 0x28, A: 255},
+		color.RGBA{R: 0xFF, G: 0x98, B: 0x96, A: 255},
+		color.RGBA{R: 0x94, G: 0x67, B: 0xBD, A: 255},
+		color.RGBA{R: 0xC5, G: 0xB0, B: 0xD5, A: 255},
+		color.RGBA{R: 0x8C, G: 0x56, B: 0x4B, A: 255},
+		color.RGBA{R: 0xC4, G: 0x9C, B: 0x94, A: 255},
+		color.RGBA{R: 0xE3, G: 0x77, B: 0xC2, A: 255},
+		color.RGBA{R: 0xF7, G: 0xB6, B: 0xD2, A: 255},
+		color.RGBA{R: 0x7F, G: 0x7F, B: 0x7F, A: 255},
+		color.RGBA{R: 0xC7, G: 0xC7, B: 0xC7, A: 255},
+		color.RGBA{R: 0xBC, G: 0xBD, B: 0x22, A: 255},
+		color.RGBA{R: 0xDB, G: 0xDB, B: 0x8D, A: 255},
+		color.RGBA{R: 0x17, G: 0xBE, B: 0xCF, A: 255},
+		color.RGBA{R: 0x9E, G: 0xDA, B: 0xE5, A: 255},
 	}
 	for i := range want {
 		if colors[i] != want[i] {
@@ -40,9 +52,9 @@ func TestPythonLaboursColorPaletteMatchesGGPlotCycle(t *testing.T) {
 	}
 
 	// More requested series than palette entries cycles, matching matplotlib.
-	wrapped := PythonLaboursColorPalette(8)
-	if wrapped[7] != want[0] {
-		t.Fatalf("wrap color = %#v, want %#v", wrapped[7], want[0])
+	wrapped := PythonLaboursColorPalette(21)
+	if wrapped[20] != want[0] {
+		t.Fatalf("wrap color = %#v, want %#v", wrapped[20], want[0])
 	}
 }
 

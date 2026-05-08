@@ -162,8 +162,7 @@ func plotTopShotnessCouplingPairs(analysis ShotnessCouplingAnalysis, output stri
 		}
 	}
 	p.X.Tick.Marker = plot.ConstantTicks(ticks)
-	p.X.Min = -0.5
-	p.X.Max = float64(maxPairs) - 0.5
+	p.X.Min, p.X.Max = shotnessCouplingPairXRange(maxPairs)
 	p.Y.Min = 0
 	p.Y.Max = maxCouplingValue(values) * 1.05
 	p.Y.Tick.Marker = plot.ConstantTicks(couplingScoreTicks(p.Y.Max, 2, 0))
