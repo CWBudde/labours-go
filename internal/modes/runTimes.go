@@ -5,11 +5,13 @@ import (
 	"image/color"
 	"path/filepath"
 	"sort"
+	"strings"
 
+	"github.com/cwbudde/matplotlib-go/backends"
+	"github.com/cwbudde/matplotlib-go/core"
+	"github.com/cwbudde/matplotlib-go/render"
+	"github.com/cwbudde/matplotlib-go/style"
 	"github.com/spf13/viper"
-	"gonum.org/v1/plot"
-	"gonum.org/v1/plot/plotter"
-	"gonum.org/v1/plot/vg"
 	"labours-go/internal/graphics"
 	"labours-go/internal/progress"
 	"labours-go/internal/readers"
@@ -239,52 +241,27 @@ func plotRuntimePieChart(analysis RuntimeAnalysis, output string) error {
 		return fmt.Errorf("no runtime metrics available")
 	}
 
-	// Use a simple stacked bar chart as pie charts are complex in gonum/plot
-	p := plot.New()
-	p.Title.Text = "Runtime Percentage Distribution"
-	p.X.Label.Text = "Cumulative Percentage"
-	p.Y.Label.Text = "Operations"
-
 	// Prepare data for stacked representation (top 10 operations)
 	maxOps := len(analysis.Metrics)
 	if maxOps > 10 {
 		maxOps = 10
 	}
 
-	// Create horizontal bars showing percentages
-	values := make(plotter.Values, maxOps)
+	labels := make([]string, maxOps)
+	values := make([]float64, maxOps)
 	for i := 0; i < maxOps; i++ {
+		labels[i] = fmt.Sprintf("%s (%.1f%%)", compactRuntimeLabel(analysis.Metrics[i].Operation, 18), analysis.Metrics[i].Percentage)
 		values[i] = analysis.Metrics[i].Percentage
 	}
 
-	// Create horizontal bar chart
-	bars, err := plotter.NewBarChart(values, vg.Points(25))
-	if err != nil {
-		return fmt.Errorf("error creating percentage chart: %v", err)
+	pngFile := filepath.Join(output, "runtime_percentage.png")
+	if err := plotRuntimePercentageMatplotlib(labels, values, pngFile); err != nil {
+		return fmt.Errorf("failed to save runtime percentage PNG plot: %v", err)
 	}
 
-	bars.Color = graphics.ColorPalette[6]
-	bars.Horizontal = true
-	p.Add(bars)
-
-	// Create tick marks with operation names and percentages
-	ticks := make([]plot.Tick, maxOps)
-	for i := 0; i < maxOps; i++ {
-		opName := analysis.Metrics[i].Operation
-		if len(opName) > 15 {
-			opName = opName[:15] + "..."
-		}
-		percentage := analysis.Metrics[i].Percentage
-		ticks[i] = plot.Tick{
-			Value: float64(i),
-			Label: fmt.Sprintf("%s (%.1f%%)", opName, percentage),
-		}
-	}
-	p.Y.Tick.Marker = plot.ConstantTicks(ticks)
-
-	pngFile, svgFile, err := savePlotPNGAndSVG(p, 16*vg.Inch, 10*vg.Inch, output, "runtime_percentage")
-	if err != nil {
-		return fmt.Errorf("failed to save runtime percentage plot: %v", err)
+	svgFile := filepath.Join(output, "runtime_percentage.svg")
+	if err := plotRuntimePercentageMatplotlib(labels, values, svgFile); err != nil {
+		return fmt.Errorf("failed to save runtime percentage SVG plot: %v", err)
 	}
 
 	fmt.Printf("Saved runtime percentage plots to %s and %s\n", pngFile, svgFile)
@@ -298,4 +275,77 @@ func plotRuntimePieChart(analysis RuntimeAnalysis, output string) error {
 	fmt.Printf("  Fastest operation: %s (%.2f ms)\n", analysis.Statistics.FastestOp, analysis.Statistics.MinTime)
 
 	return nil
+}
+
+func plotRuntimePercentageMatplotlib(labels []string, values []float64, output string) error {
+	width, height := 1536, 960
+	fig := core.NewFigure(
+		width,
+		height,
+		style.WithTheme(style.ThemeDefault),
+		style.WithFont("DejaVu Sans", 12),
+		style.WithTextColor(0, 0, 0, 1),
+		style.WithBackground(1, 1, 1, 1),
+		style.WithAxesBackground(render.Color{R: 1, G: 1, B: 1, A: 1}),
+		style.WithAxesEdgeColor(render.Color{R: 0, G: 0, B: 0, A: 1}),
+	)
+	grid := fig.Subplots(1, 1, core.WithSubplotPadding(0.149, 0.991, 0.058, 0.964))
+	if len(grid) == 0 || len(grid[0]) == 0 || grid[0][0] == nil {
+		return fmt.Errorf("failed to create runtime percentage axes")
+	}
+	ax := grid[0][0]
+	ax.SetTitle("Runtime Percentage Distribution")
+	ax.SetXLabel("Cumulative Percentage")
+	ax.SetYLabel("Operations")
+
+	y := make([]float64, len(values))
+	ticks := make([]float64, len(values))
+	maxValue := 0.0
+	for i, value := range values {
+		y[i] = float64(i)
+		ticks[i] = float64(i)
+		if value > maxValue {
+			maxValue = value
+		}
+	}
+
+	orientation := core.BarHorizontal
+	barHeight := 0.8
+	barColor := renderColor(color.RGBA{R: 228, G: 87, B: 86, A: 255})
+	ax.Bar(y, values, core.BarOptions{
+		Color:       &barColor,
+		Width:       &barHeight,
+		Orientation: &orientation,
+	})
+	ax.SetXLim(0, maxValue*1.05)
+	ax.SetYLim(-0.89, float64(len(values))-0.11)
+	ax.XAxis.Locator = core.FixedLocator{TicksList: []float64{0, 20, 40, 60, 80}}
+	ax.YAxis.Locator = core.FixedLocator{TicksList: ticks}
+	ax.YAxis.Formatter = core.FixedFormatter{Labels: append([]string(nil), labels...)}
+
+	return saveRuntimeFigure(fig, output, width, height)
+}
+
+func saveRuntimeFigure(fig *core.Figure, output string, width, height int) error {
+	config := backends.Config{
+		Width:       width,
+		Height:      height,
+		Background:  render.Color{R: 1, G: 1, B: 1, A: 1},
+		DPI:         96,
+		Transparent: false,
+	}
+	switch strings.ToLower(filepath.Ext(output)) {
+	case ".svg":
+		renderer, _, err := backends.NewRenderer("svg", config, nil)
+		if err != nil {
+			return fmt.Errorf("failed to create SVG renderer: %v", err)
+		}
+		return core.SaveSVG(fig, renderer, output)
+	default:
+		renderer, _, err := backends.NewRenderer("agg", config, backends.TextCapabilities)
+		if err != nil {
+			return fmt.Errorf("failed to create AGG renderer: %v", err)
+		}
+		return core.SavePNG(fig, renderer, output)
+	}
 }

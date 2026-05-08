@@ -570,7 +570,7 @@ func plotBusFactorSubsystemsMatplotlib(repoName string, labels []string, values 
 	}
 	width, height := reportPlotPixels("bus-factor-subsystems.png")
 	fig := newReportFigure(width, height)
-	grid := fig.Subplots(1, 1, core.WithSubplotPadding(0.24, 0.945, 0.105, 0.93))
+	grid := fig.Subplots(1, 1, core.WithSubplotPadding(0.24, 0.945, 0.100, 0.936))
 	if len(grid) == 0 || len(grid[0]) == 0 || grid[0][0] == nil {
 		return fmt.Errorf("failed to create bus factor subsystem axes")
 	}
@@ -610,15 +610,13 @@ func plotBusFactorSubsystemsMatplotlib(repoName string, labels []string, values 
 
 	limitColor := renderColor(color.RGBA{R: 244, G: 67, B: 54, A: 255})
 	lineWidth := 1.0
-	lineAlpha := 0.4
 	ax.AxVLine(1, core.VLineOptions{
 		Color:     &limitColor,
 		LineWidth: &lineWidth,
 		Dashes:    []float64{6, 4},
-		Alpha:     &lineAlpha,
 	})
 	ax.SetXLim(0, math.Max(maxValue*1.05, 1.05))
-	ax.SetYLim(-0.5, float64(len(labels))-0.5)
+	ax.SetYLim(-0.78, float64(len(labels))-0.22)
 	ax.InvertY()
 	ax.YAxis.Locator = core.FixedLocator{TicksList: ticks}
 	ax.YAxis.Formatter = core.FixedFormatter{Labels: append([]string(nil), labels...)}

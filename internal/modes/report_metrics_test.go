@@ -222,6 +222,45 @@ func TestBuildTemporalHourCommitSeriesPreservesDeveloperStacks(t *testing.T) {
 	}
 }
 
+func TestBusFactorSubsystemPairsMatchesPythonParityTieOrder(t *testing.T) {
+	labels, values := busFactorSubsystemPairs(map[string]int{
+		"/":                               1,
+		"cmd/hercules":                    1,
+		"contrib/_plugin_example":         1,
+		"doc":                             1,
+		"pb":                              1,
+		"rbtree":                          1,
+		"test_data":                       1,
+		"toposort":                        1,
+		"vendor/github.com/jeffail/tunny": 1,
+		"yaml":                            1,
+	}, 20)
+
+	expectedLabels := []string{
+		"yaml",
+		"rbtree",
+		"contrib/_plugin_example",
+		"toposort",
+		"cmd/hercules",
+		"/",
+		"pb",
+		"doc",
+		"vendor/github.com/jeffail/tunny",
+		"test_data",
+	}
+	if len(labels) != len(expectedLabels) {
+		t.Fatalf("labels length = %d, want %d", len(labels), len(expectedLabels))
+	}
+	for i, expected := range expectedLabels {
+		if labels[i] != expected {
+			t.Fatalf("label %d = %q, want %q", i, labels[i], expected)
+		}
+		if values[i] != 1 {
+			t.Fatalf("value %d = %d, want 1", i, values[i])
+		}
+	}
+}
+
 func assertNonEmptyFile(t *testing.T, path string) {
 	t.Helper()
 
