@@ -14,10 +14,18 @@ default:
 
 # === ESSENTIAL COMMANDS ===
 
-# Build the project
+# Build the project (produces ./labours and a labours-go symlink for dev use)
 build:
     @echo "Building ./{{binary}}"
     go build -o {{binary}}
+    @ln -sf {{binary}} labours-go
+
+# Install the binary onto PATH (defaults to ~/.local/bin; override with PREFIX=...)
+install PREFIX="$HOME/.local/bin":
+    @echo "Installing {{binary}} to {{PREFIX}}"
+    @mkdir -p "{{PREFIX}}"
+    go build -o "{{PREFIX}}/{{binary}}"
+    @ln -sf {{binary}} "{{PREFIX}}/labours-go"
 
 # Build release binaries for supported platforms
 build-all:

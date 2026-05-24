@@ -35,16 +35,18 @@ Build the drop-in binary:
 just build
 ```
 
-This creates `./labours`. A development alias can also be built manually when useful:
+This creates `./labours` and a `labours-go` symlink next to it for development. To install onto `PATH`:
 
 ```bash
-go build -o labours-go
+just install                       # ~/.local/bin/labours (+ labours-go alias)
+just install PREFIX=/usr/local/bin # custom prefix
 ```
 
 Verify the CLI:
 
 ```bash
 ./labours --help
+./labours version
 ```
 
 ## Usage Examples
@@ -126,6 +128,35 @@ The CLI normalizes `-o/--output` before dispatching each mode. Single-file modes
 | `hotspot-risk`            | Primary file with companion  | Requested output path plus `<base>_table.tsv`                                                              |
 | `sentiment`               | Asset directory              | `sentiment-overview.{png,svg}` and optional type-specific charts                                           |
 | `refactoring-proxy`       | Single file                  | Requested output path                                                                                      |
+
+## Compatibility Notes
+
+### `--disable-projector`
+
+Python `labours` trains TensorFlow Projector embeddings for the `couples-*` and
+`overwrites-matrix` modes unless `--disable-projector` is passed. The Go port
+never trains TensorFlow embeddings, so `--disable-projector` is effectively
+always true — the flag is accepted for CLI compatibility but does nothing. The
+`couples-files` / `couples-people` modes still write the `*_vocabulary.tsv`,
+`*_vectors.tsv`, and `*_metadata.tsv` assets so that downstream tools (Hercules
+report asset collection) keep finding the expected filenames.
+
+### `--people-dict`
+
+Use `-p`/`--people-dict <file>` to merge alias signatures into canonical
+identities (analogous to a `.mailmap`). The file is the same shape Hercules
+expects: one canonical author per line, optionally followed by `|`-separated
+aliases.
+
+```text
+# analysis_results/system-optimiser-core/raw/people-dict.txt
+Christian Budde
+Christian Budde|cwbudde@example.org|cbudde@meko.de
+Jane Doe|jane@example.org|j.doe@example.org
+```
+
+Pass it through to both backends when generating side-by-side comparisons
+(`scripts/full_showcase.sh PEOPLE_DICT=…`) so that the identity sets match.
 
 ## Development Workflow
 

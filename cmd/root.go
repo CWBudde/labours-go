@@ -100,6 +100,12 @@ func initConfig() {
 }
 
 func runLaboursCommand(cmd *cobra.Command, args []string) {
+	// --version short-circuits everything else, matching common CLI conventions.
+	if viper.GetBool("version") {
+		versionCmd.Run(cmd, args)
+		return
+	}
+
 	// Handle theme-specific commands first
 	if viper.GetBool("list-themes") {
 		listThemes()

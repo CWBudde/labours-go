@@ -396,9 +396,9 @@ Tasks:
 - [x] Enforce output convention for each mode in tests.
 - [x] Support PNG consistently across modes.
 - [x] Support SVG consistently across modes.
-- [ ] Decide whether TensorFlow projector behavior is implemented or intentionally disabled.
+- [x] Decide whether TensorFlow projector behavior is implemented or intentionally disabled. Decision: intentionally disabled — Go port never trains TF embeddings; `couples-*` modes still emit the same `*_vocabulary.tsv` / `*_vectors.tsv` / `*_metadata.tsv` asset filenames so Hercules report asset collection still finds them.
 - [ ] If projector behavior is implemented, write projector metadata/vector files compatible with Python labours.
-- [ ] If projector behavior is not implemented, document that `--disable-projector` is effectively always true and adjust Hercules report expectations if necessary.
+- [x] If projector behavior is not implemented, document that `--disable-projector` is effectively always true and adjust Hercules report expectations if necessary. Documented in README "Compatibility Notes".
 - [ ] Ensure JSON output is real mode data, not placeholder extraction.
 - [ ] Make stdout/stderr messages useful but quiet under `--quiet`.
 - [ ] Remove progress bars from non-interactive/quiet report runs.
@@ -439,10 +439,10 @@ Goal: users can install and Hercules can discover the Go replacement naturally.
 Tasks:
 
 - [x] Build binary as `labours` by default.
-- [ ] Optionally keep `labours-go` as an alias for development.
-- [ ] Add install target.
+- [x] Optionally keep `labours-go` as an alias for development.
+- [x] Add install target.
 - [ ] Add release workflow.
-- [ ] Add version output that includes schema compatibility with Hercules.
+- [x] Add version output that includes schema compatibility with Hercules.
 - [x] Document how to point Hercules report at this binary:
 
 ```bash

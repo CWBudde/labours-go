@@ -236,7 +236,8 @@ func GenerateBurndownReposCombinedPython(reader readers.Reader, output string, r
 
 	repoReader, ok := reader.(readers.RepositoryBurndownReader)
 	if !ok {
-		return fmt.Errorf("reader does not expose repository burndown data")
+		// Match Python labours: ValueError("No repository data available").
+		return fmt.Errorf("No repository data available")
 	}
 
 	repositories, err := repoReader.GetRepositoriesBurndown()
@@ -244,7 +245,7 @@ func GenerateBurndownReposCombinedPython(reader readers.Reader, output string, r
 		return fmt.Errorf("failed to get repositories burndown data: %v", err)
 	}
 	if len(repositories) == 0 {
-		return fmt.Errorf("no repository burndown data found")
+		return fmt.Errorf("No repository data available")
 	}
 
 	header, _, _, err := reader.GetProjectBurndownWithHeader()
