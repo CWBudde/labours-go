@@ -13,9 +13,6 @@ import (
 	"github.com/cwbudde/matplotlib-go/core"
 	"github.com/cwbudde/matplotlib-go/render"
 	"github.com/cwbudde/matplotlib-go/style"
-	"gonum.org/v1/plot"
-	"gonum.org/v1/plot/vg"
-	"gonum.org/v1/plot/vg/draw"
 	"labours-go/internal/graphics"
 	"labours-go/internal/readers"
 )
@@ -264,43 +261,6 @@ func matrixRange(matrix [][]float64) (minValue, maxValue float64) {
 		return minValue - 0.5, maxValue + 0.5
 	}
 	return minValue, maxValue
-}
-
-type topTickLabels struct {
-	Labels []string
-	Style  draw.TextStyle
-	Pad    vg.Length
-}
-
-func newTopTickLabels(labels []string, style draw.TextStyle) *topTickLabels {
-	style.Rotation = math.Pi / 4
-	style.XAlign = draw.XLeft
-	style.YAlign = draw.YBottom
-	return &topTickLabels{
-		Labels: labels,
-		Style:  style,
-		Pad:    vg.Points(2),
-	}
-}
-
-func (t *topTickLabels) Plot(c draw.Canvas, p *plot.Plot) {
-	trX, _ := p.Transforms(&c)
-	y := c.Max.Y + t.Pad
-	for i, label := range t.Labels {
-		c.FillText(t.Style, vg.Point{X: trX(float64(i)), Y: y}, label)
-	}
-}
-
-func (t *topTickLabels) GlyphBoxes(p *plot.Plot) []plot.GlyphBox {
-	boxes := make([]plot.GlyphBox, 0, len(t.Labels))
-	for i, label := range t.Labels {
-		boxes = append(boxes, plot.GlyphBox{
-			X:         p.X.Norm(float64(i)),
-			Y:         1,
-			Rectangle: t.Style.Rectangle(label).Add(vg.Point{Y: t.Pad}),
-		})
-	}
-	return boxes
 }
 
 func saveMatrixAsJSON(output string, people []string, matrix [][]float64) error {

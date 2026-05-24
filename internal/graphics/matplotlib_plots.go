@@ -67,11 +67,16 @@ type MatplotlibBarOptions struct {
 	XMin         float64
 	XMax         float64
 	YMax         float64
+	// BarLabels, when set (len == values), draws a rotated text annotation above
+	// each bar with a non-empty label. Mirrors gonum's per-bar XYLabels.
+	BarLabels     []string
+	BarLabelAngle float64
 }
 
 type MatplotlibGroupedBarSeries struct {
 	Name   string
 	Values []float64
+	Color  color.Color
 }
 
 type MatplotlibGroupedBarOptions struct {
@@ -90,6 +95,10 @@ type MatplotlibLineSeries struct {
 	Y      []float64
 	Color  color.Color
 	Marker bool
+	// Dashes sets a dash pattern (e.g. {5, 5}); nil draws a solid line.
+	Dashes []float64
+	// Fill shades the area between the series and y=0.
+	Fill bool
 }
 
 type MatplotlibLineOptions struct {
@@ -267,9 +276,21 @@ func PlotLineChartMatplotlib(series []MatplotlibLineSeries, opts MatplotlibLineO
 		}
 		color := renderColor(c)
 		lineWidth := 2.0
+		if item.Fill {
+			fillColor := color
+			fillAlpha := 0.3
+			fillEdge := 0.0
+			zero := make([]float64, len(item.Y))
+			ax.FillBetween(item.X, item.Y, zero, core.FillOptions{
+				Color:     &fillColor,
+				Alpha:     &fillAlpha,
+				EdgeWidth: &fillEdge,
+			})
+		}
 		ax.Plot(item.X, item.Y, core.PlotOptions{
 			Color:     &color,
 			LineWidth: &lineWidth,
+			Dashes:    item.Dashes,
 			Label:     item.Name,
 		})
 		if item.Marker {
@@ -408,6 +429,24 @@ func PlotBarChartMatplotlib(labels []string, values []float64, opts MatplotlibBa
 	}
 	renderedColor := renderColor(barColor)
 	ax.Bar(x, values, core.BarOptions{Color: &renderedColor})
+	if len(opts.BarLabels) > 0 {
+		angle := opts.BarLabelAngle
+		if angle == 0 {
+			angle = 70
+		}
+		for i, label := range opts.BarLabels {
+			if i >= len(values) || label == "" {
+				continue
+			}
+			ax.Text(x[i], values[i], label, core.TextOptions{
+				FontSize: 7,
+				Color:    render.Color{R: 0, G: 0, B: 0, A: 1},
+				HAlign:   core.TextAlignLeft,
+				VAlign:   core.TextVAlignBottom,
+				Angle:    angle,
+			})
+		}
+	}
 	if opts.ManualXLim {
 		ax.SetXLim(opts.XMin, opts.XMax)
 	} else {
@@ -469,7 +508,11 @@ func PlotGroupedBarChartMatplotlib(labels []string, series []MatplotlibGroupedBa
 				maxValue = value
 			}
 		}
-		color := renderColor(palette[i%len(palette)])
+		seriesColor := palette[i%len(palette)]
+		if item.Color != nil {
+			seriesColor = item.Color
+		}
+		color := renderColor(seriesColor)
 		ax.Bar(x, item.Values, core.BarOptions{
 			Color: &color,
 			Width: &barWidth,
@@ -486,6 +529,187 @@ func PlotGroupedBarChartMatplotlib(labels []string, series []MatplotlibGroupedBa
 	ax.XAxis.Formatter = core.FixedFormatter{Labels: append([]string(nil), labels...)}
 	if opts.RotateX {
 		ax.XAxis.MajorLabelStyle = core.TickLabelStyle{Rotation: 45, AutoAlign: true}
+	}
+	ax.AddLegend()
+
+	return saveMatplotlibFigure(fig, opts.Output, width, height)
+}
+
+type MatplotlibScatterPoint struct {
+	X     float64
+	Y     float64
+	Label string
+}
+
+type MatplotlibScatterSeries struct {
+	Name   string
+	Points []MatplotlibScatterPoint
+	Color  color.Color
+	Size   float64
+}
+
+type MatplotlibScatterOptions struct {
+	Title          string
+	XLabel         string
+	YLabel         string
+	Output         string
+	WidthInches    float64
+	HeightInches   float64
+	ShowGrid       bool
+	Legend         bool
+	ZeroLine       bool
+	AnnotateLabels bool
+	// XTickLabels, when set, replaces the numeric x-axis with categorical tick
+	// labels (one per index 0..len-1), mirroring gonum's NominalX.
+	XTickLabels []string
+	RotateX     bool
+}
+
+// PlotScatterMatplotlib renders one or more scatter series via matplotlib-go,
+// optionally annotating points with text labels and drawing a dashed y=0
+// reference line.
+func PlotScatterMatplotlib(series []MatplotlibScatterSeries, opts MatplotlibScatterOptions) error {
+	if len(series) == 0 {
+		return fmt.Errorf("no scatter data to plot")
+	}
+
+	width, height := pythonPlotPixelSize(defaultPlotWidth(opts.WidthInches), defaultPlotHeight(opts.HeightInches))
+	fig := core.NewFigure(width, height, pythonTransparentFigureOptions()...)
+	ax := fig.AddSubplot(1, 1, 1)
+	if ax == nil {
+		return fmt.Errorf("failed to create axes")
+	}
+	ax.SetTitle(opts.Title)
+	ax.SetXLabel(opts.XLabel)
+	ax.SetYLabel(opts.YLabel)
+	if opts.ShowGrid {
+		ax.AddXGrid()
+		ax.AddYGrid()
+	}
+
+	palette := PythonLaboursColorPalette(len(series))
+	for i, item := range series {
+		if len(item.Points) == 0 {
+			continue
+		}
+		x := make([]float64, len(item.Points))
+		y := make([]float64, len(item.Points))
+		for j, point := range item.Points {
+			x[j] = point.X
+			y[j] = point.Y
+		}
+		c := item.Color
+		if c == nil {
+			c = palette[i%len(palette)]
+		}
+		renderedColor := renderColor(c)
+		size := item.Size
+		if size <= 0 {
+			size = 24
+		}
+		ax.Scatter(x, y, core.ScatterOptions{Color: &renderedColor, Size: &size, Label: item.Name})
+		if opts.AnnotateLabels {
+			for j, point := range item.Points {
+				if point.Label == "" {
+					continue
+				}
+				ax.Text(x[j], y[j], point.Label, core.TextOptions{
+					FontSize: 9,
+					Color:    render.Color{R: 0, G: 0, B: 0, A: 1},
+					HAlign:   core.TextAlignLeft,
+					VAlign:   core.TextVAlignBottom,
+				})
+			}
+		}
+	}
+
+	if len(opts.XTickLabels) > 0 {
+		ticks := make([]float64, len(opts.XTickLabels))
+		for i := range opts.XTickLabels {
+			ticks[i] = float64(i)
+		}
+		ax.SetXLim(-0.5, float64(len(opts.XTickLabels))-0.5)
+		ax.XAxis.Locator = core.FixedLocator{TicksList: ticks}
+		ax.XAxis.Formatter = core.FixedFormatter{Labels: append([]string(nil), opts.XTickLabels...)}
+		if opts.RotateX {
+			ax.XAxis.MajorLabelStyle = core.TickLabelStyle{
+				Rotation: 45,
+				HAlign:   core.TextAlignRight,
+				VAlign:   core.TextVAlignTop,
+			}
+		}
+	}
+
+	if opts.ZeroLine {
+		ax.AxHLine(0, core.HLineOptions{Dashes: []float64{5, 5}})
+	}
+	if opts.Legend {
+		ax.AddLegend()
+	}
+
+	return saveMatplotlibFigure(fig, opts.Output, width, height)
+}
+
+// PlotStackedBarChartMatplotlib renders categorical stacked bars (one stack per
+// label) using per-bar baselines, mirroring gonum's BarChart.StackOn chains.
+func PlotStackedBarChartMatplotlib(labels []string, series []MatplotlibGroupedBarSeries, opts MatplotlibGroupedBarOptions) error {
+	if len(labels) == 0 || len(series) == 0 {
+		return fmt.Errorf("no stacked bar data to plot")
+	}
+
+	width, height := pythonPlotPixelSize(defaultPlotWidth(opts.WidthInches), defaultPlotHeight(opts.HeightInches))
+	fig := core.NewFigure(width, height, pythonTransparentFigureOptions()...)
+	ax := fig.AddSubplot(1, 1, 1)
+	if ax == nil {
+		return fmt.Errorf("failed to create axes")
+	}
+	ax.SetTitle(opts.Title)
+	ax.SetXLabel(opts.XLabel)
+	ax.SetYLabel(opts.YLabel)
+	ax.AddYGrid()
+
+	x := make([]float64, len(labels))
+	for i := range labels {
+		x[i] = float64(i)
+	}
+	baseline := make([]float64, len(labels))
+	palette := PythonLaboursColorPalette(len(series))
+	for i, item := range series {
+		if len(item.Values) != len(labels) {
+			return fmt.Errorf("stacked bar series %q has %d values for %d labels", item.Name, len(item.Values), len(labels))
+		}
+		seriesColor := palette[i%len(palette)]
+		if item.Color != nil {
+			seriesColor = item.Color
+		}
+		color := renderColor(seriesColor)
+		bottoms := append([]float64(nil), baseline...)
+		ax.Bar(x, item.Values, core.BarOptions{
+			Color:     &color,
+			Baselines: bottoms,
+			Label:     item.Name,
+		})
+		for j, value := range item.Values {
+			baseline[j] += value
+		}
+	}
+
+	maxTotal := 0.0
+	for _, total := range baseline {
+		if total > maxTotal {
+			maxTotal = total
+		}
+	}
+	ax.SetXLim(-0.5, float64(len(labels))-0.5)
+	ax.SetYLim(0, math.Max(maxTotal*1.05, 1))
+	ax.XAxis.Locator = core.FixedLocator{TicksList: append([]float64(nil), x...)}
+	ax.XAxis.Formatter = core.FixedFormatter{Labels: append([]string(nil), labels...)}
+	if opts.RotateX {
+		ax.XAxis.MajorLabelStyle = core.TickLabelStyle{
+			Rotation: 45,
+			HAlign:   core.TextAlignRight,
+			VAlign:   core.TextVAlignTop,
+		}
 	}
 	ax.AddLegend()
 

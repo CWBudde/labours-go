@@ -3,12 +3,9 @@ package modes
 import (
 	"image"
 	"image/png"
-	"math"
 	"os"
 	"path/filepath"
 	"testing"
-
-	"gonum.org/v1/plot"
 )
 
 func TestProcessOverwritesMatrixUsesPythonColumnSemantics(t *testing.T) {
@@ -88,22 +85,5 @@ func TestMatrixRangeUsesActualProcessedValues(t *testing.T) {
 
 	if minValue != -0.7 || maxValue != 0.5 {
 		t.Fatalf("matrixRange() = (%v, %v), want (-0.7, 0.5)", minValue, maxValue)
-	}
-}
-
-func TestTopTickLabelsReserveTopSpace(t *testing.T) {
-	labels := newTopTickLabels([]string{"Unidentified", "Alice"}, plot.New().X.Tick.Label)
-	boxes := labels.GlyphBoxes(plot.New())
-
-	if len(boxes) != 2 {
-		t.Fatalf("GlyphBoxes() returned %d boxes, want 2", len(boxes))
-	}
-	for i, box := range boxes {
-		if box.Y != 1 {
-			t.Fatalf("box %d Y = %v, want 1", i, box.Y)
-		}
-		if box.Rectangle.Size().Y <= 0 || math.IsNaN(float64(box.Rectangle.Size().Y)) {
-			t.Fatalf("box %d height = %v, want positive", i, box.Rectangle.Size().Y)
-		}
 	}
 }

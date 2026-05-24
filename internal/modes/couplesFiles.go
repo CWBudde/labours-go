@@ -3,17 +3,10 @@ package modes
 import (
 	"fmt"
 	"image/color"
-	"math"
 	"path/filepath"
 	"strconv"
 
 	"github.com/spf13/viper"
-	"gonum.org/v1/plot"
-	"gonum.org/v1/plot/font"
-	"gonum.org/v1/plot/plotter"
-	"gonum.org/v1/plot/text"
-	"gonum.org/v1/plot/vg"
-	"gonum.org/v1/plot/vg/draw"
 	"labours-go/internal/graphics"
 	"labours-go/internal/progress"
 	"labours-go/internal/readers"
@@ -218,60 +211,39 @@ func plotTopCouplingPairs(analysis FileCouplingAnalysis, output string) error {
 		return fmt.Errorf("no coupling pairs data available")
 	}
 
-	p := plot.New()
-	p.X.Label.Text = "Coupling Pair Rank"
-	p.X.Label.Padding = vg.Points(3)
-	p.Y.Label.Text = "Coupling Score"
-
 	// Prepare data for bar chart
 	maxPairs := len(analysis.TopCoupling)
 	if maxPairs > 15 {
 		maxPairs = 15 // Show top 15 pairs
 	}
 
-	values := make(plotter.Values, maxPairs)
-	for i := 0; i < maxPairs; i++ {
-		values[i] = analysis.TopCoupling[i].CouplingScore
-	}
-
-	// Create bar chart
-	bars, err := plotter.NewBarChart(values, couplingFilePairBarWidth(maxPairs))
-	if err != nil {
-		return fmt.Errorf("error creating bar chart: %v", err)
-	}
-
-	bars.Color = color.RGBA{R: 76, G: 120, B: 168, A: 255}
-	bars.LineStyle = draw.LineStyle{Color: color.RGBA{}, Width: 0}
-	p.Add(bars)
-
-	labels := make([]string, maxPairs)
+	values := make([]float64, maxPairs)
+	rankLabels := make([]string, maxPairs)
+	barLabels := make([]string, maxPairs)
 	for i := 0; i < maxPairs; i++ {
 		pair := analysis.TopCoupling[i]
-		labels[i] = compactCouplingPairLabel(filepath.Base(pair.File1)+"-"+filepath.Base(pair.File2), 28)
-	}
-	addTopCouplingPairLabels(p, labels, values, 10)
-
-	// Create custom tick marks
-	ticks := make([]plot.Tick, maxPairs)
-	for i := range ticks {
-		ticks[i] = plot.Tick{
-			Value: float64(i),
-			Label: strconv.Itoa(i + 1), // Just show rank numbers
+		values[i] = pair.CouplingScore
+		rankLabels[i] = strconv.Itoa(i + 1)
+		if i < 10 {
+			barLabels[i] = compactCouplingPairLabel(filepath.Base(pair.File1)+"-"+filepath.Base(pair.File2), 28)
 		}
 	}
-	p.X.Tick.Marker = plot.ConstantTicks(ticks)
-	p.X.Min, p.X.Max = couplingPairXRange(maxPairs)
-	p.Y.Min = 0
-	p.Y.Max = maxCouplingValue(values) * 1.05
-	p.Y.Tick.Marker = plot.ConstantTicks(couplingScoreTicks(p.Y.Max, 2.5, 1))
-	addCouplingPairsTitle(p, "Top File Coupling Pairs", float64(maxPairs-1)/2, p.Y.Max)
-	p.Add(plotTopPadding{Height: vg.Points(83.25)})
-	p.Add(plotAxesRectangle{})
 
-	// Save the plot
 	outputFile := filepath.Join(output, "top_file_coupling_pairs.png")
-	widthBar, heightBar := graphics.GetPlotSize(graphics.ChartTypeDefault)
-	if err := p.Save(widthBar, heightBar, outputFile); err != nil {
+	widthBar, heightBar := graphics.GetPlotSizeInches(graphics.ChartTypeDefault)
+	if err := graphics.PlotBarChartMatplotlib(rankLabels, values, graphics.MatplotlibBarOptions{
+		Title:         "Top File Coupling Pairs",
+		XLabel:        "Coupling Pair Rank",
+		YLabel:        "Coupling Score",
+		Output:        outputFile,
+		WidthInches:   widthBar,
+		HeightInches:  heightBar,
+		Color:         color.RGBA{R: 76, G: 120, B: 168, A: 255},
+		DisableGrid:   true,
+		YMax:          maxCouplingValue(values) * 1.05,
+		BarLabels:     barLabels,
+		BarLabelAngle: 70,
+	}); err != nil {
 		return fmt.Errorf("failed to save coupling pairs plot: %v", err)
 	}
 
@@ -287,69 +259,6 @@ func plotTopCouplingPairs(analysis FileCouplingAnalysis, output string) error {
 	return nil
 }
 
-func addTopCouplingPairLabels(p *plot.Plot, labels []string, values plotter.Values, maxLabels int) {
-	labelCount := len(labels)
-	if labelCount > len(values) {
-		labelCount = len(values)
-	}
-	if maxLabels > 0 && labelCount > maxLabels {
-		labelCount = maxLabels
-	}
-	if labelCount == 0 {
-		return
-	}
-
-	labelPoints := make(plotter.XYs, labelCount)
-	shownLabels := make([]string, labelCount)
-	for i := 0; i < labelCount; i++ {
-		labelPoints[i].X = float64(i)
-		labelPoints[i].Y = values[i]
-		shownLabels[i] = labels[i]
-	}
-
-	labelPlotter, err := plotter.NewLabels(plotter.XYLabels{
-		XYs:    labelPoints,
-		Labels: shownLabels,
-	})
-	if err != nil {
-		return
-	}
-	labelStyle := text.Style{
-		Color:    color.Black,
-		Font:     font.From(plot.DefaultFont, vg.Points(7)),
-		Rotation: 70 * math.Pi / 180,
-		XAlign:   text.XLeft,
-		YAlign:   text.YBottom,
-		Handler:  plot.DefaultTextHandler,
-	}
-	for i := range labelPlotter.TextStyle {
-		labelPlotter.TextStyle[i] = labelStyle
-	}
-	labelPlotter.Offset = vg.Point{Y: vg.Points(2)}
-	p.Add(labelPlotter)
-}
-
-func addCouplingPairsTitle(p *plot.Plot, title string, x, y float64) {
-	titlePlotter, err := plotter.NewLabels(plotter.XYLabels{
-		XYs: plotter.XYs{{X: x, Y: y}},
-		Labels: []string{
-			title,
-		},
-	})
-	if err != nil {
-		return
-	}
-	titlePlotter.TextStyle[0] = text.Style{
-		Color:   color.Black,
-		Font:    font.From(plot.DefaultFont, vg.Points(12)),
-		XAlign:  text.XCenter,
-		YAlign:  text.YBottom,
-		Handler: plot.DefaultTextHandler,
-	}
-	titlePlotter.Offset = vg.Point{Y: vg.Points(8)}
-	p.Add(titlePlotter)
-}
-
 func compactCouplingPairLabel(label string, limit int) string {
 	if limit <= 0 || len(label) <= limit {
 		return label
@@ -360,7 +269,7 @@ func compactCouplingPairLabel(label string, limit int) string {
 	return "..." + label[len(label)-(limit-3):]
 }
 
-func maxCouplingValue(values plotter.Values) float64 {
+func maxCouplingValue(values []float64) float64 {
 	maxValue := 0.0
 	for _, value := range values {
 		if value > maxValue {
@@ -368,102 +277,4 @@ func maxCouplingValue(values plotter.Values) float64 {
 		}
 	}
 	return maxValue
-}
-
-func couplingBarWidth(maxPairs int) vg.Length {
-	if maxPairs <= 0 {
-		return vg.Points(40)
-	}
-	return couplingFilePairBarWidth(maxPairs)
-}
-
-func couplingFilePairBarWidth(maxPairs int) vg.Length {
-	if maxPairs <= 0 {
-		return vg.Points(40)
-	}
-	return vg.Points(800 / float64(maxPairs))
-}
-
-func couplingPairXRange(maxPairs int) (float64, float64) {
-	if maxPairs <= 0 {
-		return -0.5, 0.5
-	}
-	// The Python baseline uses Matplotlib's default 0.8-width bars plus
-	// autoscale padding. Gonum leaves a slightly wider plot canvas, so this
-	// domain matches the same visible rank spacing in the rendered image.
-	return -1.2, float64(maxPairs) + 0.3
-}
-
-func shotnessCouplingPairXRange(maxPairs int) (float64, float64) {
-	if maxPairs <= 0 {
-		return -0.5, 0.5
-	}
-	const barWidth = 0.8
-	dataMin := -barWidth / 2
-	dataMax := float64(maxPairs-1) + barWidth/2
-	margin := (dataMax - dataMin) * 0.05
-	return dataMin - margin, dataMax + margin
-}
-
-func couplingScoreTicks(maxValue, step float64, decimals int) []plot.Tick {
-	if maxValue <= 0 {
-		return []plot.Tick{{Value: 0, Label: fmt.Sprintf("%.*f", decimals, 0.0)}}
-	}
-	if step <= 0 {
-		step = 1
-	}
-	ticks := []plot.Tick{}
-	for value := 0.0; value <= maxValue; value += step {
-		label := fmt.Sprintf("%.*f", decimals, value)
-		ticks = append(ticks, plot.Tick{Value: value, Label: label})
-	}
-	return ticks
-}
-
-type plotAxesRectangle struct{}
-
-func (plotAxesRectangle) Plot(c draw.Canvas, _ *plot.Plot) {
-	spineWidth := vg.Points(0.75)
-	c.FillPolygon(color.Black, []vg.Point{
-		{X: c.Max.X, Y: c.Min.Y + spineWidth},
-		{X: c.Min.X, Y: c.Min.Y + spineWidth},
-		{X: c.Min.X, Y: c.Min.Y + 2*spineWidth},
-		{X: c.Max.X, Y: c.Min.Y + 2*spineWidth},
-	})
-	c.FillPolygon(color.Black, []vg.Point{
-		{X: c.Min.X, Y: c.Max.Y - spineWidth},
-		{X: c.Max.X, Y: c.Max.Y - spineWidth},
-		{X: c.Max.X, Y: c.Max.Y},
-		{X: c.Min.X, Y: c.Max.Y},
-	})
-	c.FillPolygon(color.Black, []vg.Point{
-		{X: c.Min.X, Y: c.Min.Y},
-		{X: c.Min.X + spineWidth, Y: c.Min.Y},
-		{X: c.Min.X + spineWidth, Y: c.Max.Y},
-		{X: c.Min.X, Y: c.Max.Y},
-	})
-	c.FillPolygon(color.Black, []vg.Point{
-		{X: c.Max.X - spineWidth, Y: c.Min.Y},
-		{X: c.Max.X, Y: c.Min.Y},
-		{X: c.Max.X, Y: c.Max.Y},
-		{X: c.Max.X - spineWidth, Y: c.Max.Y},
-	})
-}
-
-type plotTopPadding struct {
-	Height vg.Length
-}
-
-func (plotTopPadding) Plot(draw.Canvas, *plot.Plot) {}
-
-func (p plotTopPadding) GlyphBoxes(*plot.Plot) []plot.GlyphBox {
-	return []plot.GlyphBox{
-		{
-			Y: 1,
-			Rectangle: vg.Rectangle{
-				Min: vg.Point{},
-				Max: vg.Point{Y: p.Height},
-			},
-		},
-	}
 }

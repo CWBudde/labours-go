@@ -85,7 +85,7 @@ func generateBurndownPlot(name string, matrix [][]int, output string, relative b
 	}
 
 	// Create plot
-	if err := graphics.PlotStackedBurndown(interpolatedMatrix, dateRange, output, relative); err != nil {
+	if err := graphics.PlotStackedBurndownMatplotlib(interpolatedMatrix, dateRange, output, relative); err != nil {
 		progEstimator.FinishMultiOperation()
 		return fmt.Errorf("error creating burndown plot: %v", err)
 	}

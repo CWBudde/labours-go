@@ -22,6 +22,49 @@ import (
 	"labours-go/internal/burndown"
 )
 
+// PlotStackedBurndownMatplotlib renders a stacked burndown chart from a raw
+// per-layer matrix and date range using the matplotlib-go backend. It backs the
+// legacy/fallback burndown path that operates on already-interpolated matrices
+// (the header-driven path uses PlotBurndownMatplotlib).
+func PlotStackedBurndownMatplotlib(matrix [][]float64, dateRange []time.Time, output string, relative bool) error {
+	if len(matrix) == 0 || len(dateRange) == 0 {
+		return fmt.Errorf("empty matrix or date range")
+	}
+
+	numPoints := len(dateRange)
+	if cols := len(matrix[0]); cols < numPoints {
+		numPoints = cols
+		dateRange = dateRange[:numPoints]
+	}
+
+	colors := GetBurndownColors(len(matrix))
+	series := make([]MatplotlibTimeAreaSeries, len(matrix))
+	for i, row := range matrix {
+		values := make([]float64, numPoints)
+		copy(values, row[:min(numPoints, len(row))])
+		series[i] = MatplotlibTimeAreaSeries{
+			Label:  fmt.Sprintf("Layer %d", i),
+			Values: values,
+			Color:  colors[i%len(colors)],
+		}
+	}
+
+	yLabel := "Lines of Code"
+	if relative {
+		yLabel = "Relative Fraction"
+	}
+
+	return PlotTimeAreasMatplotlib(dateRange, series, MatplotlibTimeAreaOptions{
+		Title:    "Burndown Chart",
+		XLabel:   "Time",
+		YLabel:   yLabel,
+		Output:   output,
+		Stacked:  true,
+		ShowGrid: true,
+		Legend:   true,
+	})
+}
+
 // PlotBurndownMatplotlib creates a burndown plot with matplotlib-go stackplot rendering.
 func PlotBurndownMatplotlib(data *burndown.ProcessedBurndown, output string, relative bool) error {
 	if data == nil || len(data.Matrix) == 0 || len(data.DateRange) == 0 {

@@ -6,9 +6,6 @@ import (
 	"math"
 	"sort"
 
-	"gonum.org/v1/plot"
-	"gonum.org/v1/plot/plotter"
-	"gonum.org/v1/plot/vg"
 	"labours-go/internal/graphics"
 	"labours-go/internal/readers"
 )
@@ -546,63 +543,51 @@ func plotParallelActivity(metrics ParallelismMetrics, output string) error {
 		metrics.PeriodConcurrency = []int{0}
 	}
 
-	p := plot.New()
-	p.Title.Text = "Parallel Development Activity Over Time"
-	p.X.Label.Text = "Time Period"
-	p.Y.Label.Text = "Number of Concurrent Developers"
-
-	// Create points for the concurrency timeline
-	pts := make(plotter.XYs, len(metrics.PeriodConcurrency))
+	x := make([]float64, len(metrics.PeriodConcurrency))
+	y := make([]float64, len(metrics.PeriodConcurrency))
 	for i, concurrency := range metrics.PeriodConcurrency {
-		pts[i].X = float64(i)
-		pts[i].Y = float64(concurrency)
+		x[i] = float64(i)
+		y[i] = float64(concurrency)
 	}
 
-	// Create line plot
-	line, err := plotter.NewLine(pts)
-	if err != nil {
-		return fmt.Errorf("error creating line plot: %v", err)
-	}
-	line.Color = color.RGBA{R: 76, G: 120, B: 168, A: 255}
-	line.Width = vg.Points(2)
-
-	// Add a filled polygon area under the line
-	// Create polygon points for filled area
-	areaPoints := make(plotter.XYs, len(pts)+2)
-	areaPoints[0] = plotter.XY{X: pts[0].X, Y: 0}
-	for i, pt := range pts {
-		areaPoints[i+1] = pt
-	}
-	areaPoints[len(areaPoints)-1] = plotter.XY{X: pts[len(pts)-1].X, Y: 0}
-
-	polygon, err := plotter.NewPolygon(areaPoints)
-	if err == nil {
-		// Create a semi-transparent version of the color
-		polygon.Color = color.RGBA{R: 211, G: 225, B: 241, A: 255}
-		p.Add(polygon)
+	series := []graphics.MatplotlibLineSeries{
+		{
+			Name:  "Concurrent developers",
+			X:     x,
+			Y:     y,
+			Color: color.RGBA{R: 76, G: 120, B: 168, A: 255},
+			Fill:  true,
+		},
 	}
 
-	p.Add(line)
-
-	// Add horizontal line for average concurrency
+	// Add horizontal line for average concurrency as a flat dashed series so it
+	// appears in the legend.
 	if metrics.AverageConcurrency > 0 {
-		avgLine := plotter.NewFunction(func(x float64) float64 {
-			return metrics.AverageConcurrency
+		avgY := make([]float64, len(x))
+		for i := range avgY {
+			avgY[i] = metrics.AverageConcurrency
+		}
+		series = append(series, graphics.MatplotlibLineSeries{
+			Name:   fmt.Sprintf("Average (%.1f)", metrics.AverageConcurrency),
+			X:      x,
+			Y:      avgY,
+			Color:  color.RGBA{R: 245, G: 133, B: 24, A: 255},
+			Dashes: []float64{5, 5},
 		})
-		avgLine.Color = color.RGBA{R: 245, G: 133, B: 24, A: 255}
-		avgLine.Dashes = []vg.Length{vg.Points(5), vg.Points(5)}
-		p.Add(avgLine)
-		p.Legend.Add(fmt.Sprintf("Average (%.1f)", metrics.AverageConcurrency), avgLine)
-		p.Legend.Top = true
-		p.Legend.Left = true
 	}
 
 	// Save to the user's requested output path (Python parity: single file).
 	if output == "" {
 		output = "devs-parallel.png"
 	}
-	width, height := graphics.GetPlotSize(graphics.ChartTypeDefault)
-	if err := p.Save(width, height, output); err != nil {
+	if err := graphics.PlotLineChartMatplotlib(series, graphics.MatplotlibLineOptions{
+		Title:    "Parallel Development Activity Over Time",
+		XLabel:   "Time Period",
+		YLabel:   "Number of Concurrent Developers",
+		Output:   output,
+		ShowGrid: true,
+		Legend:   true,
+	}); err != nil {
 		return fmt.Errorf("failed to save parallel activity plot: %v", err)
 	}
 

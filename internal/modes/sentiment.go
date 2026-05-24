@@ -11,9 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"gonum.org/v1/plot"
-	"gonum.org/v1/plot/plotter"
-	"gonum.org/v1/plot/vg"
 	"labours-go/internal/graphics"
 	"labours-go/internal/readers"
 )
@@ -437,16 +434,10 @@ func plotSentimentOverview(results []SentimentResult, output string) error {
 		return results[i].Score > results[j].Score
 	})
 
-	p := plot.New()
-	p.Title.Text = "Repository Sentiment Analysis Overview"
-	p.X.Label.Text = "Entities (Developers & Languages)"
-	p.Y.Label.Text = "Sentiment Distribution"
-
-	// Prepare data for stacked bars
 	entities := make([]string, len(results))
-	positiveVals := make(plotter.Values, len(results))
-	neutralVals := make(plotter.Values, len(results))
-	negativeVals := make(plotter.Values, len(results))
+	positiveVals := make([]float64, len(results))
+	neutralVals := make([]float64, len(results))
+	negativeVals := make([]float64, len(results))
 
 	for i, result := range results {
 		result = normalizeSentimentResult(result)
@@ -456,52 +447,29 @@ func plotSentimentOverview(results []SentimentResult, output string) error {
 		negativeVals[i] = result.Negative
 	}
 
-	// Create stacked bars
-	positiveBars, err := plotter.NewBarChart(positiveVals, vg.Points(40))
-	if err != nil {
-		return fmt.Errorf("failed to create positive bars: %v", err)
+	series := []graphics.MatplotlibGroupedBarSeries{
+		{Name: "Positive", Values: positiveVals, Color: graphics.ColorPalette[2]}, // Green
+		{Name: "Neutral", Values: neutralVals, Color: graphics.ColorPalette[7]},   // Gray
+		{Name: "Negative", Values: negativeVals, Color: graphics.ColorPalette[3]}, // Red
 	}
-	positiveBars.Color = graphics.ColorPalette[2] // Green
-
-	neutralBars, err := plotter.NewBarChart(neutralVals, vg.Points(40))
-	if err != nil {
-		return fmt.Errorf("failed to create neutral bars: %v", err)
-	}
-	neutralBars.Color = graphics.ColorPalette[7] // Gray
-	neutralBars.StackOn(positiveBars)
-
-	negativeBars, err := plotter.NewBarChart(negativeVals, vg.Points(40))
-	if err != nil {
-		return fmt.Errorf("failed to create negative bars: %v", err)
-	}
-	negativeBars.Color = graphics.ColorPalette[3] // Red
-	negativeBars.StackOn(neutralBars)
-
-	p.Add(positiveBars, neutralBars, negativeBars)
-	p.NominalX(entities...)
-
-	// Rotate labels if many entities
-	if len(results) > 8 {
-		p.X.Tick.Label.Rotation = 0.785398 // 45 degrees
-		p.X.Tick.Label.XAlign = -0.5
-		p.X.Tick.Label.YAlign = -0.5
+	opts := graphics.MatplotlibGroupedBarOptions{
+		Title:        "Repository Sentiment Analysis Overview",
+		XLabel:       "Entities (Developers & Languages)",
+		YLabel:       "Sentiment Distribution",
+		WidthInches:  16,
+		HeightInches: 12,
+		RotateX:      len(results) > 8,
 	}
 
-	// Add legend
-	p.Legend.Add("Positive", positiveBars)
-	p.Legend.Add("Neutral", neutralBars)
-	p.Legend.Add("Negative", negativeBars)
-	p.Legend.Top = true
-
-	// Save plots
-	width, height := graphics.GetPythonPlotSize(16, 12)
 	outputFile := filepath.Join(output, "sentiment-overview.png")
-	if err := p.Save(width, height, outputFile); err != nil {
+	opts.Output = outputFile
+	if err := graphics.PlotStackedBarChartMatplotlib(entities, series, opts); err != nil {
 		return fmt.Errorf("failed to save sentiment overview: %v", err)
 	}
 
 	svgFile := filepath.Join(output, "sentiment-overview.svg")
-	if err := p.Save(width, height, svgFile); err != nil {
+	opts.Output = svgFile
+	if err := graphics.PlotStackedBarChartMatplotlib(entities, series, opts); err != nil {
 		return fmt.Errorf("failed to save sentiment overview SVG: %v", err)
 	}
 
@@ -546,57 +514,38 @@ func plotSentimentForType(results []SentimentResult, title, output, filename str
 		return results[i].Score > results[j].Score
 	})
 
-	p := plot.New()
-	p.Title.Text = title
-	p.X.Label.Text = "Entities"
-	p.Y.Label.Text = "Sentiment Score"
-
-	// Create scatter plot of sentiment scores
-	pts := make(plotter.XYs, len(results))
-	for i, result := range results {
-		result = normalizeSentimentResult(result)
-		pts[i].X = float64(i)
-		pts[i].Y = result.Score
-	}
-
-	scatter, err := plotter.NewScatter(pts)
-	if err != nil {
-		return fmt.Errorf("failed to create scatter plot: %v", err)
-	}
-	scatter.Color = graphics.ColorPalette[0]
-	scatter.Radius = vg.Points(4)
-
-	p.Add(scatter)
-
-	// Set X-axis labels
+	points := make([]graphics.MatplotlibScatterPoint, len(results))
 	names := make([]string, len(results))
 	for i, result := range results {
+		result = normalizeSentimentResult(result)
+		points[i] = graphics.MatplotlibScatterPoint{X: float64(i), Y: result.Score}
 		names[i] = result.Entity
 	}
-	p.NominalX(names...)
 
-	// Rotate labels if many entities
-	if len(results) > 6 {
-		p.X.Tick.Label.Rotation = 0.785398
-		p.X.Tick.Label.XAlign = -0.5
-		p.X.Tick.Label.YAlign = -0.5
+	series := []graphics.MatplotlibScatterSeries{
+		{Name: "Sentiment score", Points: points, Color: graphics.ColorPalette[0], Size: 32},
+	}
+	opts := graphics.MatplotlibScatterOptions{
+		Title:        title,
+		XLabel:       "Entities",
+		YLabel:       "Sentiment Score",
+		WidthInches:  14,
+		HeightInches: 8,
+		ShowGrid:     true,
+		ZeroLine:     true,
+		XTickLabels:  names,
+		RotateX:      len(results) > 6,
 	}
 
-	// Add horizontal line at y=0 for neutral sentiment
-	line := plotter.NewFunction(func(x float64) float64 { return 0 })
-	line.Color = graphics.ColorPalette[4]
-	line.Dashes = []vg.Length{vg.Points(5), vg.Points(5)}
-	p.Add(line)
-
-	// Save plots
-	width, height := graphics.GetPythonPlotSize(14, 8)
 	outputFile := filepath.Join(output, filename+".png")
-	if err := p.Save(width, height, outputFile); err != nil {
+	opts.Output = outputFile
+	if err := graphics.PlotScatterMatplotlib(series, opts); err != nil {
 		return fmt.Errorf("failed to save %s: %v", filename, err)
 	}
 
 	svgFile := filepath.Join(output, filename+".svg")
-	if err := p.Save(width, height, svgFile); err != nil {
+	opts.Output = svgFile
+	if err := graphics.PlotScatterMatplotlib(series, opts); err != nil {
 		return fmt.Errorf("failed to save %s SVG: %v", filename, err)
 	}
 

@@ -10,8 +10,6 @@ import (
 	"time"
 
 	"github.com/spf13/viper"
-	"gonum.org/v1/plot"
-	"gonum.org/v1/plot/vg"
 	"labours-go/internal/burndown"
 )
 
@@ -55,30 +53,6 @@ func TestPythonLaboursColorPaletteMatchesTab20Cycle(t *testing.T) {
 	wrapped := PythonLaboursColorPalette(21)
 	if wrapped[20] != want[0] {
 		t.Fatalf("wrap color = %#v, want %#v", wrapped[20], want[0])
-	}
-}
-
-func TestSavePNGWithBackgroundPreservesTransparency(t *testing.T) {
-	p := plot.New()
-	output := filepath.Join(t.TempDir(), "transparent.png")
-
-	if err := SavePNGWithBackground(p, 2*vg.Inch, 2*vg.Inch, output, color.Transparent); err != nil {
-		t.Fatalf("save transparent png: %v", err)
-	}
-
-	file, err := os.Open(output) // #nosec G304 - test path is under t.TempDir.
-	if err != nil {
-		t.Fatalf("open transparent png: %v", err)
-	}
-	defer func() { _ = file.Close() }()
-
-	img, err := png.Decode(file)
-	if err != nil {
-		t.Fatalf("decode transparent png: %v", err)
-	}
-	_, _, _, a := img.At(0, 0).RGBA()
-	if a != 0 {
-		t.Fatalf("corner alpha = %d, want 0", a)
 	}
 }
 

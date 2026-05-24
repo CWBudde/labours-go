@@ -3,13 +3,11 @@ package modes
 import (
 	"fmt"
 	"image/color"
+	"os"
 	"path/filepath"
 	"strconv"
 
-	"gonum.org/v1/plot"
-	"gonum.org/v1/plot/plotter"
-	"gonum.org/v1/plot/vg"
-	"gonum.org/v1/plot/vg/draw"
+	"labours-go/internal/graphics"
 	"labours-go/internal/readers"
 )
 
@@ -121,57 +119,50 @@ func plotTopShotnessCouplingPairs(analysis ShotnessCouplingAnalysis, output stri
 		return fmt.Errorf("no coupling pairs data available")
 	}
 
-	p := plot.New()
-	p.X.Label.Text = "Coupling Pair Rank"
-	p.Y.Label.Text = "Coupling Score"
-
 	// Prepare data for bar chart
 	maxPairs := len(analysis.TopCoupling)
 	if maxPairs > 20 {
 		maxPairs = 20 // Show top 20 pairs
 	}
 
-	values := make(plotter.Values, maxPairs)
-	for i := 0; i < maxPairs; i++ {
-		values[i] = analysis.TopCoupling[i].CouplingScore
-	}
-
-	// Create bar chart
-	bars, err := plotter.NewBarChart(values, couplingBarWidth(maxPairs))
-	if err != nil {
-		return fmt.Errorf("error creating bar chart: %v", err)
-	}
-
-	bars.Color = color.RGBA{R: 76, G: 120, B: 168, A: 255}
-	bars.LineStyle = draw.LineStyle{Color: color.RGBA{}, Width: 0}
-	p.Add(bars)
-
-	labels := make([]string, maxPairs)
+	values := make([]float64, maxPairs)
+	rankLabels := make([]string, maxPairs)
+	barLabels := make([]string, maxPairs)
 	for i := 0; i < maxPairs; i++ {
 		pair := analysis.TopCoupling[i]
-		labels[i] = compactCouplingPairLabel(filepath.Base(pair.Entity1)+"-"+filepath.Base(pair.Entity2), 28)
-	}
-	addTopCouplingPairLabels(p, labels, values, 10)
-
-	// Create custom tick marks
-	ticks := make([]plot.Tick, maxPairs)
-	for i := range ticks {
-		ticks[i] = plot.Tick{
-			Value: float64(i),
-			Label: strconv.Itoa(i + 1), // Just show rank numbers
+		values[i] = pair.CouplingScore
+		rankLabels[i] = strconv.Itoa(i + 1)
+		if i < 10 {
+			barLabels[i] = compactCouplingPairLabel(filepath.Base(pair.Entity1)+"-"+filepath.Base(pair.Entity2), 28)
 		}
 	}
-	p.X.Tick.Marker = plot.ConstantTicks(ticks)
-	p.X.Min, p.X.Max = shotnessCouplingPairXRange(maxPairs)
-	p.Y.Min = 0
-	p.Y.Max = maxCouplingValue(values) * 1.05
-	p.Y.Tick.Marker = plot.ConstantTicks(couplingScoreTicks(p.Y.Max, 2, 0))
-	addCouplingPairsTitle(p, "Top Shotness Coupling Pairs", float64(maxPairs-1)/2, p.Y.Max)
-	p.Add(plotTopPadding{Height: vg.Points(84)})
-	p.Add(plotAxesRectangle{})
 
-	pngFile, svgFile, err := savePlotPNGAndSVG(p, 16*vg.Inch, 8*vg.Inch, output, "top_shotness_coupling_pairs")
-	if err != nil {
+	if output == "" {
+		output = "."
+	}
+	if err := os.MkdirAll(output, 0o750); err != nil {
+		return fmt.Errorf("failed to create output directory %s: %v", output, err)
+	}
+	opts := graphics.MatplotlibBarOptions{
+		Title:         "Top Shotness Coupling Pairs",
+		XLabel:        "Coupling Pair Rank",
+		YLabel:        "Coupling Score",
+		WidthInches:   16,
+		HeightInches:  8,
+		Color:         color.RGBA{R: 76, G: 120, B: 168, A: 255},
+		DisableGrid:   true,
+		YMax:          maxCouplingValue(values) * 1.05,
+		BarLabels:     barLabels,
+		BarLabelAngle: 70,
+	}
+	pngFile := filepath.Join(output, "top_shotness_coupling_pairs.png")
+	opts.Output = pngFile
+	if err := graphics.PlotBarChartMatplotlib(rankLabels, values, opts); err != nil {
+		return fmt.Errorf("failed to save coupling pairs plot: %v", err)
+	}
+	svgFile := filepath.Join(output, "top_shotness_coupling_pairs.svg")
+	opts.Output = svgFile
+	if err := graphics.PlotBarChartMatplotlib(rankLabels, values, opts); err != nil {
 		return fmt.Errorf("failed to save coupling pairs plot: %v", err)
 	}
 

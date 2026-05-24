@@ -6,9 +6,6 @@ import (
 	"sort"
 
 	"github.com/spf13/viper"
-	"gonum.org/v1/plot"
-	"gonum.org/v1/plot/plotter"
-	"gonum.org/v1/plot/vg"
 	"labours-go/internal/graphics"
 	"labours-go/internal/progress"
 	"labours-go/internal/readers"
@@ -122,41 +119,31 @@ func plotDevEfforts(metrics []EffortMetric, output string) error {
 
 // plotCommitsVsLines creates scatter plot of commits vs total lines changed
 func plotCommitsVsLines(metrics []EffortMetric, output string) error {
-	p := plot.New()
-	p.Title.Text = "Developer Efforts: Commits vs Lines Changed"
-	p.X.Label.Text = "Total Commits"
-	p.Y.Label.Text = "Total Lines Changed"
-
-	// Prepare data points
-	pts := make(plotter.XYs, len(metrics))
+	points := make([]graphics.MatplotlibScatterPoint, len(metrics))
 	for i, metric := range metrics {
-		pts[i].X = float64(metric.Commits)
-		pts[i].Y = float64(metric.LinesAdded + metric.LinesRemoved + metric.LinesModified)
-	}
-
-	// Create scatter plot
-	scatter, err := plotter.NewScatter(pts)
-	if err != nil {
-		return fmt.Errorf("error creating scatter plot: %v", err)
-	}
-
-	scatter.Color = graphics.ColorPalette[0]
-	p.Add(scatter)
-
-	// Add developer names as labels (simplified)
-	for i, metric := range metrics {
-		if i < 10 { // Only label top 10 to avoid clutter
-			label, err := plotter.NewLabels(plotter.XYLabels{
-				XYs:    plotter.XYs{{X: float64(metric.Commits), Y: float64(metric.LinesAdded + metric.LinesRemoved + metric.LinesModified)}},
-				Labels: []string{metric.Name},
-			})
-			if err == nil {
-				p.Add(label)
-			}
+		point := graphics.MatplotlibScatterPoint{
+			X: float64(metric.Commits),
+			Y: float64(metric.LinesAdded + metric.LinesRemoved + metric.LinesModified),
 		}
+		if i < 10 { // Only label top 10 to avoid clutter
+			point.Label = metric.Name
+		}
+		points[i] = point
 	}
 
-	if err := p.Save(16*vg.Inch, 8*vg.Inch, output); err != nil {
+	series := []graphics.MatplotlibScatterSeries{
+		{Name: "Developers", Points: points, Color: graphics.ColorPalette[0], Size: 32},
+	}
+	if err := graphics.PlotScatterMatplotlib(series, graphics.MatplotlibScatterOptions{
+		Title:          "Developer Efforts: Commits vs Lines Changed",
+		XLabel:         "Total Commits",
+		YLabel:         "Total Lines Changed",
+		Output:         output,
+		WidthInches:    16,
+		HeightInches:   8,
+		ShowGrid:       true,
+		AnnotateLabels: true,
+	}); err != nil {
 		return fmt.Errorf("failed to save devs-efforts plot %s: %v", output, err)
 	}
 

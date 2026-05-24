@@ -20,8 +20,6 @@ import (
 	"github.com/cwbudde/matplotlib-go/core"
 	"github.com/cwbudde/matplotlib-go/render"
 	"github.com/cwbudde/matplotlib-go/style"
-	"gonum.org/v1/plot"
-	"gonum.org/v1/plot/plotter"
 	"labours-go/internal/graphics"
 	"labours-go/internal/readers"
 )
@@ -430,7 +428,7 @@ func BusFactor(reader readers.Reader, output string) error {
 	}
 
 	ticks := sortedIntKeys(data.Snapshots)
-	series := make(plotter.XYs, len(ticks))
+	series := make(xySeries, len(ticks))
 	for i, tick := range ticks {
 		series[i].X = float64(tick)
 		series[i].Y = float64(data.Snapshots[tick].BusFactor)
@@ -688,8 +686,8 @@ func OwnershipConcentration(reader readers.Reader, output string) error {
 	}
 
 	ticks := sortedIntKeys(data.Snapshots)
-	gini := make(plotter.XYs, len(ticks))
-	hhi := make(plotter.XYs, len(ticks))
+	gini := make(xySeries, len(ticks))
+	hhi := make(xySeries, len(ticks))
 	for i, tick := range ticks {
 		snapshot := data.Snapshots[tick]
 		gini[i].X = float64(tick)
@@ -834,12 +832,12 @@ func plotKnowledgeLorenz(repoName string, data *readers.KnowledgeDiffusionData, 
 		return nil
 	}
 
-	lorenz := make(plotter.XYs, n+1)
-	lorenz[0] = plotter.XY{X: 0, Y: 0}
+	lorenz := make(xySeries, n+1)
+	lorenz[0] = xyPoint{X: 0, Y: 0}
 	cum := 0
 	for i, c := range counts {
 		cum += c
-		lorenz[i+1] = plotter.XY{
+		lorenz[i+1] = xyPoint{
 			X: float64(i+1) / float64(n),
 			Y: float64(cum) / float64(total),
 		}
@@ -853,7 +851,7 @@ func plotKnowledgeLorenz(repoName string, data *readers.KnowledgeDiffusionData, 
 	}
 	gini := 1 - 2*area
 
-	diagonal := plotter.XYs{{X: 0, Y: 0}, {X: 1, Y: 1}}
+	diagonal := xySeries{{X: 0, Y: 0}, {X: 1, Y: 1}}
 	title := fmt.Sprintf("Editor Distribution (Lorenz Curve) - Gini=%.3f", gini)
 	if repoName != "" {
 		title = fmt.Sprintf("%s - %s", repoName, title)
@@ -893,7 +891,7 @@ func HotspotRisk(reader readers.Reader, output string) error {
 	}
 
 	labels := make([]string, len(files))
-	values := make(plotter.Values, len(files))
+	values := make(floatSeries, len(files))
 	for i, file := range files {
 		labels[i] = compactPathLabel(file.Path)
 		values[i] = file.RiskScore
@@ -1008,9 +1006,17 @@ func plotKnowledgeDistribution(repoName string, labels []string, values []int, o
 	return nil
 }
 
+type xyPoint struct {
+	X, Y float64
+}
+
+type xySeries []xyPoint
+
+type floatSeries []float64
+
 type namedSeries struct {
 	Name   string
-	Points plotter.XYs
+	Points xySeries
 }
 
 func buildTemporalHourCommitSeries(data *readers.TemporalActivityData) []temporalHourCommitSeries {
@@ -1116,14 +1122,14 @@ func knowledgeDistribution(data *readers.KnowledgeDiffusionData) ([]string, []in
 }
 
 func plotIntBars(title, xLabel, yLabel string, labels []string, values []int, output, defaultOutput string) error {
-	plotValues := make(plotter.Values, len(values))
+	plotValues := make(floatSeries, len(values))
 	for i, value := range values {
 		plotValues[i] = float64(value)
 	}
 	return plotFloatBars(title, xLabel, yLabel, labels, plotValues, output, defaultOutput)
 }
 
-func plotFloatBars(title, xLabel, yLabel string, labels []string, values plotter.Values, output, defaultOutput string) error {
+func plotFloatBars(title, xLabel, yLabel string, labels []string, values floatSeries, output, defaultOutput string) error {
 	output, err := resolveReportOutput(output, defaultOutput)
 	if err != nil {
 		return err
@@ -1249,8 +1255,8 @@ func plotKnowledgeSilos(repoName string, data *readers.KnowledgeDiffusionData, o
 	}
 
 	labels := make([]string, len(files))
-	uniqueValues := make(plotter.Values, len(files))
-	recentValues := make(plotter.Values, len(files))
+	uniqueValues := make(floatSeries, len(files))
+	recentValues := make(floatSeries, len(files))
 	for i, file := range files {
 		labels[i] = truncateKnowledgeSiloLabel(file.Path)
 		uniqueValues[i] = float64(file.UniqueEditors)
@@ -1260,7 +1266,7 @@ func plotKnowledgeSilos(repoName string, data *readers.KnowledgeDiffusionData, o
 	return plotKnowledgeSilosMatplotlib(repoName, labels, uniqueValues, recentValues, data.WindowMonths, output)
 }
 
-func plotKnowledgeSilosMatplotlib(repoName string, labels []string, uniqueValues, recentValues plotter.Values, windowMonths int, output string) error {
+func plotKnowledgeSilosMatplotlib(repoName string, labels []string, uniqueValues, recentValues floatSeries, windowMonths int, output string) error {
 	output, err := resolveReportOutput(output, "knowledge-diffusion-silos.png")
 	if err != nil {
 		return err
@@ -1367,7 +1373,7 @@ func plotKnowledgeTrend(data *readers.KnowledgeDiffusionData, output string) err
 	}
 
 	ticks := sortedIntKeys(trend)
-	points := make(plotter.XYs, len(ticks))
+	points := make(xySeries, len(ticks))
 	for i, tick := range ticks {
 		points[i].X = float64(tick)
 		points[i].Y = float64(trend[tick])
@@ -1433,7 +1439,7 @@ func writeHotspotRiskTable(files []readers.HotspotRiskFile, output string) error
 	return nil
 }
 
-func plotHotspotRiskRanked(repoName string, files []readers.HotspotRiskFile, labels []string, values plotter.Values, output string) error {
+func plotHotspotRiskRanked(repoName string, files []readers.HotspotRiskFile, labels []string, values floatSeries, output string) error {
 	output, err := resolveReportOutput(output, "hotspot-risk.png")
 	if err != nil {
 		return err
@@ -1700,10 +1706,6 @@ func printHotspotRiskTable(files []readers.HotspotRiskFile, limit int) {
 }
 
 func plotLineSeries(title, xLabel, yLabel string, series []namedSeries, output, defaultOutput string) error {
-	if defaultOutput == "knowledge-diffusion-trend.png" {
-		return plotLineSeriesGonum(title, xLabel, yLabel, series, output, defaultOutput)
-	}
-
 	output, err := resolveReportOutput(output, defaultOutput)
 	if err != nil {
 		return err
@@ -1729,35 +1731,6 @@ func plotLineSeries(title, xLabel, yLabel string, series []namedSeries, output, 
 		ShowGrid:     true,
 		Legend:       true,
 	}); err != nil {
-		return err
-	}
-	fmt.Printf("Saved %s\n", output)
-	return nil
-}
-
-func plotLineSeriesGonum(title, xLabel, yLabel string, series []namedSeries, output, defaultOutput string) error {
-	output, err := resolveReportOutput(output, defaultOutput)
-	if err != nil {
-		return err
-	}
-
-	p := plot.New()
-	p.Title.Text = title
-	p.X.Label.Text = xLabel
-	p.Y.Label.Text = yLabel
-
-	for i, item := range series {
-		line, err := plotter.NewLine(item.Points)
-		if err != nil {
-			return fmt.Errorf("failed to create line series %s: %v", item.Name, err)
-		}
-		line.Color = graphics.ColorPalette[i%len(graphics.ColorPalette)]
-		p.Add(line)
-		p.Legend.Add(item.Name, line)
-	}
-
-	width, height := graphics.GetPlotSize(graphics.ChartTypeDefault)
-	if err := graphics.SavePlotWithFormat(p, width, height, output); err != nil {
 		return err
 	}
 	fmt.Printf("Saved %s\n", output)
