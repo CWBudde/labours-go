@@ -108,6 +108,13 @@ test-visual:
     @echo "Running visual regression tests"
     go test -v ./test/visual/...
 
+# Run the full hercules + labours-go showcase against a repository.
+# Produces analysis_results/<repo-name>/{raw,plots,logs,manifest.txt}.
+# Example: just showcase /mnt/projekte/Code/Coda/system-optimiser-core
+showcase REPO OUT="":
+    @echo "Running full showcase on {{REPO}}"
+    bash scripts/full_showcase.sh "{{REPO}}" {{OUT}}
+
 # Generate Go-side PNGs used by the Python-vs-Go parity viewer
 parity-update:
     @echo "Generating Go parity reference images"
@@ -123,9 +130,21 @@ parity-update-python:
 parity-viewer PORT="8096" FILTER="":
     PORT={{PORT}} GOCACHE=/tmp/labours-parity-gocache go run ./cmd/parityviewer --port {{PORT}} --name-filter "{{FILTER}}"
 
+# Start parity comparison viewer for an arbitrary showcase output (plots-go vs plots-python)
+showcase-compare REPO_NAME PORT="8096" FILTER="":
+    PORT={{PORT}} GOCACHE=/tmp/labours-parity-gocache go run ./cmd/parityviewer --port {{PORT}} --name-filter "{{FILTER}}" --baseline-dir analysis_results/{{REPO_NAME}}/plots-python --artifact-dir analysis_results/{{REPO_NAME}}/plots-go --baseline-prefix "" --artifact-prefix ""
+
+# Start parity comparison viewer for the MeKo ewws-events parity set
+parity-viewer-meko PORT="8096" FILTER="":
+    PORT={{PORT}} GOCACHE=/tmp/labours-parity-gocache go run ./cmd/parityviewer --port {{PORT}} --name-filter "{{FILTER}}" --baseline-dir analysis_results/ewws-events-parity/baseline-python --artifact-dir analysis_results/ewws-events-parity/artifacts-go --baseline-prefix "" --artifact-prefix ""
+
 # Print parity comparison rows for filtered cases without starting a server
 parity-viewer-print PORT="8096" FILTER="" PREFIX="":
     PORT={{PORT}} GOCACHE=/tmp/labours-parity-gocache go run ./cmd/parityviewer --port {{PORT}} --name-filter "{{FILTER}}" --name-prefix "{{PREFIX}}" --print
+
+# Print MeKo parity comparison rows without starting a server
+parity-viewer-meko-print PORT="8096" FILTER="" PREFIX="":
+    PORT={{PORT}} GOCACHE=/tmp/labours-parity-gocache go run ./cmd/parityviewer --port {{PORT}} --name-filter "{{FILTER}}" --name-prefix "{{PREFIX}}" --baseline-dir analysis_results/ewws-events-parity/baseline-python --artifact-dir analysis_results/ewws-events-parity/artifacts-go --baseline-prefix "" --artifact-prefix "" --print
 
 # Run benchmark tests
 test-bench:
@@ -216,11 +235,6 @@ ci: quality test-all
 
 # Pre-release checks
 release-check: clean quality test-all build-all
-
-# Install the binary to GOPATH/bin
-install: build
-    @echo "Installing {{binary}}"
-    go install .
 
 # Remove generated test data
 clean-testdata:
