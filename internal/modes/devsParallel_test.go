@@ -8,7 +8,7 @@ import (
 )
 
 func TestDevsParallelRequiresPeopleBurndownByDefault(t *testing.T) {
-	err := DevsParallel(&NoDataReader{}, t.TempDir(), 20, false)
+	err := DevsParallel(&NoDataReader{}, t.TempDir(), 20, false, false)
 	if !errors.Is(err, readers.ErrAnalysisMissing) {
 		t.Fatalf("Expected missing-analysis error when people burndown is absent, got %v", err)
 	}

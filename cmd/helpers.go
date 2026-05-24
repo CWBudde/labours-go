@@ -329,8 +329,8 @@ var modeOutputConventions = map[string]outputConvention{
 	},
 	"devs-efforts": {
 		Kind:        outputSingleFile,
-		Description: "writes exactly the requested developer efforts chart file",
-		Assets:      []string{"<output>"},
+		Description: "writes the requested developer efforts chart file; --devs-efforts-detail also writes a Go-only productivity ranking sibling",
+		Assets:      []string{"<output>", "<base>_productivity_ranking<ext> (only with --devs-efforts-detail)"},
 	},
 	"old-vs-new": {
 		Kind:        outputSingleFile,
@@ -343,24 +343,28 @@ var modeOutputConventions = map[string]outputConvention{
 		Assets:      []string{"<output>"},
 	},
 	"temporal-activity": {
-		Kind:        outputSingleFile,
-		Description: "writes exactly the requested temporal activity chart file",
-		Assets:      []string{"<output>"},
+		Kind:        outputCompanions,
+		Description: "writes the Python labours sibling set: eight stacked bar charts (weekdays/hours/months/weeks × commits/lines) plus two weekday×hour heatmaps",
+		Assets: []string{
+			"<base>_weekdays_commits<ext>", "<base>_hours_commits<ext>", "<base>_months_commits<ext>", "<base>_weeks_commits<ext>",
+			"<base>_weekdays_lines<ext>", "<base>_hours_lines<ext>", "<base>_months_lines<ext>", "<base>_weeks_lines<ext>",
+			"<base>_heatmap_commits<ext>", "<base>_heatmap_lines<ext>",
+		},
 	},
 	"devs-parallel": {
 		Kind:        outputSingleFile,
-		Description: "writes exactly the requested parallel-activity chart file",
-		Assets:      []string{"<output>"},
+		Description: "prints a parallel-development summary; the Go-only concurrency timeline chart is written only with --devs-parallel-detail (Python parity: text-only)",
+		Assets:      []string{"<output> (only with --devs-parallel-detail)"},
 	},
 	"run-times": {
 		Kind:        outputSingleFile,
-		Description: "writes exactly the requested runtime breakdown chart file (text summary always printed)",
-		Assets:      []string{"<output>"},
+		Description: "prints the runtime summary; the Go-only breakdown chart is written only with --run-times-detail (Python parity: text-only)",
+		Assets:      []string{"<output> (only with --run-times-detail)"},
 	},
 	"bus-factor": {
 		Kind:        outputCompanions,
-		Description: "writes timeline and subsystem bus-factor sibling charts (gauge panel TODO)",
-		Assets:      []string{"<base>_timeline<ext>", "<base>_subsystems<ext>"},
+		Description: "writes timeline, gauge, and subsystem bus-factor sibling charts",
+		Assets:      []string{"<base>_timeline<ext>", "<base>_gauge<ext>", "<base>_subsystems<ext>"},
 	},
 	"ownership-concentration": {
 		Kind:        outputCompanions,
@@ -369,8 +373,8 @@ var modeOutputConventions = map[string]outputConvention{
 	},
 	"knowledge-diffusion": {
 		Kind:        outputCompanions,
-		Description: "writes distribution, silos, and Lorenz-curve sibling charts",
-		Assets:      []string{"<base>_distribution<ext>", "<base>_silos<ext>", "<base>_lorenz<ext>"},
+		Description: "writes distribution, silos, and Lorenz-curve sibling charts; --knowledge-diffusion-detail also writes a Go-only trend sibling",
+		Assets:      []string{"<base>_distribution<ext>", "<base>_silos<ext>", "<base>_lorenz<ext>", "<base>_trend<ext> (only with --knowledge-diffusion-detail)"},
 	},
 	"hotspot-risk": {
 		Kind:        outputCompanions,

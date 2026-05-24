@@ -3,7 +3,6 @@ package modes
 import (
 	"fmt"
 	"image/color"
-	"path/filepath"
 	"sort"
 
 	"github.com/spf13/viper"
@@ -15,8 +14,10 @@ import (
 	"labours-go/internal/readers"
 )
 
-// DevsEfforts generates plots for developers' effort analysis over time
-func DevsEfforts(reader readers.Reader, output string, maxPeople int) error {
+// DevsEfforts generates plots for developers' effort analysis over time. When
+// detail is set it also renders the Go-only productivity ranking chart as a
+// sibling of the requested output path.
+func DevsEfforts(reader readers.Reader, output string, maxPeople int, detail bool) error {
 	quiet := viper.GetBool("quiet")
 	progEstimator := progress.NewProgressEstimator(!quiet)
 
@@ -49,6 +50,13 @@ func DevsEfforts(reader readers.Reader, output string, maxPeople int) error {
 	if err := plotDevEfforts(effortMetrics, output); err != nil {
 		progEstimator.FinishMultiOperation()
 		return fmt.Errorf("failed to generate developer efforts plots: %v", err)
+	}
+	if detail {
+		rankingOutput := siblingOutputPath(output, "devs-efforts.png", "productivity_ranking")
+		if err := plotProductivityRanking(effortMetrics, rankingOutput); err != nil {
+			progEstimator.FinishMultiOperation()
+			return fmt.Errorf("failed to generate developer productivity ranking: %v", err)
+		}
 	}
 
 	progEstimator.FinishMultiOperation()
@@ -156,10 +164,13 @@ func plotCommitsVsLines(metrics []EffortMetric, output string) error {
 	return nil
 }
 
-// plotProductivityRanking creates a bar chart of developer productivity ranking.
-// Currently unreferenced — kept as scaffolding for a future `--devs-efforts-detail` flag.
-// nolint:unused
+// plotProductivityRanking creates a bar chart of developer productivity ranking
+// at the requested sibling output path (Go-only --devs-efforts-detail chart).
 func plotProductivityRanking(metrics []EffortMetric, output string) error {
+	if output == "" {
+		output = "devs-efforts_productivity_ranking.png"
+	}
+
 	// Prepare data for top developers only
 	maxDev := len(metrics)
 	if maxDev > 20 {
@@ -175,12 +186,11 @@ func plotProductivityRanking(metrics []EffortMetric, output string) error {
 	}
 
 	barColor := color.RGBA{R: 245, G: 133, B: 24, A: 255}
-	pngFile := filepath.Join(output, "devs_productivity_ranking.png")
 	if err := graphics.PlotBarChartMatplotlib(labels, values, graphics.MatplotlibBarOptions{
 		Title:        "Developer Productivity Ranking",
 		XLabel:       "Developer Rank",
 		YLabel:       "Productivity Score (Commits + Lines/100)",
-		Output:       pngFile,
+		Output:       output,
 		WidthInches:  15.36,
 		HeightInches: 7.68,
 		Color:        barColor,
@@ -191,28 +201,9 @@ func plotProductivityRanking(metrics []EffortMetric, output string) error {
 		XMin:         -0.64,
 		XMax:         float64(maxDev) - 0.36,
 	}); err != nil {
-		return fmt.Errorf("failed to save productivity ranking PNG plot: %v", err)
+		return fmt.Errorf("failed to save productivity ranking plot: %v", err)
 	}
 
-	svgFile := filepath.Join(output, "devs_productivity_ranking.svg")
-	if err := graphics.PlotBarChartMatplotlib(labels, values, graphics.MatplotlibBarOptions{
-		Title:        "Developer Productivity Ranking",
-		XLabel:       "Developer Rank",
-		YLabel:       "Productivity Score (Commits + Lines/100)",
-		Output:       svgFile,
-		WidthInches:  15.36,
-		HeightInches: 7.68,
-		Color:        barColor,
-		DisableGrid:  true,
-		Opaque:       true,
-		DefaultStyle: true,
-		ManualXLim:   true,
-		XMin:         -0.64,
-		XMax:         float64(maxDev) - 0.36,
-	}); err != nil {
-		return fmt.Errorf("failed to save productivity ranking SVG plot: %v", err)
-	}
-
-	fmt.Printf("Saved developer productivity ranking plots to %s and %s\n", pngFile, svgFile)
+	fmt.Printf("Saved developer productivity ranking plot to %s\n", output)
 	return nil
 }

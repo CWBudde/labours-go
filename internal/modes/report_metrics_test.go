@@ -35,13 +35,26 @@ func testReportMetricModesCreateOutputFiles(t *testing.T, ext string) {
 			run: func(output string) error {
 				return TemporalActivity(reader, output, 32, 10, nil, nil)
 			},
+			extras: []string{
+				"temporal-activity_weekdays_commits." + ext,
+				"temporal-activity_hours_commits." + ext,
+				"temporal-activity_months_commits." + ext,
+				"temporal-activity_weeks_commits." + ext,
+				"temporal-activity_weekdays_lines." + ext,
+				"temporal-activity_hours_lines." + ext,
+				"temporal-activity_months_lines." + ext,
+				"temporal-activity_weeks_lines." + ext,
+				"temporal-activity_heatmap_commits." + ext,
+				"temporal-activity_heatmap_lines." + ext,
+			},
+			noPrimary: true,
 		},
 		{
 			name: "bus-factor",
 			run: func(output string) error {
 				return BusFactor(reader, output)
 			},
-			extras:    []string{"bus-factor_timeline." + ext, "bus-factor_subsystems." + ext},
+			extras:    []string{"bus-factor_timeline." + ext, "bus-factor_gauge." + ext, "bus-factor_subsystems." + ext},
 			noPrimary: true,
 		},
 		{
@@ -55,7 +68,7 @@ func testReportMetricModesCreateOutputFiles(t *testing.T, ext string) {
 		{
 			name: "knowledge-diffusion",
 			run: func(output string) error {
-				return KnowledgeDiffusion(reader, output)
+				return KnowledgeDiffusion(reader, output, false)
 			},
 			extras: []string{
 				"knowledge-diffusion_distribution." + ext,
@@ -80,20 +93,21 @@ func testReportMetricModesCreateOutputFiles(t *testing.T, ext string) {
 		{
 			name: "devs-parallel",
 			run: func(output string) error {
-				return DevsParallel(reader, output, 20, true)
+				return DevsParallel(reader, output, 20, true, true)
 			},
 		},
 		{
 			name: "run-times",
 			run: func(output string) error {
-				return RunTimes(reader, output)
+				return RunTimes(reader, output, true)
 			},
 		},
 		{
 			name: "devs-efforts",
 			run: func(output string) error {
-				return DevsEfforts(reader, output, 20)
+				return DevsEfforts(reader, output, 20, true)
 			},
+			extras: []string{"devs-efforts_productivity_ranking." + ext},
 		},
 	}
 
@@ -408,19 +422,36 @@ func (r *reportMetricsReader) GetDeveloperTimeSeriesData() (*readers.DeveloperTi
 }
 
 func (r *reportMetricsReader) GetTemporalActivity() (*readers.TemporalActivityData, error) {
+	weekdaysCommits := make([]int, 7)
+	weekdaysLines := make([]int, 7)
+	weekdaysCommits[1] = 3
+	weekdaysCommits[2] = 2
+	weekdaysLines[1] = 30
+	weekdaysLines[2] = 20
+	monthsCommits := make([]int, 12)
+	monthsLines := make([]int, 12)
+	monthsCommits[0] = 5
+	monthsLines[0] = 50
+	weeksCommits := make([]int, 53)
+	weeksLines := make([]int, 53)
+	weeksCommits[0] = 5
+	weeksLines[0] = 50
 	return &readers.TemporalActivityData{
 		People: []string{"alice"},
 		Activities: map[int]readers.TemporalDeveloperActivity{
 			0: {
+				Weekdays: readers.TemporalDimensionData{Commits: weekdaysCommits, Lines: weekdaysLines},
 				Hours: readers.TemporalDimensionData{
 					Commits: []int{0, 2, 3},
 					Lines:   []int{0, 20, 30},
 				},
+				Months: readers.TemporalDimensionData{Commits: monthsCommits, Lines: monthsLines},
+				Weeks:  readers.TemporalDimensionData{Commits: weeksCommits, Lines: weeksLines},
 			},
 		},
 		Ticks: map[int]map[int]readers.TemporalActivityTick{
-			0: {0: {Commits: 2, Lines: 20, Hour: 1}},
-			1: {0: {Commits: 3, Lines: 30, Hour: 2}},
+			0: {0: {Commits: 2, Lines: 20, Hour: 1, Weekday: 1, Month: 0, Week: 0}},
+			1: {0: {Commits: 3, Lines: 30, Hour: 2, Weekday: 2, Month: 0, Week: 0}},
 		},
 		TickSize: int64(24 * 60 * 60 * 1_000_000_000),
 	}, nil
@@ -430,8 +461,8 @@ func (r *reportMetricsReader) GetBusFactor() (*readers.BusFactorData, error) {
 	return &readers.BusFactorData{
 		People: []string{"alice", "bob"},
 		Snapshots: map[int]readers.BusFactorSnapshot{
-			0: {BusFactor: 1, TotalLines: 100},
-			1: {BusFactor: 2, TotalLines: 120},
+			0: {BusFactor: 1, TotalLines: 100, AuthorLines: map[int]int64{0: 80, 1: 20}},
+			1: {BusFactor: 2, TotalLines: 120, AuthorLines: map[int]int64{0: 70, 1: 50}},
 		},
 		SubsystemBusFactor: map[string]int{"core": 1},
 		Threshold:          0.8,

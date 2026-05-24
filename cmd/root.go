@@ -57,6 +57,13 @@ func initializeFlags() {
 	rootCmd.PersistentFlags().Bool("sentiment-fallback", false, "Allow heuristic sentiment charts when collected sentiment data is missing")
 	rootCmd.PersistentFlags().Bool("devs-parallel-fallback", false, "Allow synthetic devs-parallel charts when people burndown data is missing")
 
+	// Go-only auxiliary plots. Off by default so the rendered file set mirrors
+	// Python labours; enable to render the extra Go-specific charts.
+	rootCmd.PersistentFlags().Bool("run-times-detail", false, "Render the Go-only run-times breakdown chart (Python labours is text-only)")
+	rootCmd.PersistentFlags().Bool("devs-efforts-detail", false, "Also render the Go-only developer productivity ranking chart")
+	rootCmd.PersistentFlags().Bool("devs-parallel-detail", false, "Render the Go-only devs-parallel concurrency timeline chart")
+	rootCmd.PersistentFlags().Bool("knowledge-diffusion-detail", false, "Also render the Go-only knowledge-diffusion trend chart")
+
 	// Progress and output control flags
 	rootCmd.PersistentFlags().BoolP("quiet", "q", false, "Disable progress bars and reduce output")
 	rootCmd.PersistentFlags().Bool("verbose", false, "Enable verbose output with detailed progress information")

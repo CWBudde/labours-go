@@ -39,15 +39,17 @@ type ParallelDeveloperData struct {
 	AverageOverlapScore float64
 }
 
-// DevsParallel analyzes parallel development patterns and visualizes when developers work concurrently.
-func DevsParallel(reader readers.Reader, output string, maxPeople int, allowSyntheticFallback bool) error {
+// DevsParallel analyzes parallel development patterns. The concurrency timeline
+// is a Go-only chart (Python labours needs a shared couples_people_data.tsv and
+// emits nothing standalone), so it is gated behind detail (--devs-parallel-detail).
+func DevsParallel(reader readers.Reader, output string, maxPeople int, allowSyntheticFallback, detail bool) error {
 	fmt.Println("Analyzing parallel development patterns...")
 
 	parallelData, timeSeries, err := loadDevsParallelData(reader, maxPeople)
 	if err != nil {
 		if allowSyntheticFallback {
 			fmt.Printf("Warning: could not load devs-parallel data: %v\n", err)
-			return generateSyntheticParallelAnalysis(reader, output)
+			return generateSyntheticParallelAnalysis(reader, output, detail)
 		}
 		return err
 	}
@@ -58,14 +60,17 @@ func DevsParallel(reader readers.Reader, output string, maxPeople int, allowSynt
 
 	metrics := calculateParallelismMetricsFromParallelData(parallelData, timeSeries)
 
-	// Generate visualization. Python labours emits a single "Developers" parallel-coordinates
-	// chart at args.output; we emit a single parallel-activity timeline there for parity.
-	if err := plotParallelActivity(metrics, output); err != nil {
-		return fmt.Errorf("failed to create parallel activity plot: %v", err)
+	if detail {
+		if err := plotParallelActivity(metrics, output); err != nil {
+			return fmt.Errorf("failed to create parallel activity plot: %v", err)
+		}
 	}
 
 	// Print summary statistics
 	printParallelismSummary(metrics)
+	if !detail {
+		fmt.Println("Concurrency timeline chart skipped (pass --devs-parallel-detail to render it).")
+	}
 
 	fmt.Println("Parallel development analysis completed successfully.")
 	return nil
@@ -606,7 +611,7 @@ func plotParallelActivity(metrics ParallelismMetrics, output string) error {
 }
 
 // generateSyntheticParallelAnalysis creates a fallback analysis when real data is not available
-func generateSyntheticParallelAnalysis(reader readers.Reader, output string) error {
+func generateSyntheticParallelAnalysis(reader readers.Reader, output string, detail bool) error {
 	fmt.Println("Generating synthetic parallel development analysis...")
 
 	// Try to get basic developer stats for fallback
@@ -663,12 +668,16 @@ func generateSyntheticParallelAnalysis(reader readers.Reader, output string) err
 		metrics.PeriodConcurrency[i] = concurrency
 	}
 
-	// Generate plot with synthetic data (single-file parity with Python).
-	if err := plotParallelActivity(metrics, output); err != nil {
-		return fmt.Errorf("failed to create parallel activity plot: %v", err)
+	if detail {
+		if err := plotParallelActivity(metrics, output); err != nil {
+			return fmt.Errorf("failed to create parallel activity plot: %v", err)
+		}
 	}
 
 	printParallelismSummary(metrics)
+	if !detail {
+		fmt.Println("Concurrency timeline chart skipped (pass --devs-parallel-detail to render it).")
+	}
 
 	fmt.Println("Synthetic parallel development analysis completed.")
 	return nil

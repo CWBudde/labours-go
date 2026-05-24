@@ -26,6 +26,56 @@ import (
 	"labours-go/internal/readers"
 )
 
+// temporalWeekdayLabels matches Python labours' WEEKDAY_LABELS ordering, which
+// follows Go's time.Weekday (Sunday = 0).
+var temporalWeekdayLabels = []string{"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"}
+
+var temporalMonthLabels = []string{
+	"Jan", "Feb", "Mar", "Apr", "May", "Jun",
+	"Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+}
+
+// temporalNanosecondsPerDay mirrors Python's NANOSECONDS_PER_DAY: hercules tick
+// sizes are reported in nanoseconds.
+const temporalNanosecondsPerDay = int64(24) * 60 * 60 * 1_000_000_000
+
+type temporalDimensionSpec struct {
+	Key      string
+	Labels   []string
+	Title    string
+	TickStep int
+	Rotate   bool
+}
+
+func temporalDimensionSpecs() []temporalDimensionSpec {
+	return []temporalDimensionSpec{
+		{Key: "weekdays", Labels: temporalWeekdayLabels, Title: "Weekday", TickStep: 1, Rotate: false},
+		{Key: "hours", Labels: temporalClockLabels(), Title: "Hour of Day", TickStep: 3, Rotate: true},
+		{Key: "months", Labels: temporalMonthLabels, Title: "Month", TickStep: 1, Rotate: true},
+		{Key: "weeks", Labels: temporalWeekLabels(), Title: "ISO Week", TickStep: 5, Rotate: true},
+	}
+}
+
+func temporalClockLabels() []string {
+	labels := make([]string, 24)
+	for hour := range labels {
+		labels[hour] = fmt.Sprintf("%02d:00", hour)
+	}
+	return labels
+}
+
+func temporalWeekLabels() []string {
+	labels := make([]string, 53)
+	for week := range labels {
+		labels[week] = fmt.Sprintf("W%d", week+1)
+	}
+	return labels
+}
+
+// TemporalActivity renders the Python labours temporal-activity file set: eight
+// stacked bar charts (weekdays/hours/months/weeks × commits/lines) plus two
+// weekday×hour heatmaps (commits/lines). Each is written as a sibling of the
+// requested output path using Python's underscore-suffix basenames.
 func TemporalActivity(reader readers.Reader, output string, legendThreshold, singleColumnThreshold int, startTime, endTime *time.Time) error {
 	temporalReader, ok := reader.(readers.TemporalActivityReader)
 	if !ok {
@@ -36,15 +86,329 @@ func TemporalActivity(reader readers.Reader, output string, legendThreshold, sin
 		return fmt.Errorf("failed to get temporal activity data: %v", err)
 	}
 
-	hourlyCommits, hourlyLines := aggregateTemporalHours(data, reader, startTime, endTime)
-	if sumInts(hourlyCommits) == 0 && sumInts(hourlyLines) == 0 {
+	if startTime != nil || endTime != nil {
+		if filtered, ok := filterTemporalActivitiesByDateRange(data, reader, startTime, endTime); ok {
+			data = filtered
+		}
+	}
+
+	totalCommits, totalLines := temporalActivityTotals(data)
+	if totalCommits == 0 && totalLines == 0 {
 		return fmt.Errorf("no temporal activity values found")
 	}
 
-	legendNote := temporalLegendNote(len(data.People), legendThreshold, singleColumnThreshold)
+	legendNote := temporalLegendNote(len(data.Activities), legendThreshold, singleColumnThreshold)
 	fmt.Printf("Temporal activity: %d developers, %d commits, %d changed lines%s\n",
-		len(data.People), sumInts(hourlyCommits), sumInts(hourlyLines), legendNote)
-	return plotTemporalHourCommits(reader.GetName(), data, output, legendThreshold, singleColumnThreshold)
+		len(data.Activities), totalCommits, totalLines, legendNote)
+
+	repoName := reader.GetName()
+	for _, mode := range []string{"commits", "lines"} {
+		for _, spec := range temporalDimensionSpecs() {
+			out := siblingOutputPath(output, "temporal-activity.png", spec.Key+"_"+mode)
+			if err := plotTemporalDimension(repoName, data, spec, mode, out, legendThreshold, singleColumnThreshold); err != nil {
+				return err
+			}
+		}
+		out := siblingOutputPath(output, "temporal-activity.png", "heatmap_"+mode)
+		if err := plotTemporalHeatmap(repoName, data, mode, out); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func temporalDimensionValues(activity readers.TemporalDeveloperActivity, dimKey, mode string) []int {
+	var dim readers.TemporalDimensionData
+	switch dimKey {
+	case "weekdays":
+		dim = activity.Weekdays
+	case "hours":
+		dim = activity.Hours
+	case "months":
+		dim = activity.Months
+	case "weeks":
+		dim = activity.Weeks
+	}
+	if mode == "lines" {
+		return dim.Lines
+	}
+	return dim.Commits
+}
+
+func temporalActivityTotals(data *readers.TemporalActivityData) (int, int) {
+	commits, lines := 0, 0
+	for _, activity := range data.Activities {
+		commits += sumInts(activity.Hours.Commits)
+		lines += sumInts(activity.Hours.Lines)
+	}
+	return commits, lines
+}
+
+func buildTemporalDimensionSeries(data *readers.TemporalActivityData, dimKey, mode string, numBins int) []temporalHourCommitSeries {
+	developers := sortedIntKeys(data.Activities)
+	series := make([]temporalHourCommitSeries, 0, len(developers))
+	for _, developer := range developers {
+		values := make([]int, numBins)
+		for i, value := range temporalDimensionValues(data.Activities[developer], dimKey, mode) {
+			if i < numBins {
+				values[i] = value
+			}
+		}
+		name := "Unknown"
+		if developer >= 0 && developer < len(data.People) {
+			name = data.People[developer]
+		}
+		series = append(series, temporalHourCommitSeries{Name: name, Values: values})
+	}
+	return series
+}
+
+func plotTemporalDimension(repoName string, data *readers.TemporalActivityData, spec temporalDimensionSpec, mode, output string, legendThreshold, singleColumnThreshold int) error {
+	_ = singleColumnThreshold
+
+	output, err := resolveReportOutput(output, "temporal-activity_"+spec.Key+"_"+mode+".png")
+	if err != nil {
+		return err
+	}
+
+	numBins := len(spec.Labels)
+	series := buildTemporalDimensionSeries(data, spec.Key, mode, numBins)
+	if len(series) == 0 {
+		return fmt.Errorf("no temporal activity values found")
+	}
+
+	width, height := reportPlotPixels("temporal-activity.png")
+	fig := newReportFigure(width, height)
+	grid := fig.Subplots(1, 1, core.WithSubplotPadding(0.060, 0.985, 0.110, 0.945))
+	if len(grid) == 0 || len(grid[0]) == 0 || grid[0][0] == nil {
+		return fmt.Errorf("failed to create temporal activity axes")
+	}
+	ax := grid[0][0]
+	ax.SetTitle(fmt.Sprintf("%s - Activity by %s (%s)", repoName, spec.Title, mode))
+	ax.SetXLabel(spec.Title)
+	ax.SetYLabel(fmt.Sprintf("Number of %s", mode))
+
+	x := make([]float64, numBins)
+	bottom := make([]float64, numBins)
+	for i := range x {
+		x[i] = float64(i)
+	}
+
+	barWidth := 0.8
+	maxStack := 0.0
+	colors := sampledTab20Colors(len(series))
+	for i, item := range series {
+		values := make([]float64, numBins)
+		for bin, count := range item.Values {
+			if bin >= numBins {
+				break
+			}
+			values[bin] = float64(count)
+		}
+		barColor := colors[i]
+		ax.Bar(x, values, core.BarOptions{
+			Color:     &barColor,
+			Width:     &barWidth,
+			Baselines: append([]float64(nil), bottom...),
+			Label:     item.Name,
+		})
+		for bin := range bottom {
+			bottom[bin] += values[bin]
+			if bottom[bin] > maxStack {
+				maxStack = bottom[bin]
+			}
+		}
+	}
+
+	ticks, labels := temporalDimensionTicks(spec)
+	ax.SetXLim(-0.75, float64(numBins)-0.25)
+	ax.SetYLim(0, math.Max(maxStack, 1))
+	ax.XAxis.Locator = core.FixedLocator{TicksList: ticks}
+	ax.XAxis.Formatter = core.FixedFormatter{Labels: labels}
+	if spec.Rotate {
+		ax.XAxis.MajorLabelStyle = core.TickLabelStyle{
+			Rotation: 45,
+			HAlign:   core.TextAlignRight,
+			VAlign:   core.TextVAlignTop,
+		}
+	}
+	ax.YAxis.Locator = core.FixedLocator{TicksList: temporalActivityYTicks(maxStack)}
+
+	addTemporalLegend(ax, len(series), legendThreshold)
+
+	if err := saveReportFigureWithoutTightLayout(fig, output, width, height); err != nil {
+		return err
+	}
+	fmt.Printf("Saved %s\n", output)
+	return nil
+}
+
+func temporalDimensionTicks(spec temporalDimensionSpec) ([]float64, []string) {
+	numBins := len(spec.Labels)
+	ticks := make([]float64, 0, numBins)
+	labels := make([]string, 0, numBins)
+	for bin := 0; bin < numBins; bin += spec.TickStep {
+		ticks = append(ticks, float64(bin))
+		labels = append(labels, spec.Labels[bin])
+	}
+	return ticks, labels
+}
+
+func addTemporalLegend(ax *core.Axes, seriesCount, legendThreshold int) {
+	if seriesCount <= 1 || (legendThreshold > 0 && seriesCount >= legendThreshold) {
+		return
+	}
+	legend := ax.AddLegend()
+	legend.Location = core.LegendUpperRight
+	legend.FontSize = 9.6
+	legend.BackgroundColor = render.Color{R: 1, G: 1, B: 1, A: 1}
+	legend.BorderColor = render.Color{R: 1, G: 1, B: 1, A: 0}
+	legend.TextColor = render.Color{R: 0, G: 0, B: 0, A: 1}
+}
+
+// temporalWeekdayHourMatrix reconstructs a weekday×hour activity matrix from the
+// per-developer marginal distributions, mirroring Python labours' independence
+// (outer-product) approximation since hercules only emits the marginals.
+func temporalWeekdayHourMatrix(data *readers.TemporalActivityData, mode string) [][]float64 {
+	matrix := make([][]float64, 7)
+	for i := range matrix {
+		matrix[i] = make([]float64, 24)
+	}
+	for _, activity := range data.Activities {
+		weekday := temporalDimensionValues(activity, "weekdays", mode)
+		hour := temporalDimensionValues(activity, "hours", mode)
+		totalWeekday := sumInts(weekday)
+		totalHour := sumInts(hour)
+		if totalWeekday == 0 || totalHour == 0 {
+			continue
+		}
+		for wi := 0; wi < 7 && wi < len(weekday); wi++ {
+			if weekday[wi] == 0 {
+				continue
+			}
+			weekdayProb := float64(weekday[wi]) / float64(totalWeekday)
+			for hi := 0; hi < 24 && hi < len(hour); hi++ {
+				hourProb := float64(hour[hi]) / float64(totalHour)
+				matrix[wi][hi] += math.Trunc(weekdayProb * hourProb * float64(totalWeekday))
+			}
+		}
+	}
+	return matrix
+}
+
+func plotTemporalHeatmap(repoName string, data *readers.TemporalActivityData, mode, output string) error {
+	matrix := temporalWeekdayHourMatrix(data, mode)
+	total := 0.0
+	for _, row := range matrix {
+		for _, value := range row {
+			total += value
+		}
+	}
+	if total == 0 {
+		fmt.Printf("No data for weekday×hour heatmap (%s)\n", mode)
+		return nil
+	}
+
+	output, err := resolveReportOutput(output, "temporal-activity_heatmap_"+mode+".png")
+	if err != nil {
+		return err
+	}
+
+	colLabels := make([]string, 24)
+	for hour := range colLabels {
+		colLabels[hour] = fmt.Sprintf("%02d", hour)
+	}
+	rowLabels := append([]string(nil), temporalWeekdayLabels...)
+
+	if err := graphics.PlotHeatmapMatplotlib(matrix, rowLabels, colLabels, graphics.MatplotlibHeatmapOptions{
+		Title:        fmt.Sprintf("%s - Activity Heatmap: Weekday × Hour (%s)", repoName, mode),
+		Output:       output,
+		Colormap:     "YlOrRd",
+		WidthInches:  19.2,
+		HeightInches: 8,
+	}); err != nil {
+		return fmt.Errorf("failed to plot temporal heatmap: %v", err)
+	}
+	fmt.Printf("Saved %s\n", output)
+	return nil
+}
+
+// filterTemporalActivitiesByDateRange rebuilds per-developer dimension data from
+// the per-tick records, restricted to the requested window. Mirrors Python
+// labours' _filter_activities_by_date_range.
+func filterTemporalActivitiesByDateRange(data *readers.TemporalActivityData, reader readers.Reader, startTime, endTime *time.Time) (*readers.TemporalActivityData, bool) {
+	headerStart, headerEnd := reader.GetHeader()
+	if headerStart == 0 || data.TickSize <= 0 || len(data.Ticks) == 0 {
+		return nil, false
+	}
+
+	repoStart := time.Unix(headerStart, 0)
+	repoEnd := time.Unix(headerEnd, 0)
+	filterStart := repoStart
+	filterEnd := repoEnd
+	if startTime != nil {
+		filterStart = *startTime
+	}
+	if endTime != nil {
+		filterEnd = *endTime
+	}
+	if !filterStart.After(repoStart) && !filterEnd.Before(repoEnd) {
+		return nil, false
+	}
+
+	tickDays := float64(data.TickSize) / float64(temporalNanosecondsPerDay)
+	if tickDays <= 0 {
+		tickDays = 1
+	}
+	startTick := int(filterStart.Sub(repoStart).Hours() / 24 / tickDays)
+	endTick := int(filterEnd.Sub(repoStart).Hours() / 24 / tickDays)
+
+	activities := make(map[int]readers.TemporalDeveloperActivity)
+	for tickID, tickDevs := range data.Ticks {
+		if tickID < startTick || tickID > endTick {
+			continue
+		}
+		for devID, tick := range tickDevs {
+			activity := activities[devID]
+			ensureTemporalDimensionCapacity(&activity)
+			addTemporalTick(&activity, tick)
+			activities[devID] = activity
+		}
+	}
+
+	fmt.Printf("Filtering temporal activity to %s - %s\n",
+		filterStart.Format("2006-01-02"), filterEnd.Format("2006-01-02"))
+
+	return &readers.TemporalActivityData{
+		Activities: activities,
+		People:     data.People,
+		Ticks:      data.Ticks,
+		TickSize:   data.TickSize,
+	}, true
+}
+
+func ensureTemporalDimensionCapacity(activity *readers.TemporalDeveloperActivity) {
+	if len(activity.Weekdays.Commits) == 0 {
+		activity.Weekdays = readers.TemporalDimensionData{Commits: make([]int, 7), Lines: make([]int, 7)}
+		activity.Hours = readers.TemporalDimensionData{Commits: make([]int, 24), Lines: make([]int, 24)}
+		activity.Months = readers.TemporalDimensionData{Commits: make([]int, 12), Lines: make([]int, 12)}
+		activity.Weeks = readers.TemporalDimensionData{Commits: make([]int, 53), Lines: make([]int, 53)}
+	}
+}
+
+func addTemporalTick(activity *readers.TemporalDeveloperActivity, tick readers.TemporalActivityTick) {
+	addTemporalBin(activity.Weekdays.Commits, activity.Weekdays.Lines, tick.Weekday, tick.Commits, tick.Lines)
+	addTemporalBin(activity.Hours.Commits, activity.Hours.Lines, tick.Hour, tick.Commits, tick.Lines)
+	addTemporalBin(activity.Months.Commits, activity.Months.Lines, tick.Month, tick.Commits, tick.Lines)
+	addTemporalBin(activity.Weeks.Commits, activity.Weeks.Lines, tick.Week, tick.Commits, tick.Lines)
+}
+
+func addTemporalBin(commits, lines []int, index, commitDelta, lineDelta int) {
+	if index < 0 || index >= len(commits) {
+		return
+	}
+	commits[index] += commitDelta
+	lines[index] += lineDelta
 }
 
 type temporalHourCommitSeries struct {
@@ -88,6 +452,18 @@ func BusFactor(reader readers.Reader, output string) error {
 		return err
 	}
 
+	if err := plotBusFactorGauge(
+		reader.GetName(),
+		latest.BusFactor,
+		latest.TotalLines,
+		latest.AuthorLines,
+		data.People,
+		float64(data.Threshold),
+		siblingOutputPath(output, "bus-factor.png", "gauge"),
+	); err != nil {
+		return fmt.Errorf("failed to plot bus factor gauge: %v", err)
+	}
+
 	if len(data.SubsystemBusFactor) > 0 {
 		labels, values := busFactorSubsystemPairs(data.SubsystemBusFactor, 0)
 		if err := plotBusFactorSubsystemsMatplotlib(
@@ -101,10 +477,201 @@ func BusFactor(reader readers.Reader, output string) error {
 		}
 		fmt.Printf("Bus factor subsystem summary: %d subsystems\n", len(data.SubsystemBusFactor))
 	}
-	// TODO Phase 9.a: emit `_gauge.png` panel matching Python's two-panel
-	// (big colored bus-factor number + pie of top owners). Currently labours-go
-	// only produces the `_timeline` and `_subsystems` siblings.
 	return nil
+}
+
+// busFactorStatus maps a bus-factor value to Python labours' color + status label.
+func busFactorStatus(busFactor int) (color.RGBA, string) {
+	switch {
+	case busFactor <= 1:
+		return color.RGBA{R: 244, G: 67, B: 54, A: 255}, "CRITICAL"
+	case busFactor <= 3:
+		return color.RGBA{R: 255, G: 152, B: 0, A: 255}, "LOW"
+	case busFactor <= 5:
+		return color.RGBA{R: 255, G: 193, B: 7, A: 255}, "MODERATE"
+	default:
+		return color.RGBA{R: 76, G: 175, B: 80, A: 255}, "HEALTHY"
+	}
+}
+
+// busFactorTopOwners returns the top maxSlices authors by line ownership plus an
+// aggregated "Others" slice, mirroring Python labours' gauge pie.
+func busFactorTopOwners(authorLines map[int]int64, people []string, maxSlices int) ([]string, []float64) {
+	type owner struct {
+		ID    int
+		Lines int64
+	}
+	owners := make([]owner, 0, len(authorLines))
+	for id, lines := range authorLines {
+		owners = append(owners, owner{ID: id, Lines: lines})
+	}
+	sort.Slice(owners, func(i, j int) bool {
+		if owners[i].Lines != owners[j].Lines {
+			return owners[i].Lines > owners[j].Lines
+		}
+		return owners[i].ID < owners[j].ID
+	})
+
+	labels := make([]string, 0, maxSlices+1)
+	values := make([]float64, 0, maxSlices+1)
+	var others int64
+	for i, o := range owners {
+		if i < maxSlices {
+			name := fmt.Sprintf("Author %d", o.ID)
+			if o.ID >= 0 && o.ID < len(people) {
+				name = people[o.ID]
+			}
+			labels = append(labels, name)
+			values = append(values, float64(o.Lines))
+		} else {
+			others += o.Lines
+		}
+	}
+	if others > 0 {
+		labels = append(labels, "Others")
+		values = append(values, float64(others))
+	}
+	return labels, values
+}
+
+// humanizeInt formats an integer with thousands separators (e.g. 12345 -> "12,345").
+func humanizeInt(value int64) string {
+	s := strconv.FormatInt(value, 10)
+	negative := strings.HasPrefix(s, "-")
+	if negative {
+		s = s[1:]
+	}
+	n := len(s)
+	if n <= 3 {
+		if negative {
+			return "-" + s
+		}
+		return s
+	}
+	var b strings.Builder
+	lead := n % 3
+	if lead > 0 {
+		b.WriteString(s[:lead])
+	}
+	for i := lead; i < n; i += 3 {
+		if b.Len() > 0 {
+			b.WriteByte(',')
+		}
+		b.WriteString(s[i : i+3])
+	}
+	if negative {
+		return "-" + b.String()
+	}
+	return b.String()
+}
+
+func plotBusFactorGauge(repoName string, busFactor int, totalLines int64, authorLines map[int]int64, people []string, threshold float64, output string) error {
+	output, err := resolveReportOutput(output, "bus-factor-gauge.png")
+	if err != nil {
+		return err
+	}
+
+	width, height := 1000, 600
+	fig := newReportFigure(width, height)
+	if repoName != "" {
+		fig.SetSuptitle(fmt.Sprintf("%s - Bus Factor Summary", repoName))
+	}
+	gs := fig.GridSpec(
+		1, 2,
+		core.WithGridSpecPadding(0.03, 0.97, 0.05, 0.90),
+		core.WithGridSpecSpacing(0.2, 0.1),
+	)
+	if gs == nil {
+		return fmt.Errorf("failed to create bus factor gauge axes")
+	}
+	axGauge := gs.Cell(0, 0).AddAxes()
+	axPie := gs.Cell(0, 1).AddAxes()
+	if axGauge == nil || axPie == nil {
+		return fmt.Errorf("failed to create bus factor gauge axes")
+	}
+
+	hideAxesContent(axGauge)
+	axGauge.SetXLim(0, 1)
+	axGauge.SetYLim(0, 1)
+
+	statusColor, statusLabel := busFactorStatus(busFactor)
+	statusRenderColor := renderColor(statusColor)
+	gray := render.Color{R: 0.5, G: 0.5, B: 0.5, A: 1}
+	axesCoords := core.Coords(core.CoordAxes)
+	axGauge.Text(0.5, 0.6, strconv.Itoa(busFactor), core.TextOptions{
+		Coords:   axesCoords,
+		FontSize: 72,
+		Color:    statusRenderColor,
+		HAlign:   core.TextAlignCenter,
+		VAlign:   core.TextVAlignMiddle,
+	})
+	axGauge.Text(0.5, 0.35, statusLabel, core.TextOptions{
+		Coords:   axesCoords,
+		FontSize: 18,
+		Color:    statusRenderColor,
+		HAlign:   core.TextAlignCenter,
+		VAlign:   core.TextVAlignMiddle,
+	})
+	axGauge.Text(0.5, 0.2, fmt.Sprintf("Bus Factor @ %.0f%%", threshold*100), core.TextOptions{
+		Coords:   axesCoords,
+		FontSize: 12,
+		Color:    gray,
+		HAlign:   core.TextAlignCenter,
+		VAlign:   core.TextVAlignMiddle,
+	})
+	axGauge.Text(0.5, 0.1, fmt.Sprintf("%s total lines", humanizeInt(totalLines)), core.TextOptions{
+		Coords:   axesCoords,
+		FontSize: 10,
+		Color:    gray,
+		HAlign:   core.TextAlignCenter,
+		VAlign:   core.TextVAlignMiddle,
+	})
+
+	if len(authorLines) > 0 && totalLines > 0 {
+		labels, values := busFactorTopOwners(authorLines, people, 8)
+		axPie.Pie(values, core.PieOptions{
+			Labels:     labels,
+			AutoPct:    "%.1f%%",
+			Colors:     sampledTab20Colors(len(values)),
+			StartAngle: 90,
+		})
+		axPie.SetTitle("Line Ownership")
+	} else {
+		hideAxesContent(axPie)
+		axPie.SetXLim(0, 1)
+		axPie.SetYLim(0, 1)
+		axPie.Text(0.5, 0.5, "No ownership data", core.TextOptions{
+			Coords:   axesCoords,
+			FontSize: 14,
+			HAlign:   core.TextAlignCenter,
+			VAlign:   core.TextVAlignMiddle,
+		})
+	}
+
+	if err := saveReportFigure(fig, output, width, height); err != nil {
+		return err
+	}
+	fmt.Printf("Saved %s\n", output)
+	return nil
+}
+
+// hideAxesContent removes spines, ticks, and labels from an axes, mirroring
+// matplotlib's ax.axis("off") for text-only / pie panels.
+func hideAxesContent(ax *core.Axes) {
+	if ax == nil {
+		return
+	}
+	ax.ShowFrame = false
+	if ax.XAxis != nil {
+		ax.XAxis.ShowSpine = false
+		ax.XAxis.ShowTicks = false
+		ax.XAxis.ShowLabels = false
+	}
+	if ax.YAxis != nil {
+		ax.YAxis.ShowSpine = false
+		ax.YAxis.ShowTicks = false
+		ax.YAxis.ShowLabels = false
+	}
 }
 
 func OwnershipConcentration(reader readers.Reader, output string) error {
@@ -213,7 +780,7 @@ func plotOwnershipSubsystemsBar(repoName string, labels []string, values []float
 	})
 }
 
-func KnowledgeDiffusion(reader readers.Reader, output string) error {
+func KnowledgeDiffusion(reader readers.Reader, output string, detail bool) error {
 	diffusionReader, ok := reader.(readers.KnowledgeDiffusionReader)
 	if !ok {
 		return fmt.Errorf("reader does not expose knowledge diffusion data")
@@ -239,6 +806,11 @@ func KnowledgeDiffusion(reader readers.Reader, output string) error {
 	}
 	if err := plotKnowledgeLorenz(reader.GetName(), data, siblingOutputPath(output, "knowledge-diffusion.png", "lorenz")); err != nil {
 		return err
+	}
+	if detail {
+		if err := plotKnowledgeTrend(data, siblingOutputPath(output, "knowledge-diffusion.png", "trend")); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -441,84 +1013,6 @@ type namedSeries struct {
 	Points plotter.XYs
 }
 
-func aggregateTemporalHours(data *readers.TemporalActivityData, reader readers.Reader, startTime, endTime *time.Time) ([]int, []int) {
-	if (startTime != nil || endTime != nil) && len(data.Ticks) > 0 {
-		if commits, lines, ok := aggregateTemporalHoursFromTicks(data, reader, startTime, endTime); ok {
-			return commits, lines
-		}
-	}
-
-	commits := make([]int, 24)
-	lines := make([]int, 24)
-
-	for _, activity := range data.Activities {
-		for hour, value := range activity.Hours.Commits {
-			if hour >= 0 && hour < len(commits) {
-				commits[hour] += value
-			}
-		}
-		for hour, value := range activity.Hours.Lines {
-			if hour >= 0 && hour < len(lines) {
-				lines[hour] += value
-			}
-		}
-	}
-
-	if sumInts(commits) > 0 || sumInts(lines) > 0 {
-		return commits, lines
-	}
-
-	for _, tickDevs := range data.Ticks {
-		for _, tick := range tickDevs {
-			if tick.Hour >= 0 && tick.Hour < len(commits) {
-				commits[tick.Hour] += tick.Commits
-				lines[tick.Hour] += tick.Lines
-			}
-		}
-	}
-	return commits, lines
-}
-
-func aggregateTemporalHoursFromTicks(data *readers.TemporalActivityData, reader readers.Reader, startTime, endTime *time.Time) ([]int, []int, bool) {
-	headerStart, headerEnd := reader.GetHeader()
-	if headerStart == 0 || data.TickSize <= 0 {
-		return nil, nil, false
-	}
-
-	filterStart := time.Unix(headerStart, 0)
-	filterEnd := time.Unix(headerEnd, 0)
-	if startTime != nil {
-		filterStart = *startTime
-	}
-	if endTime != nil {
-		filterEnd = *endTime
-	}
-
-	tickDuration := time.Duration(data.TickSize)
-	if tickDuration <= 0 {
-		return nil, nil, false
-	}
-
-	commits := make([]int, 24)
-	lines := make([]int, 24)
-	repoStart := time.Unix(headerStart, 0)
-	for tickID, tickDevs := range data.Ticks {
-		tickTime := repoStart.Add(time.Duration(tickID) * tickDuration)
-		if tickTime.Before(filterStart) || tickTime.After(filterEnd) {
-			continue
-		}
-		for _, tick := range tickDevs {
-			if tick.Hour >= 0 && tick.Hour < len(commits) {
-				commits[tick.Hour] += tick.Commits
-				lines[tick.Hour] += tick.Lines
-			}
-		}
-	}
-	fmt.Printf("Filtering temporal activity to %s - %s\n",
-		filterStart.Format("2006-01-02"), filterEnd.Format("2006-01-02"))
-	return commits, lines, true
-}
-
 func buildTemporalHourCommitSeries(data *readers.TemporalActivityData) []temporalHourCommitSeries {
 	if data == nil || len(data.Activities) == 0 {
 		return nil
@@ -544,91 +1038,6 @@ func buildTemporalHourCommitSeries(data *readers.TemporalActivityData) []tempora
 		})
 	}
 	return series
-}
-
-func plotTemporalHourCommits(repoName string, data *readers.TemporalActivityData, output string, legendThreshold, singleColumnThreshold int) error {
-	output, err := resolveReportOutput(output, "temporal-activity.png")
-	if err != nil {
-		return err
-	}
-	_ = singleColumnThreshold
-
-	series := buildTemporalHourCommitSeries(data)
-	if len(series) == 0 {
-		return fmt.Errorf("no temporal activity values found")
-	}
-
-	width, height := reportPlotPixels("temporal-activity.png")
-	fig := newReportFigure(width, height)
-	grid := fig.Subplots(1, 1, core.WithSubplotPadding(0.043, 0.991, 0.090, 0.961))
-	ax := grid[0][0]
-	ax.SetTitle(fmt.Sprintf("%s - Hour of Day (commits)", repoName))
-	ax.SetXLabel("Hour of Day")
-	ax.SetYLabel("Number of commits")
-
-	x := make([]float64, 24)
-	bottom := make([]float64, 24)
-	for hour := range x {
-		x[hour] = float64(hour)
-	}
-
-	barWidth := 0.8
-	maxStack := 0.0
-	colors := sampledTab20Colors(len(series))
-	for i, item := range series {
-		values := make([]float64, 24)
-		for hour, commits := range item.Values {
-			if hour >= len(values) {
-				break
-			}
-			values[hour] = float64(commits)
-		}
-		color := colors[i]
-		ax.Bar(x, values, core.BarOptions{
-			Color:     &color,
-			Width:     &barWidth,
-			Baselines: append([]float64(nil), bottom...),
-			Label:     item.Name,
-		})
-		for hour := range bottom {
-			bottom[hour] += values[hour]
-			if bottom[hour] > maxStack {
-				maxStack = bottom[hour]
-			}
-		}
-	}
-
-	ticks := make([]float64, 0, 8)
-	labels := make([]string, 0, 8)
-	for hour := 0; hour < 24; hour += 3 {
-		ticks = append(ticks, float64(hour))
-		labels = append(labels, fmt.Sprintf("%02d:00", hour))
-	}
-	ax.SetXLim(-1.59, 24.59)
-	ax.SetYLim(0, math.Max(maxStack, 1))
-	ax.XAxis.Locator = core.FixedLocator{TicksList: ticks}
-	ax.XAxis.Formatter = core.FixedFormatter{Labels: labels}
-	ax.XAxis.MajorLabelStyle = core.TickLabelStyle{
-		Rotation: 45,
-		HAlign:   core.TextAlignRight,
-		VAlign:   core.TextVAlignTop,
-	}
-	ax.YAxis.Locator = core.FixedLocator{TicksList: temporalActivityYTicks(maxStack)}
-
-	if len(series) > 1 && (legendThreshold <= 0 || len(series) < legendThreshold) {
-		legend := ax.AddLegend()
-		legend.Location = core.LegendUpperRight
-		legend.FontSize = 9.6
-		legend.BackgroundColor = render.Color{R: 1, G: 1, B: 1, A: 1}
-		legend.BorderColor = render.Color{R: 1, G: 1, B: 1, A: 0}
-		legend.TextColor = render.Color{R: 0, G: 0, B: 0, A: 1}
-	}
-
-	if err := saveReportFigureWithoutTightLayout(fig, output, width, height); err != nil {
-		return err
-	}
-	fmt.Printf("Saved %s\n", output)
-	return nil
 }
 
 func sampledTab20Colors(n int) []render.Color {
@@ -942,9 +1351,8 @@ func plotKnowledgeSilosMatplotlib(repoName string, labels []string, uniqueValues
 	return nil
 }
 
-// plotKnowledgeTrend renders a max-unique-editors-over-time chart.
-// Currently unreferenced — kept as scaffolding for a future Go-only `--knowledge-diffusion-trend` flag.
-// nolint:unused
+// plotKnowledgeTrend renders a max-unique-editors-over-time chart. Go-only,
+// gated behind --knowledge-diffusion-detail.
 func plotKnowledgeTrend(data *readers.KnowledgeDiffusionData, output string) error {
 	trend := make(map[int]int)
 	for _, file := range data.Files {
@@ -1701,14 +2109,6 @@ func siblingOutputPath(output, defaultOutput, suffix string) string {
 		return base + "_" + suffix
 	}
 	return base + "_" + suffix + ext
-}
-
-func hourLabels(hours int) []string {
-	labels := make([]string, hours)
-	for hour := range labels {
-		labels[hour] = fmt.Sprintf("%02d", hour)
-	}
-	return labels
 }
 
 func sumInts(values []int) int {

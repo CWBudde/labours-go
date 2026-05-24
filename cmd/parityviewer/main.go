@@ -336,9 +336,11 @@ func laboursReferenceRecipes() []referenceRecipe {
 			Mode:  "devs-efforts",
 		},
 		{
-			Name:  "temporal_activity",
-			Input: filepath.Join("test", "testdata", "hercules", "report_default.pb"),
-			Mode:  "temporal-activity",
+			Name:          "temporal_activity",
+			Input:         filepath.Join("test", "testdata", "hercules", "report_default.pb"),
+			Mode:          "temporal-activity",
+			OutputIsDir:   true,
+			GeneratedFile: "temporal-activity_hours_commits.png",
 		},
 		{
 			Name:          "bus_factor_timeline",
@@ -346,6 +348,13 @@ func laboursReferenceRecipes() []referenceRecipe {
 			Mode:          "bus-factor",
 			OutputIsDir:   true,
 			GeneratedFile: "bus-factor_timeline.png",
+		},
+		{
+			Name:          "bus_factor_gauge",
+			Input:         filepath.Join("test", "testdata", "hercules", "report_default.pb"),
+			Mode:          "bus-factor",
+			OutputIsDir:   true,
+			GeneratedFile: "bus-factor_gauge.png",
 		},
 		{
 			Name:          "bus_factor_subsystems",
@@ -398,12 +407,13 @@ func laboursReferenceRecipes() []referenceRecipe {
 			Name:      "devs_parallel",
 			Input:     filepath.Join("test", "testdata", "hercules", "report_default.pb"),
 			Mode:      "devs-parallel",
-			ExtraArgs: []string{"--devs-parallel-fallback"},
+			ExtraArgs: []string{"--devs-parallel-fallback", "--devs-parallel-detail"},
 		},
 		{
-			Name:  "run_times",
-			Input: filepath.Join("test", "testdata", "hercules", "report_default.pb"),
-			Mode:  "run-times",
+			Name:      "run_times",
+			Input:     filepath.Join("test", "testdata", "hercules", "report_default.pb"),
+			Mode:      "run-times",
+			ExtraArgs: []string{"--run-times-detail"},
 		},
 		{
 			Name:          "couples_files_heatmap",

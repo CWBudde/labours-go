@@ -302,7 +302,7 @@ func devs(reader readers.Reader, output string, _ *time.Time, _ *time.Time) erro
 
 func devsEfforts(reader readers.Reader, output string, _ *time.Time, _ *time.Time) error {
 	maxPeople := viper.GetInt("max-people")
-	return modes.DevsEfforts(reader, output, maxPeople)
+	return modes.DevsEfforts(reader, output, maxPeople, viper.GetBool("devs-efforts-detail"))
 }
 
 func oldVsNew(reader readers.Reader, output string, startTime, endTime *time.Time) error {
@@ -321,11 +321,11 @@ func temporalActivity(reader readers.Reader, output string, startTime, endTime *
 }
 
 func devsParallel(reader readers.Reader, output string, _ *time.Time, _ *time.Time) error {
-	return modes.DevsParallel(reader, output, viper.GetInt("max-people"), devsParallelFallbackEnabled)
+	return modes.DevsParallel(reader, output, viper.GetInt("max-people"), devsParallelFallbackEnabled, viper.GetBool("devs-parallel-detail"))
 }
 
 func runTimes(reader readers.Reader, output string, _ *time.Time, _ *time.Time) error {
-	return modes.RunTimes(reader, output)
+	return modes.RunTimes(reader, output, viper.GetBool("run-times-detail"))
 }
 
 func busFactor(reader readers.Reader, output string, _ *time.Time, _ *time.Time) error {
@@ -337,7 +337,7 @@ func ownershipConcentration(reader readers.Reader, output string, _ *time.Time, 
 }
 
 func knowledgeDiffusion(reader readers.Reader, output string, _ *time.Time, _ *time.Time) error {
-	return modes.KnowledgeDiffusion(reader, output)
+	return modes.KnowledgeDiffusion(reader, output, viper.GetBool("knowledge-diffusion-detail"))
 }
 
 func hotspotRisk(reader readers.Reader, output string, _ *time.Time, _ *time.Time) error {

@@ -17,8 +17,10 @@ import (
 	"labours-go/internal/readers"
 )
 
-// RunTimes generates runtime analysis and visualization
-func RunTimes(reader readers.Reader, output string) error {
+// RunTimes generates runtime analysis. Python labours is text-only for this
+// mode, so by default we only print the summary; the Go-only breakdown chart is
+// gated behind detail (--run-times-detail).
+func RunTimes(reader readers.Reader, output string, detail bool) error {
 	quiet := viper.GetBool("quiet")
 	progEstimator := progress.NewProgressEstimator(!quiet)
 
@@ -45,18 +47,31 @@ func RunTimes(reader readers.Reader, output string) error {
 	progEstimator.NextOperation("Analyzing runtime patterns")
 	runtimeAnalysis := analyzeRuntimeStats(runtimeStats)
 
-	// Phase 3: Generate visualizations
+	// Phase 3: Generate visualizations (detail only) and print the summary.
 	progEstimator.NextOperation("Generating visualization")
-	if err := plotRuntimeAnalysis(runtimeAnalysis, output); err != nil {
-		progEstimator.FinishMultiOperation()
-		return fmt.Errorf("failed to generate runtime plots: %v", err)
+	if detail {
+		if err := plotRuntimeBreakdown(runtimeAnalysis, runtimeOutputPath(output)); err != nil {
+			progEstimator.FinishMultiOperation()
+			return fmt.Errorf("failed to generate runtime plots: %v", err)
+		}
 	}
+	printRuntimeSummary(runtimeAnalysis)
 
 	progEstimator.FinishMultiOperation()
 	if !quiet {
+		if !detail {
+			fmt.Println("Runtime breakdown chart skipped (pass --run-times-detail to render it).")
+		}
 		fmt.Println("Runtime analysis completed successfully.")
 	}
 	return nil
+}
+
+func runtimeOutputPath(output string) string {
+	if output == "" {
+		return "run-times.png"
+	}
+	return output
 }
 
 // RuntimeMetric represents a single runtime measurement
@@ -146,20 +161,6 @@ func analyzeRuntimeStats(runtimeStats map[string]float64) RuntimeAnalysis {
 			FastestOp:       fastestOp,
 		},
 	}
-}
-
-// plotRuntimeAnalysis generates runtime visualization plot (single file, Python-parity).
-// Python labours emits no PNG for run-times (text only); we emit a breakdown bar chart at
-// the requested output path when one is provided.
-func plotRuntimeAnalysis(analysis RuntimeAnalysis, output string) error {
-	if output == "" {
-		output = "run-times.png"
-	}
-	if err := plotRuntimeBreakdown(analysis, output); err != nil {
-		return err
-	}
-	printRuntimeSummary(analysis)
-	return nil
 }
 
 func printRuntimeSummary(analysis RuntimeAnalysis) {
