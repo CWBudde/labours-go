@@ -25,9 +25,10 @@ func testReportMetricModesCreateOutputFiles(t *testing.T, ext string) {
 	t.Helper()
 	reader := &reportMetricsReader{}
 	tests := []struct {
-		name   string
-		run    func(string) error
-		extras []string
+		name      string
+		run       func(string) error
+		extras    []string
+		noPrimary bool // mode does not write to args.output directly; only extras are checked
 	}{
 		{
 			name: "temporal-activity",
@@ -40,20 +41,28 @@ func testReportMetricModesCreateOutputFiles(t *testing.T, ext string) {
 			run: func(output string) error {
 				return BusFactor(reader, output)
 			},
-			extras: []string{"bus-factor_subsystems." + ext},
+			extras:    []string{"bus-factor_timeline." + ext, "bus-factor_subsystems." + ext},
+			noPrimary: true,
 		},
 		{
 			name: "ownership-concentration",
 			run: func(output string) error {
 				return OwnershipConcentration(reader, output)
 			},
+			extras:    []string{"ownership-concentration_timeline." + ext, "ownership-concentration_subsystems." + ext},
+			noPrimary: true,
 		},
 		{
 			name: "knowledge-diffusion",
 			run: func(output string) error {
 				return KnowledgeDiffusion(reader, output)
 			},
-			extras: []string{"knowledge-diffusion_silos." + ext, "knowledge-diffusion_trend." + ext},
+			extras: []string{
+				"knowledge-diffusion_distribution." + ext,
+				"knowledge-diffusion_silos." + ext,
+				"knowledge-diffusion_lorenz." + ext,
+			},
+			noPrimary: true,
 		},
 		{
 			name: "hotspot-risk",
@@ -61,6 +70,30 @@ func testReportMetricModesCreateOutputFiles(t *testing.T, ext string) {
 				return HotspotRisk(reader, output)
 			},
 			extras: []string{"hotspot-risk_table.tsv"},
+		},
+		{
+			name: "old-vs-new",
+			run: func(output string) error {
+				return OldVsNew(reader, output, nil, nil, "")
+			},
+		},
+		{
+			name: "devs-parallel",
+			run: func(output string) error {
+				return DevsParallel(reader, output, 20, true)
+			},
+		},
+		{
+			name: "run-times",
+			run: func(output string) error {
+				return RunTimes(reader, output)
+			},
+		},
+		{
+			name: "devs-efforts",
+			run: func(output string) error {
+				return DevsEfforts(reader, output, 20)
+			},
 		},
 	}
 
@@ -71,7 +104,9 @@ func testReportMetricModesCreateOutputFiles(t *testing.T, ext string) {
 			if err := tt.run(output); err != nil {
 				t.Fatalf("%s() unexpected error: %v", tt.name, err)
 			}
-			assertNonEmptyFile(t, output)
+			if !tt.noPrimary {
+				assertNonEmptyFile(t, output)
+			}
 			for _, extra := range tt.extras {
 				assertNonEmptyFile(t, filepath.Join(dir, extra))
 			}
@@ -121,30 +156,6 @@ func TestDirectoryChartModesCreatePNGAndSVGAssets(t *testing.T) {
 				"shotness_coupling_heatmap.svg",
 				"top_shotness_coupling_pairs.png",
 				"top_shotness_coupling_pairs.svg",
-			},
-		},
-		{
-			name: "devs-efforts",
-			run: func(output string) error {
-				return DevsEfforts(reader, output, 20)
-			},
-			files: []string{
-				"devs_efforts_scatter.png",
-				"devs_efforts_scatter.svg",
-				"devs_productivity_ranking.png",
-				"devs_productivity_ranking.svg",
-			},
-		},
-		{
-			name: "run-times",
-			run: func(output string) error {
-				return RunTimes(reader, output)
-			},
-			files: []string{
-				"runtime_breakdown.png",
-				"runtime_breakdown.svg",
-				"runtime_percentage.png",
-				"runtime_percentage.svg",
 			},
 		},
 	}
@@ -261,12 +272,59 @@ func TestBusFactorSubsystemPairsMatchesPythonParityTieOrder(t *testing.T) {
 	}
 }
 
+func TestBusFactorSubsystemPairsCanReturnAllSubsystems(t *testing.T) {
+	values := map[string]int{}
+	for i := 0; i < 25; i++ {
+		values[fmt.Sprintf("subsystem-%02d", i)] = i % 4
+	}
+
+	labels, gotValues := busFactorSubsystemPairs(values, 0)
+
+	if len(labels) != len(values) {
+		t.Fatalf("labels length = %d, want %d", len(labels), len(values))
+	}
+	if len(gotValues) != len(values) {
+		t.Fatalf("values length = %d, want %d", len(gotValues), len(values))
+	}
+}
+
+func TestBusFactorSubsystemPlotPixelsMatchPythonDynamicHeight(t *testing.T) {
+	width, height := busFactorSubsystemPlotPixels(32)
+
+	if width != 1200 {
+		t.Fatalf("width = %d, want 1200", width)
+	}
+	if height != 1480 {
+		t.Fatalf("height = %d, want 1480", height)
+	}
+}
+
+func TestBusFactorSubsystemPlotPixelsKeepPythonMinimumHeight(t *testing.T) {
+	width, height := busFactorSubsystemPlotPixels(2)
+
+	if width != 1200 {
+		t.Fatalf("width = %d, want 1200", width)
+	}
+	if height != 400 {
+		t.Fatalf("height = %d, want 400", height)
+	}
+}
+
+func TestBusFactorSubsystemYAxisMatchesPythonOrientation(t *testing.T) {
+	if busFactorSubsystemInvertY() {
+		t.Fatal("bus factor subsystem chart should keep Python barh default Y orientation")
+	}
+}
+
 func assertNonEmptyFile(t *testing.T, path string) {
 	t.Helper()
 
 	info, err := os.Stat(path)
 	if err != nil {
 		t.Fatalf("expected output file %s: %v", path, err)
+	}
+	if !info.Mode().IsRegular() {
+		t.Fatalf("expected regular file at %s, got mode %s", path, info.Mode())
 	}
 	if info.Size() == 0 {
 		t.Fatalf("expected non-empty output file %s", path)

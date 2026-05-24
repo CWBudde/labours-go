@@ -148,19 +148,27 @@ func analyzeRuntimeStats(runtimeStats map[string]float64) RuntimeAnalysis {
 	}
 }
 
-// plotRuntimeAnalysis generates runtime visualization plots
+// plotRuntimeAnalysis generates runtime visualization plot (single file, Python-parity).
+// Python labours emits no PNG for run-times (text only); we emit a breakdown bar chart at
+// the requested output path when one is provided.
 func plotRuntimeAnalysis(analysis RuntimeAnalysis, output string) error {
-	// Create bar chart of runtime breakdown
+	if output == "" {
+		output = "run-times.png"
+	}
 	if err := plotRuntimeBreakdown(analysis, output); err != nil {
 		return err
 	}
-
-	// Create pie chart showing percentage breakdown
-	if err := plotRuntimePieChart(analysis, output); err != nil {
-		return err
-	}
-
+	printRuntimeSummary(analysis)
 	return nil
+}
+
+func printRuntimeSummary(analysis RuntimeAnalysis) {
+	fmt.Printf("Runtime Analysis Summary:\n")
+	fmt.Printf("  Total operations: %d\n", analysis.Statistics.TotalOperations)
+	fmt.Printf("  Total runtime: %.2f ms\n", analysis.Statistics.TotalTimeMs)
+	fmt.Printf("  Average runtime per operation: %.2f ms\n", analysis.Statistics.AverageTime)
+	fmt.Printf("  Slowest operation: %s (%.2f ms)\n", analysis.Statistics.SlowestOp, analysis.Statistics.MaxTime)
+	fmt.Printf("  Fastest operation: %s (%.2f ms)\n", analysis.Statistics.FastestOp, analysis.Statistics.MinTime)
 }
 
 // plotRuntimeBreakdown creates a bar chart showing runtime for each operation
@@ -184,12 +192,11 @@ func plotRuntimeBreakdown(analysis RuntimeAnalysis, output string) error {
 
 	xMargin := 0.05 * (float64(maxOps) - 0.2)
 	barColor := color.RGBA{R: 84, G: 162, B: 75, A: 255}
-	pngFile := filepath.Join(output, "runtime_breakdown.png")
 	if err := graphics.PlotBarChartMatplotlib(labels, values, graphics.MatplotlibBarOptions{
 		Title:        "Runtime Analysis Breakdown",
 		XLabel:       "Operations (by time)",
 		YLabel:       "Time",
-		Output:       pngFile,
+		Output:       output,
 		WidthInches:  15.36,
 		HeightInches: 7.68,
 		RotateX:      true,
@@ -201,30 +208,10 @@ func plotRuntimeBreakdown(analysis RuntimeAnalysis, output string) error {
 		XMin:         -0.4 - xMargin,
 		XMax:         float64(maxOps) - 0.6 + xMargin,
 	}); err != nil {
-		return fmt.Errorf("failed to save runtime breakdown PNG plot: %v", err)
+		return fmt.Errorf("failed to save runtime breakdown plot: %v", err)
 	}
 
-	svgFile := filepath.Join(output, "runtime_breakdown.svg")
-	if err := graphics.PlotBarChartMatplotlib(labels, values, graphics.MatplotlibBarOptions{
-		Title:        "Runtime Analysis Breakdown",
-		XLabel:       "Operations (by time)",
-		YLabel:       "Time",
-		Output:       svgFile,
-		WidthInches:  15.36,
-		HeightInches: 7.68,
-		RotateX:      true,
-		Color:        barColor,
-		DisableGrid:  true,
-		Opaque:       true,
-		DefaultStyle: true,
-		ManualXLim:   true,
-		XMin:         -0.4 - xMargin,
-		XMax:         float64(maxOps) - 0.6 + xMargin,
-	}); err != nil {
-		return fmt.Errorf("failed to save runtime breakdown SVG plot: %v", err)
-	}
-
-	fmt.Printf("Saved runtime breakdown plots to %s and %s\n", pngFile, svgFile)
+	fmt.Printf("Saved runtime breakdown plot to %s\n", output)
 	return nil
 }
 
@@ -235,7 +222,9 @@ func compactRuntimeLabel(label string, limit int) string {
 	return "..." + label[len(label)-(limit-3):]
 }
 
-// plotRuntimePieChart creates a pie chart showing percentage breakdown of runtime
+// plotRuntimePieChart creates a pie chart showing percentage breakdown of runtime.
+// Currently unreferenced — kept as scaffolding for a future `--run-times-detail` flag.
+// nolint:unused
 func plotRuntimePieChart(analysis RuntimeAnalysis, output string) error {
 	if len(analysis.Metrics) == 0 {
 		return fmt.Errorf("no runtime metrics available")

@@ -457,6 +457,138 @@ Acceptance criteria:
 - [ ] Release artifact includes Linux binaries if desired.
 - [ ] Release artifact includes macOS binaries if desired.
 
+## Phase 9: Side-by-Side Python Parity on a Real Repository
+
+Goal: close the concrete divergences observed by running both backends against
+`/mnt/projekte/Code/Coda/system-optimiser-core` (1,994 commits, 7.7 years, C++23)
+on 2026-05-24. The end-to-end harness is `scripts/full_showcase.sh`; the
+artifacts and side-by-side diff are at
+`analysis_results/system-optimiser-core/{plots-go,plots-python,compare}`.
+Open `compare/index.html` for the visual record.
+
+Headline result of the baseline run: **labours-go 21 OK / 0 failed**,
+**Python labours 15 OK / 5 failed**. RMSE between matched PNGs ranges from
+0.11 (`ownership`) to 0.50 (`overwrites-matrix`); no matched pair is
+pixel-identical. Most divergences are filename/composition gaps rather than
+data gaps, but a few are real.
+
+### 9.a Filename and composition parity
+
+Many modes produce *different artifact filenames* between Go and Python.
+Hercules `report` and the parity viewer match by filename, so divergent
+names break automated comparison even when the underlying data is correct.
+Pick one canonical set per mode (prefer the Python names, since Hercules
+report expects them) and emit the same files from labours-go.
+
+**Python convention** — single-mode invocation (`-o $BASE.png`):
+
+- Single-plot modes (`burndown-project`, `ownership`, `old-vs-new`,
+  `devs-efforts`, `devs-parallel`, `devs`, `languages`, `refactoring-proxy`,
+  `overwrites-matrix`, …) write directly to `args.output`.
+- Multi-plot modes (`bus-factor`, `ownership-concentration`,
+  `knowledge-diffusion`, `temporal-activity`) split the base name and write
+  *sibling* files: `$BASE_{suffix}{ext}`. No subdirectory.
+- The `--mode all` invocation uses a different convention
+  (`get_plot_path()` writes into a subdir derived from the base) — that
+  case is what Hercules `report --all` consumes. For now Phase 9.a targets
+  the single-mode convention since that is what the showcase exercises.
+- SVG sidecars: Python does not emit them; labours-go currently does.
+  Drop the SVG companions to match Python (or gate them behind `--svg`).
+
+| Mode                      | labours-go emits today                                                  | Python emits (single-mode `-o $BASE.png`)                                              | Action                                                                                                | Status |
+| ------------------------- | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | ------ |
+| `old-vs-new`              | `$BASE.png` (matches)                                                   | `$BASE.png` (single file, no transform)                                                | —                                                                                                     | ✅ done |
+| `devs-efforts`            | `$BASE.png` (scatter; time-series TODO)                                 | `$BASE.png` (single time-series of efforts)                                            | Time-series implementation still needed; filename parity done.                                        | ✅ filename done, ⚠️ content TODO |
+| `devs-parallel`           | `$BASE.png` (parallel-activity timeline)                                | `$BASE.png` (parallel-coordinates "Developers")                                        | Picked the closest existing Go plot. True parallel-coordinates port TODO.                              | ✅ filename done, ⚠️ content TODO |
+| `run-times`               | `$BASE.png` (breakdown bar; text summary stdout)                        | no PNG (stdout table only)                                                              | Go emits one PNG when `-o` supplied; matches text behaviour.                                          | ✅ done |
+| `bus-factor`              | `$BASE_timeline.png` + `$BASE_subsystems.png`                           | `$BASE_gauge.png` + `$BASE_timeline.png` + `$BASE_subsystems.png`                      | Gauge panel (big colored BF + line-ownership pie) still TODO; renames + timeline done.                | ⚠️ 2/3 — `_gauge` TODO |
+| `ownership-concentration` | `$BASE_timeline.png` + `$BASE_subsystems.png`                           | `$BASE_timeline.png` + `$BASE_subsystems.png`                                          | —                                                                                                     | ✅ done |
+| `knowledge-diffusion`     | `$BASE_distribution.png` + `$BASE_silos.png` + `$BASE_lorenz.png`       | `$BASE_distribution.png` + `$BASE_silos.png` + `$BASE_lorenz.png`                      | Lorenz curve implemented with trapezoidal-rule Gini. `_trend` removed (Go-only, gated behind future flag). | ✅ done |
+| `temporal-activity`       | `$BASE.png` (single composite)                                          | `$BASE_{weekdays,hours,months,weeks}_{commits,lines}.png` (8) + `$BASE_heatmap_{commits,lines}.png` (2) | Stop writing single composite. Emit the 10 sibling files Python emits.                                | ❌ TODO — biggest scope |
+
+Acceptance: for every mode in the showcase, `ls plots-go/<mode>*` and
+`ls plots-python/<mode>*` produce the same set of basenames. The Go-only
+auxiliary plots (`devs-efforts` productivity ranking, `devs-parallel`
+developer concurrency, `run-times` percentage pie, `knowledge-diffusion`
+trend) remain in the codebase behind `//nolint:unused` and are tracked for
+re-exposure via mode-specific `--<mode>-detail` flags.
+
+### 9.b Visual parity within matched modes
+
+For every mode that already produces a same-named file in both backends,
+`compare -metric RMSE` reports the following on the baseline dataset:
+
+| Mode                       | RMSE  | Likely cause                                                                                |
+| -------------------------- | ----- | ------------------------------------------------------------------------------------------- |
+| `ownership`                | 0.112 | Colour map / legend placement.                                                              |
+| `devs`                     | 0.116 | Per-developer line widths and legend ordering.                                              |
+| `burndown-project`         | 0.144 | Resampling smoothing + axis label fonts.                                                    |
+| `refactoring-proxy`        | 0.144 | Threshold band tints differ from Python defaults.                                           |
+| `knowledge-diffusion_silos`| 0.213 | Bar order, palette, label truncation.                                                       |
+| `bus-factor_subsystems`    | 0.335 | Subsystem ordering and per-row colour.                                                      |
+| `languages`                | 0.429 | Stack order of language layers; Python sorts differently and uses tableau palette.          |
+| `overwrites-matrix`        | 0.503 | Most divergent: heatmap scale, colour ramp, and tick labels all differ.                     |
+
+Acceptance: every matched-name pair on this dataset gets RMSE ≤ 0.10 with
+the existing `cmd/parityviewer` toolchain. Track per-mode progress against
+the table above.
+
+### 9.c Modes where Python currently fails
+
+Python labours fails on five modes against this real-world dataset; each is
+either a Python-side limitation or an unsupported analysis. Decide per-mode
+whether to keep Go-only support or to gate Go behind the same constraint.
+
+- **`overwrites-matrix`, `couples-files`, `couples-people`** — Python raises
+  `ImportError: TensorFlow is required for training embeddings`. labours-go
+  already runs the analysis without TensorFlow. Action: document the
+  intentional divergence; keep Go behaviour but ensure the produced plot is
+  visually faithful to the Python output *when* TF is installed (use the
+  `.venv` plus `uv pip install tensorflow` path for a golden reference run).
+- **`hotspot-risk`** — Python prints `there is no registered PB decoder for
+  HotspotRisk`. The analysis is labours-go-only. Action: contribute the
+  decoder upstream to `../hercules/python/labours/_pb.py` (or document as a
+  permanent Go-only mode). Until then `hotspot-risk` has no parity baseline.
+- **`burndown-repos-combined`** — Python raises `ValueError: No repository
+  data available` on single-repo input. labours-go now returns the same
+  `No repository data available` message and exits non-zero, matching
+  Python's strictness (was: "silently writes an empty PNG").
+- **`devs-parallel`** — Python's `load_devs_parallel` reads
+  `couples_people_data.tsv` from `args.tmpdir`, so it can only run *after*
+  `couples-people`. Action: either (a) port the dependency into labours-go's
+  in-process pipeline so `devs-parallel` works standalone (already the
+  case — keep that), and update `scripts/full_showcase.sh` to share a
+  tmpdir between `couples-people` and `devs-parallel` in Python so the
+  Python comparison has data.
+
+### 9.d Tooling
+
+The showcase harness exists; lock it in as the regression surface.
+
+- [x] `scripts/full_showcase.sh` runs hercules once + both labours backends
+  + per-mode logs, with `BACKEND={go|python|both}`, `PEOPLE_DICT=…`,
+  `ENABLE_SHOTNESS`, `ENABLE_SENTIMENT`, `SKIP_HERCULES` knobs.
+- [x] `just showcase <repo>` recipe.
+- [x] `just showcase-compare <repo-name>` recipe launches `cmd/parityviewer`
+  with `--baseline-dir plots-python --artifact-dir plots-go`.
+- [x] Static `compare/index.html` with side-by-side and diff PNGs.
+- [ ] Wire `system-optimiser-core` into CI as a nightly job that fails when
+  any matched-name RMSE regresses, when any Go-only artifact disappears,
+  or when any Python-supported mode starts failing in Go.
+- [ ] Add a small fixture repo (~50 commits, 2 authors, mixed languages) so
+  the same comparison can run in <30 s on every PR.
+
+### 9.e Author identity hygiene
+
+The baseline run merged 9 raw signatures into 3 canonical names via
+`raw/people-dict.txt`. Real-world repos almost always need this.
+
+- [x] Document the `--people-dict` workflow in the README, with the
+  `analysis_results/system-optimiser-core/raw/people-dict.txt` file as a
+  worked example.
+- [ ] Consider auto-loading the repo's `.mailmap` in labours-go's manifest
+  output so users see exactly which identities were merged.
+
 ## Suggested Near-term Work Order
 
 1. Update `pb.proto` from Hercules and regenerate Go protobuf code.
@@ -469,6 +601,8 @@ Acceptance criteria:
 8. Complete report-all modes.
 9. Replace heuristic modes with true Python-compatible ports.
 10. Tighten visual parity once data parity is stable.
+11. Address Phase 9.a filename divergences (cheap, unblocks automated parity).
+12. Walk the Phase 9.b RMSE table top-to-bottom — start with `ownership`/`devs`/`burndown-project` (cheap), end with `overwrites-matrix` (largest delta).
 
 ## Definition of Done
 

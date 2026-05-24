@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"image/color"
 	"math"
-	"path/filepath"
 	"time"
 
 	"labours-go/internal/graphics"
@@ -241,10 +240,12 @@ func generateOldVsNewPlot(newCodeSeries, modifiedCodeSeries []float64, dates []t
 		},
 	}
 
-	outputFile := filepath.Join(output, "old_vs_new_analysis.png")
+	if output == "" {
+		output = "old-vs-new.png"
+	}
 	if err := graphics.PlotTimeAreasMatplotlib(dates, series, graphics.MatplotlibTimeAreaOptions{
 		Title:        "Additions vs changes",
-		Output:       outputFile,
+		Output:       output,
 		WidthInches:  6.4,
 		HeightInches: 4.8,
 		Legend:       true,
@@ -257,28 +258,7 @@ func generateOldVsNewPlot(newCodeSeries, modifiedCodeSeries []float64, dates []t
 		return fmt.Errorf("failed to save old-vs-new plot: %v", err)
 	}
 
-	svgOutputFile := filepath.Join(output, "old_vs_new_analysis.svg")
-	svgErr := graphics.PlotTimeAreasMatplotlib(dates, series, graphics.MatplotlibTimeAreaOptions{
-		Title:        "Additions vs changes",
-		Output:       svgOutputFile,
-		WidthInches:  6.4,
-		HeightInches: 4.8,
-		Legend:       true,
-		LegendLeft:   true,
-		LegendTop:    true,
-		HideFrame:    true,
-		AutoXMargin:  true,
-		Alpha:        1,
-	})
-	if svgErr != nil {
-		fmt.Printf("Warning: failed to save SVG: %v\n", svgErr)
-	}
-
-	fmt.Printf("Old vs New analysis plot saved to %s\n", outputFile)
-	if svgErr == nil {
-		fmt.Printf("SVG version saved to %s\n", svgOutputFile)
-	}
-
+	fmt.Printf("Old vs New analysis plot saved to %s\n", output)
 	return nil
 }
 

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"image/color"
 	"math"
-	"path/filepath"
 	"sort"
 
 	"gonum.org/v1/plot"
@@ -59,13 +58,10 @@ func DevsParallel(reader readers.Reader, output string, maxPeople int, allowSynt
 
 	metrics := calculateParallelismMetricsFromParallelData(parallelData, timeSeries)
 
-	// Generate visualizations
+	// Generate visualization. Python labours emits a single "Developers" parallel-coordinates
+	// chart at args.output; we emit a single parallel-activity timeline there for parity.
 	if err := plotParallelActivity(metrics, output); err != nil {
 		return fmt.Errorf("failed to create parallel activity plot: %v", err)
-	}
-
-	if err := plotDeveloperConcurrency(metrics, output); err != nil {
-		return fmt.Errorf("failed to create developer concurrency plot: %v", err)
 	}
 
 	// Print summary statistics
@@ -596,115 +592,17 @@ func plotParallelActivity(metrics ParallelismMetrics, output string) error {
 		p.Legend.Left = true
 	}
 
-	// Save PNG with dynamic sizing
+	// Save to the user's requested output path (Python parity: single file).
+	if output == "" {
+		output = "devs-parallel.png"
+	}
 	width, height := graphics.GetPlotSize(graphics.ChartTypeDefault)
-	outputFile := filepath.Join(output, "parallel_activity.png")
-	if err := p.Save(width, height, outputFile); err != nil {
+	if err := p.Save(width, height, output); err != nil {
 		return fmt.Errorf("failed to save parallel activity plot: %v", err)
 	}
 
-	// Save SVG
-	outputFileSVG := filepath.Join(output, "parallel_activity.svg")
-	if err := p.Save(width, height, outputFileSVG); err != nil {
-		return fmt.Errorf("failed to save parallel activity SVG: %v", err)
-	}
-
-	fmt.Printf("Saved parallel activity plots to %s and %s\n", outputFile, outputFileSVG)
+	fmt.Printf("Saved parallel activity plot to %s\n", output)
 	return nil
-}
-
-// plotDeveloperConcurrency creates a heatmap/bar chart showing developer overlap patterns
-func plotDeveloperConcurrency(metrics ParallelismMetrics, output string) error {
-	if len(metrics.ActiveDevelopers) == 0 {
-		return fmt.Errorf("no active developers found")
-	}
-
-	// Calculate average overlap for each developer
-	devOverlapAvgs := make([]float64, len(metrics.ActiveDevelopers))
-	for i, dev := range metrics.ActiveDevelopers {
-		total := 0.0
-		count := 0
-		for otherDev, overlap := range metrics.DeveloperOverlaps[dev] {
-			if dev != otherDev {
-				total += overlap
-				count++
-			}
-		}
-		if count > 0 {
-			devOverlapAvgs[i] = total / float64(count)
-		}
-		if math.IsNaN(devOverlapAvgs[i]) || math.IsInf(devOverlapAvgs[i], 0) {
-			devOverlapAvgs[i] = 0
-		}
-	}
-
-	labels := make([]string, len(metrics.ActiveDevelopers))
-	values := make([]float64, len(devOverlapAvgs))
-	maxOverlap := 0.0
-	for i, avg := range devOverlapAvgs {
-		values[i] = avg
-		labels[i] = compactParallelDeveloperLabel(metrics.ActiveDevelopers[i], 18)
-		if avg > maxOverlap {
-			maxOverlap = avg
-		}
-	}
-	yMax := maxOverlap * 1.05
-
-	barColor := color.RGBA{R: 114, G: 183, B: 178, A: 255}
-	outputFile := filepath.Join(output, "developer_concurrency.png")
-	if err := graphics.PlotBarChartMatplotlib(labels, values, graphics.MatplotlibBarOptions{
-		Title:        "Developer Collaboration Patterns",
-		XLabel:       "Developers",
-		YLabel:       "Average Overlap Coefficient",
-		Output:       outputFile,
-		WidthInches:  15.36,
-		HeightInches: 7.68,
-		RotateX:      true,
-		Color:        barColor,
-		DisableGrid:  true,
-		Opaque:       true,
-		DefaultStyle: true,
-		ManualXLim:   true,
-		XMin:         -0.64,
-		XMax:         float64(len(labels)) - 0.36,
-		YMax:         yMax,
-	}); err != nil {
-		return fmt.Errorf("failed to save developer concurrency plot: %v", err)
-	}
-
-	outputFileSVG := filepath.Join(output, "developer_concurrency.svg")
-	if err := graphics.PlotBarChartMatplotlib(labels, values, graphics.MatplotlibBarOptions{
-		Title:        "Developer Collaboration Patterns",
-		XLabel:       "Developers",
-		YLabel:       "Average Overlap Coefficient",
-		Output:       outputFileSVG,
-		WidthInches:  15.36,
-		HeightInches: 7.68,
-		RotateX:      true,
-		Color:        barColor,
-		DisableGrid:  true,
-		Opaque:       true,
-		DefaultStyle: true,
-		ManualXLim:   true,
-		XMin:         -0.64,
-		XMax:         float64(len(labels)) - 0.36,
-		YMax:         yMax,
-	}); err != nil {
-		return fmt.Errorf("failed to save developer concurrency SVG: %v", err)
-	}
-
-	fmt.Printf("Saved developer concurrency plots to %s and %s\n", outputFile, outputFileSVG)
-	return nil
-}
-
-func compactParallelDeveloperLabel(label string, limit int) string {
-	if limit <= 0 || len(label) <= limit {
-		return label
-	}
-	if limit <= 3 {
-		return label[len(label)-limit:]
-	}
-	return "..." + label[len(label)-(limit-3):]
 }
 
 // generateSyntheticParallelAnalysis creates a fallback analysis when real data is not available
@@ -765,13 +663,9 @@ func generateSyntheticParallelAnalysis(reader readers.Reader, output string) err
 		metrics.PeriodConcurrency[i] = concurrency
 	}
 
-	// Generate plots with synthetic data
+	// Generate plot with synthetic data (single-file parity with Python).
 	if err := plotParallelActivity(metrics, output); err != nil {
 		return fmt.Errorf("failed to create parallel activity plot: %v", err)
-	}
-
-	if err := plotDeveloperConcurrency(metrics, output); err != nil {
-		return fmt.Errorf("failed to create developer concurrency plot: %v", err)
 	}
 
 	printParallelismSummary(metrics)

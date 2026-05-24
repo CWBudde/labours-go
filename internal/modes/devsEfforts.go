@@ -101,19 +101,15 @@ func analyzeDevEfforts(stats []readers.DeveloperStat) []EffortMetric {
 	return metrics
 }
 
-// plotDevEfforts generates effort analysis plots
+// plotDevEfforts generates a single effort analysis plot at the requested output path.
+// Python labours emits a single "Efforts" time-series chart at args.output; we currently
+// emit a commits-vs-lines scatter for parity in file count. A true time-series port is
+// tracked in PLAN.md Phase 9.b.
 func plotDevEfforts(metrics []EffortMetric, output string) error {
-	// Create commits vs lines changed scatter plot
-	if err := plotCommitsVsLines(metrics, output); err != nil {
-		return err
+	if output == "" {
+		output = "devs-efforts.png"
 	}
-
-	// Create productivity ranking bar chart
-	if err := plotProductivityRanking(metrics, output); err != nil {
-		return err
-	}
-
-	return nil
+	return plotCommitsVsLines(metrics, output)
 }
 
 // plotCommitsVsLines creates scatter plot of commits vs total lines changed
@@ -152,16 +148,17 @@ func plotCommitsVsLines(metrics []EffortMetric, output string) error {
 		}
 	}
 
-	pngFile, svgFile, err := savePlotPNGAndSVG(p, 16*vg.Inch, 8*vg.Inch, output, "devs_efforts_scatter")
-	if err != nil {
-		return fmt.Errorf("failed to save scatter plot: %v", err)
+	if err := p.Save(16*vg.Inch, 8*vg.Inch, output); err != nil {
+		return fmt.Errorf("failed to save devs-efforts plot %s: %v", output, err)
 	}
 
-	fmt.Printf("Saved developer efforts scatter plots to %s and %s\n", pngFile, svgFile)
+	fmt.Printf("Saved devs-efforts plot to %s\n", output)
 	return nil
 }
 
-// plotProductivityRanking creates bar chart of developer productivity ranking
+// plotProductivityRanking creates a bar chart of developer productivity ranking.
+// Currently unreferenced — kept as scaffolding for a future `--devs-efforts-detail` flag.
+// nolint:unused
 func plotProductivityRanking(metrics []EffortMetric, output string) error {
 	// Prepare data for top developers only
 	maxDev := len(metrics)

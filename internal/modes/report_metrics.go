@@ -75,29 +75,35 @@ func BusFactor(reader readers.Reader, output string) error {
 	latest := data.Snapshots[ticks[len(ticks)-1]]
 	fmt.Printf("Bus factor: latest=%d, total lines=%d, threshold=%.2f\n",
 		latest.BusFactor, latest.TotalLines, data.Threshold)
+
+	timelineOutput := siblingOutputPath(output, "bus-factor.png", "timeline")
 	if err := plotLineSeries(
 		"Bus Factor Over Time",
 		"Tick",
 		"Bus Factor",
 		[]namedSeries{{Name: "Bus factor", Points: series}},
-		output,
-		"bus-factor.png",
+		timelineOutput,
+		"bus-factor-timeline.png",
 	); err != nil {
 		return err
 	}
 
 	if len(data.SubsystemBusFactor) > 0 {
-		labels, values := busFactorSubsystemPairs(data.SubsystemBusFactor, 20)
+		labels, values := busFactorSubsystemPairs(data.SubsystemBusFactor, 0)
 		if err := plotBusFactorSubsystemsMatplotlib(
 			reader.GetName(),
 			labels,
 			values,
+			float64(data.Threshold),
 			siblingOutputPath(output, "bus-factor.png", "subsystems"),
 		); err != nil {
 			return fmt.Errorf("failed to plot subsystem bus factor: %v", err)
 		}
 		fmt.Printf("Bus factor subsystem summary: %d subsystems\n", len(data.SubsystemBusFactor))
 	}
+	// TODO Phase 9.a: emit `_gauge.png` panel matching Python's two-panel
+	// (big colored bus-factor number + pie of top owners). Currently labours-go
+	// only produces the `_timeline` and `_subsystems` siblings.
 	return nil
 }
 
@@ -128,7 +134,9 @@ func OwnershipConcentration(reader readers.Reader, output string) error {
 	latest := data.Snapshots[ticks[len(ticks)-1]]
 	fmt.Printf("Ownership concentration: latest gini=%.3f, hhi=%.3f, total lines=%d\n",
 		latest.Gini, latest.HHI, latest.TotalLines)
-	return plotLineSeries(
+
+	timelineOutput := siblingOutputPath(output, "ownership-concentration.png", "timeline")
+	if err := plotLineSeries(
 		"Ownership Concentration Over Time",
 		"Tick",
 		"Concentration",
@@ -136,9 +144,73 @@ func OwnershipConcentration(reader readers.Reader, output string) error {
 			{Name: "Gini", Points: gini},
 			{Name: "HHI", Points: hhi},
 		},
-		output,
-		"ownership-concentration.png",
-	)
+		timelineOutput,
+		"ownership-concentration-timeline.png",
+	); err != nil {
+		return err
+	}
+
+	if len(data.SubsystemGini) > 0 {
+		labels, values := subsystemFloatPairs(data.SubsystemGini, 0)
+		subsystemOutput := siblingOutputPath(output, "ownership-concentration.png", "subsystems")
+		if err := plotOwnershipSubsystemsBar(reader.GetName(), labels, values, subsystemOutput); err != nil {
+			return fmt.Errorf("failed to plot subsystem ownership concentration: %v", err)
+		}
+		fmt.Printf("Ownership concentration subsystem summary: %d subsystems\n", len(data.SubsystemGini))
+	}
+	return nil
+}
+
+func subsystemFloatPairs(values map[string]float64, limit int) ([]string, []float64) {
+	type pair struct {
+		Key   string
+		Value float64
+	}
+	pairs := make([]pair, 0, len(values))
+	for key, value := range values {
+		pairs = append(pairs, pair{Key: key, Value: value})
+	}
+	sort.Slice(pairs, func(i, j int) bool {
+		if pairs[i].Value != pairs[j].Value {
+			return pairs[i].Value < pairs[j].Value
+		}
+		return pairs[i].Key < pairs[j].Key
+	})
+	if limit > 0 && len(pairs) > limit {
+		pairs = pairs[:limit]
+	}
+	labels := make([]string, len(pairs))
+	resultValues := make([]float64, len(pairs))
+	for i, p := range pairs {
+		labels[i] = p.Key
+		resultValues[i] = p.Value
+	}
+	return labels, resultValues
+}
+
+func plotOwnershipSubsystemsBar(repoName string, labels []string, values []float64, output string) error {
+	output, err := resolveReportOutput(output, "ownership-concentration-subsystems.png")
+	if err != nil {
+		return err
+	}
+	title := "Ownership Concentration (Gini) by Subsystem"
+	if repoName != "" {
+		title = fmt.Sprintf("%s - %s", repoName, title)
+	}
+	heightInches := math.Max(4, float64(len(labels))*0.35+2)
+	return graphics.PlotBarChartMatplotlib(labels, values, graphics.MatplotlibBarOptions{
+		Title:        title,
+		XLabel:       "Subsystem",
+		YLabel:       "Gini Coefficient",
+		Output:       output,
+		WidthInches:  12,
+		HeightInches: heightInches,
+		RotateX:      true,
+		Color:        color.RGBA{R: 84, G: 162, B: 75, A: 255},
+		DisableGrid:  true,
+		Opaque:       true,
+		DefaultStyle: true,
+	})
 }
 
 func KnowledgeDiffusion(reader readers.Reader, output string) error {
@@ -157,17 +229,74 @@ func KnowledgeDiffusion(reader readers.Reader, output string) error {
 	labels, values := knowledgeDistribution(data)
 	fmt.Printf("Knowledge diffusion: %d files, %d developers, window=%d months\n",
 		len(data.Files), len(data.People), data.WindowMonths)
-	if err := plotKnowledgeDistribution(reader.GetName(), labels, values, output); err != nil {
+	distributionOutput := siblingOutputPath(output, "knowledge-diffusion.png", "distribution")
+	if err := plotKnowledgeDistribution(reader.GetName(), labels, values, distributionOutput); err != nil {
 		return err
 	}
 
 	if err := plotKnowledgeSilos(reader.GetName(), data, siblingOutputPath(output, "knowledge-diffusion.png", "silos")); err != nil {
 		return err
 	}
-	if err := plotKnowledgeTrend(data, siblingOutputPath(output, "knowledge-diffusion.png", "trend")); err != nil {
+	if err := plotKnowledgeLorenz(reader.GetName(), data, siblingOutputPath(output, "knowledge-diffusion.png", "lorenz")); err != nil {
 		return err
 	}
 	return nil
+}
+
+// plotKnowledgeLorenz renders a Lorenz curve of unique-editor distribution across files.
+// X-axis: cumulative fraction of files (sorted by editor count ascending).
+// Y-axis: cumulative fraction of total unique-editor slots.
+// The diagonal represents perfect equality; bowing below indicates concentration.
+func plotKnowledgeLorenz(repoName string, data *readers.KnowledgeDiffusionData, output string) error {
+	counts := make([]int, 0, len(data.Files))
+	for _, f := range data.Files {
+		counts = append(counts, f.UniqueEditors)
+	}
+	sort.Ints(counts)
+	n := len(counts)
+	total := 0
+	for _, c := range counts {
+		total += c
+	}
+	if n == 0 || total == 0 {
+		return nil
+	}
+
+	lorenz := make(plotter.XYs, n+1)
+	lorenz[0] = plotter.XY{X: 0, Y: 0}
+	cum := 0
+	for i, c := range counts {
+		cum += c
+		lorenz[i+1] = plotter.XY{
+			X: float64(i+1) / float64(n),
+			Y: float64(cum) / float64(total),
+		}
+	}
+
+	// Gini = 1 - 2 * area under the Lorenz curve (trapezoidal rule).
+	area := 0.0
+	for i := 1; i < len(lorenz); i++ {
+		dx := lorenz[i].X - lorenz[i-1].X
+		area += dx * (lorenz[i].Y + lorenz[i-1].Y) / 2
+	}
+	gini := 1 - 2*area
+
+	diagonal := plotter.XYs{{X: 0, Y: 0}, {X: 1, Y: 1}}
+	title := fmt.Sprintf("Editor Distribution (Lorenz Curve) - Gini=%.3f", gini)
+	if repoName != "" {
+		title = fmt.Sprintf("%s - %s", repoName, title)
+	}
+	return plotLineSeries(
+		title,
+		"Cumulative Fraction of Files",
+		"Cumulative Fraction of Editors",
+		[]namedSeries{
+			{Name: fmt.Sprintf("Lorenz (Gini=%.3f)", gini), Points: lorenz},
+			{Name: "Perfect equality", Points: diagonal},
+		},
+		output,
+		"knowledge-diffusion-lorenz.png",
+	)
 }
 
 func HotspotRisk(reader readers.Reader, output string) error {
@@ -610,12 +739,12 @@ func plotFloatBars(title, xLabel, yLabel string, labels []string, values plotter
 	return nil
 }
 
-func plotBusFactorSubsystemsMatplotlib(repoName string, labels []string, values []int, output string) error {
+func plotBusFactorSubsystemsMatplotlib(repoName string, labels []string, values []int, threshold float64, output string) error {
 	output, err := resolveReportOutput(output, "bus-factor-subsystems.png")
 	if err != nil {
 		return err
 	}
-	width, height := reportPlotPixels("bus-factor-subsystems.png")
+	width, height := busFactorSubsystemPlotPixels(len(labels))
 	fig := newReportFigure(width, height)
 	grid := fig.Subplots(1, 1, core.WithSubplotPadding(0.24, 0.945, 0.100, 0.936))
 	if len(grid) == 0 || len(grid[0]) == 0 || grid[0][0] == nil {
@@ -623,9 +752,9 @@ func plotBusFactorSubsystemsMatplotlib(repoName string, labels []string, values 
 	}
 	ax := grid[0][0]
 	if repoName != "" {
-		ax.SetTitle(fmt.Sprintf("%s - Bus Factor Subsystems", repoName))
+		ax.SetTitle(fmt.Sprintf("%s - Bus Factor by Subsystem (threshold: %.0f%%)", repoName, threshold*100))
 	} else {
-		ax.SetTitle("Bus Factor Subsystems")
+		ax.SetTitle(fmt.Sprintf("Bus Factor by Subsystem (threshold: %.0f%%)", threshold*100))
 	}
 	ax.SetXLabel("Bus Factor")
 	ax.XAxis.Locator = core.MaxNLocator{Integer: true}
@@ -642,12 +771,14 @@ func plotBusFactorSubsystemsMatplotlib(repoName string, labels []string, values 
 	}
 	orientation := core.BarHorizontal
 	barHeight := 0.6
-	barColor := renderColor(color.RGBA{R: 244, G: 67, B: 54, A: 255})
-	ax.Bar(y, barValues, core.BarOptions{
-		Color:       &barColor,
-		Width:       &barHeight,
-		Orientation: &orientation,
-	})
+	for i, value := range values {
+		barColor := renderColor(busFactorColor(value))
+		ax.Bar([]float64{y[i]}, []float64{barValues[i]}, core.BarOptions{
+			Color:       &barColor,
+			Width:       &barHeight,
+			Orientation: &orientation,
+		})
+	}
 	for i, value := range values {
 		ax.Text(float64(value)+0.1, y[i], fmt.Sprintf("%d", value), core.TextOptions{
 			FontSize: 9.6,
@@ -664,7 +795,9 @@ func plotBusFactorSubsystemsMatplotlib(repoName string, labels []string, values 
 	})
 	ax.SetXLim(0, math.Max(maxValue*1.05, 1.05))
 	ax.SetYLim(-0.78, float64(len(labels))-0.22)
-	ax.InvertY()
+	if busFactorSubsystemInvertY() {
+		ax.InvertY()
+	}
 	ax.YAxis.Locator = core.FixedLocator{TicksList: ticks}
 	ax.YAxis.Formatter = core.FixedFormatter{Labels: append([]string(nil), labels...)}
 
@@ -673,6 +806,28 @@ func plotBusFactorSubsystemsMatplotlib(repoName string, labels []string, values 
 	}
 	fmt.Printf("Saved %s\n", output)
 	return nil
+}
+
+func busFactorSubsystemPlotPixels(subsystemCount int) (int, int) {
+	heightInches := math.Max(4, float64(subsystemCount)*0.4+2)
+	return 1200, int(heightInches * 100)
+}
+
+func busFactorSubsystemInvertY() bool {
+	return false
+}
+
+func busFactorColor(value int) color.RGBA {
+	switch {
+	case value <= 1:
+		return color.RGBA{R: 244, G: 67, B: 54, A: 255}
+	case value <= 3:
+		return color.RGBA{R: 255, G: 152, B: 0, A: 255}
+	case value <= 5:
+		return color.RGBA{R: 255, G: 193, B: 7, A: 255}
+	default:
+		return color.RGBA{R: 76, G: 175, B: 80, A: 255}
+	}
 }
 
 func plotKnowledgeSilos(repoName string, data *readers.KnowledgeDiffusionData, output string) error {
@@ -787,6 +942,9 @@ func plotKnowledgeSilosMatplotlib(repoName string, labels []string, uniqueValues
 	return nil
 }
 
+// plotKnowledgeTrend renders a max-unique-editors-over-time chart.
+// Currently unreferenced — kept as scaffolding for a future Go-only `--knowledge-diffusion-trend` flag.
+// nolint:unused
 func plotKnowledgeTrend(data *readers.KnowledgeDiffusionData, output string) error {
 	trend := make(map[int]int)
 	for _, file := range data.Files {
@@ -1214,6 +1372,8 @@ func reportPlotInches(defaultOutput string) (float64, float64) {
 	switch defaultOutput {
 	case "temporal-activity.png":
 		return 16, 10
+	case "refactoring-proxy.png":
+		return 16, 6
 	case "bus-factor.png", "ownership-concentration.png":
 		return 14, 6
 	case "bus-factor-subsystems.png", "knowledge-diffusion.png":
