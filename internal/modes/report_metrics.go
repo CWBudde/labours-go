@@ -762,7 +762,7 @@ func plotOwnershipSubsystemsBar(repoName string, labels []string, values []float
 	if repoName != "" {
 		title = fmt.Sprintf("%s - %s", repoName, title)
 	}
-	heightInches := math.Max(4, float64(len(labels))*0.35+2)
+	heightInches := math.Max(4, float64(len(labels))*0.5+2)
 	return graphics.PlotBarChartMatplotlib(labels, values, graphics.MatplotlibBarOptions{
 		Title:        title,
 		XLabel:       "Subsystem",
@@ -1285,7 +1285,6 @@ func plotKnowledgeSilosMatplotlib(repoName string, labels []string, uniqueValues
 	}
 	ax.SetTitle(title)
 	ax.SetXLabel("Number of Editors")
-	ax.AddXGrid()
 
 	yTotal := make([]float64, len(labels))
 	yRecent := make([]float64, len(labels))
@@ -1755,10 +1754,13 @@ func reportPlotInches(defaultOutput string) (float64, float64) {
 		return 16, 10
 	case "refactoring-proxy.png":
 		return 16, 6
-	case "bus-factor.png", "ownership-concentration.png":
+	case "bus-factor.png", "ownership-concentration.png",
+		"bus-factor-timeline.png", "ownership-concentration-timeline.png":
 		return 14, 6
 	case "bus-factor-subsystems.png", "knowledge-diffusion.png":
 		return 12, 6
+	case "knowledge-diffusion-lorenz.png":
+		return 8, 8
 	case "knowledge-diffusion-silos.png":
 		return 14, 12.5
 	case "hotspot-risk.png":

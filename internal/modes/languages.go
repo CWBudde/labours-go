@@ -93,10 +93,9 @@ func plotLanguageEvolution(timeSeries *readers.DeveloperTimeSeriesData, startUni
 			Legend:       true,
 			LegendLeft:   true,
 			LegendTop:    true,
-			Alpha:        0.8,
 			YMin:         0,
 			YMax:         math.Max(data.Total*1.05, 1),
-			ShowGrid:     true,
+			ShowGrid:     false,
 		}); err != nil {
 			return err
 		}

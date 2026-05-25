@@ -113,7 +113,7 @@ func plotOverwritesMatrix(people, colLabels []string, matrix [][]float64, output
 	ax := fig.GridSpec(
 		1,
 		1,
-		core.WithGridSpecPadding(0.255, 0.916, 0.017, 0.748),
+		core.WithGridSpecPadding(0.105, 0.99, 0.01, 0.89),
 	).Cell(0, 0).AddAxes()
 	if ax == nil {
 		return fmt.Errorf("failed to create overwrites axes")
