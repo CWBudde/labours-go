@@ -126,12 +126,9 @@ func PlotBurndownMatplotlib(data *burndown.ProcessedBurndown, output string, rel
 		}
 	}
 
-	width, height := pythonPlotPixelSize(16, 12)
-	fontSize := viper.GetInt("font-size")
-	if fontSize <= 0 {
-		fontSize = 12
-	}
-	background, foreground := laboursPlotColors(viper.GetString("background"))
+	width, height := pythonPlotPixelSize(PythonPlotDefaultWidthInches, PythonPlotDefaultHeightInches)
+	fontSize := PythonPlotFontSize()
+	background, foreground := LaboursPlotColors(viper.GetString("background"))
 	transparentBackground := background
 	transparentBackground.A = 0
 	// Python labours forces the legend frame fully opaque in `apply_plot_style`
@@ -143,7 +140,7 @@ func PlotBurndownMatplotlib(data *burndown.ProcessedBurndown, output string, rel
 		width,
 		height,
 		style.WithTheme(style.ThemeGGPlot),
-		style.WithFont("DejaVu Sans", float64(fontSize)),
+		style.WithFont(PythonPlotFontFamily, fontSize),
 		style.WithBackground(background.R, background.G, background.B, 0),
 		style.WithAxesBackground(transparentBackground),
 		style.WithAxesEdgeColor(foreground),
@@ -181,7 +178,7 @@ func PlotBurndownMatplotlib(data *burndown.ProcessedBurndown, output string, rel
 	if relative {
 		ax.SetYLim(0, 1)
 	} else {
-		configureMatplotlibBurndownYAxis(fig, ax, matrix, float64(fontSize), foreground)
+		configureMatplotlibBurndownYAxis(fig, ax, matrix, fontSize, foreground)
 	}
 	configureMatplotlibBurndownTimeAxis(ax, data.DateRange, data.ResampleMode)
 
@@ -329,7 +326,10 @@ func maxStackY(matrix [][]float64) float64 {
 	return maxY
 }
 
-func laboursPlotColors(backgroundName string) (background, foreground render.Color) {
+// LaboursPlotColors returns the (background, foreground) figure colors for the
+// given --background flag value, matching Python labours' black-on-white default
+// and white-on-black "black" theme.
+func LaboursPlotColors(backgroundName string) (background, foreground render.Color) {
 	if strings.EqualFold(backgroundName, "black") {
 		return render.Color{R: 0, G: 0, B: 0, A: 1}, render.Color{R: 1, G: 1, B: 1, A: 1}
 	}
@@ -603,7 +603,7 @@ func pythonPlotPixelSize(defaultWidth, defaultHeight float64) (int, int) {
 			fmt.Printf("Warning: %v, using default size\n", err)
 		}
 	}
-	return atLeastOne(int(math.Round(width * 100))), atLeastOne(int(math.Round(height * 100)))
+	return InchesToPixels(width), InchesToPixels(height)
 }
 
 func atLeastOne(value int) int {

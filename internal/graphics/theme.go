@@ -3,7 +3,51 @@ package graphics
 import (
 	"fmt"
 	"image/color"
+	"math"
+
+	"github.com/spf13/viper"
 )
+
+// Python labours render-style constants. These mirror matplotlib's savefig
+// defaults as used by the reference `labours` tool and are the single source of
+// truth for the matplotlib-go render path: every mode and bridge helper reads
+// figure DPI, font family/size, and the fallback figure size from here rather
+// than re-declaring the literals.
+const (
+	// pythonPlotDPI is matplotlib's savefig dpi; figure inches * DPI = pixels.
+	pythonPlotDPI = 100
+	// PythonPlotFontFamily is the font Python labours renders with (matplotlib's
+	// bundled default face).
+	PythonPlotFontFamily = "DejaVu Sans"
+	// PythonPlotMonoFontFamily is the monospace face used for code/path labels.
+	PythonPlotMonoFontFamily = "DejaVu Sans Mono"
+	// pythonPlotDefaultFontSize is the fallback when --font-size is unset.
+	pythonPlotDefaultFontSize = 12.0
+	// PythonPlotDefaultWidthInches / PythonPlotDefaultHeightInches are the
+	// fallback figure size (matplotlib labours' 16x12 default) used when both a
+	// mode and the --size flag leave the dimensions unspecified.
+	PythonPlotDefaultWidthInches  = 16.0
+	PythonPlotDefaultHeightInches = 12.0
+)
+
+// PythonPlotFontSize resolves the configured font size (--font-size), falling
+// back to the Python-parity default of 12pt.
+func PythonPlotFontSize() float64 {
+	if fontSize := viper.GetInt("font-size"); fontSize > 0 {
+		return float64(fontSize)
+	}
+	return pythonPlotDefaultFontSize
+}
+
+// InchesToPixels converts a figure dimension in inches to device pixels at the
+// labours render DPI (matplotlib savefig dpi=100), clamped to at least 1px.
+func InchesToPixels(inches float64) int {
+	pixels := int(math.Round(inches * pythonPlotDPI))
+	if pixels < 1 {
+		return 1
+	}
+	return pixels
+}
 
 // Theme represents a complete visual theme configuration
 type Theme struct {

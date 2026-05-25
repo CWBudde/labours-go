@@ -6,6 +6,7 @@ import (
 	"math"
 	"time"
 
+	matcolor "github.com/cwbudde/matplotlib-go/color"
 	"github.com/cwbudde/matplotlib-go/core"
 	"github.com/cwbudde/matplotlib-go/render"
 	"github.com/cwbudde/matplotlib-go/style"
@@ -716,6 +717,271 @@ func PlotStackedBarChartMatplotlib(labels []string, series []MatplotlibGroupedBa
 	return saveMatplotlibFigure(fig, opts.Output, width, height)
 }
 
+type MatplotlibDevsEffortsOptions struct {
+	Title        string
+	Output       string
+	WidthInches  float64
+	HeightInches float64
+}
+
+// PlotDevsEffortsMatplotlib renders the Python labours "Efforts through time"
+// chart: a dual mirror stackplot where smoothed cumulative efforts stack upward
+// and the negated, scaled instantaneous efforts stack downward over a shared
+// date x-axis. cumLayers and instLayers must share the same shape and the last
+// layer is the aggregated "others" series.
+func PlotDevsEffortsMatplotlib(dates []time.Time, cumLayers, instLayers [][]float64, labels []string, opts MatplotlibDevsEffortsOptions) error {
+	if len(dates) < 2 {
+		return fmt.Errorf("not enough dates to plot devs-efforts time series")
+	}
+	if len(cumLayers) == 0 {
+		return fmt.Errorf("no effort layers to plot")
+	}
+
+	x := make([]float64, len(dates))
+	for i, date := range dates {
+		x[i] = float64(date.Unix())
+	}
+
+	width, height := pythonPlotPixelSize(defaultPlotWidth(opts.WidthInches), defaultPlotHeight(opts.HeightInches))
+	fig := core.NewFigure(width, height, pythonTransparentFigureOptions()...)
+	ax := fig.AddSubplot(1, 1, 1)
+	if ax == nil {
+		return fmt.Errorf("failed to create axes")
+	}
+	ax.SetTitle(opts.Title)
+
+	rows := len(cumLayers)
+	palette := tab20Palette()
+	// Python uses the axes color cycle, which advances through both stackplot
+	// calls, so the bottom (instantaneous) layers continue past the top ones.
+	topColors := make([]render.Color, rows)
+	bottomColors := make([]render.Color, rows)
+	for i := 0; i < rows; i++ {
+		topColors[i] = renderColor(palette[i%len(palette)])
+		bottomColors[i] = renderColor(palette[(rows+i)%len(palette)])
+	}
+
+	edge := 0.0
+	alpha := 1.0
+	ax.StackPlot(x, cumLayers, core.StackPlotOptions{
+		Colors:    topColors,
+		Labels:    labels,
+		EdgeWidth: &edge,
+		Alpha:     &alpha,
+	})
+	ax.StackPlot(x, instLayers, core.StackPlotOptions{
+		Colors:    bottomColors,
+		EdgeWidth: &edge,
+		Alpha:     &alpha,
+	})
+
+	ax.SetXLim(x[0], x[len(x)-1])
+	topMax := stackedSumMax(cumLayers)
+	bottomMin := stackedSumMin(instLayers)
+	if topMax <= 0 {
+		topMax = 1
+	}
+	span := topMax
+	if -bottomMin > span {
+		span = -bottomMin
+	}
+	ax.SetYLim(bottomMin-span*0.02, topMax+span*0.02)
+
+	// Python keeps only the non-negative y ticks (the mirrored lower half is
+	// unlabelled).
+	if ax.YAxis != nil {
+		ax.YAxis.Locator = core.FixedLocator{TicksList: nonNegativeNiceTicks(topMax)}
+	}
+
+	ticks, tlabels := timeAxisDateTicks(dates, "")
+	if len(ticks) > 0 {
+		ax.XAxis.Locator = core.FixedLocator{TicksList: ticks}
+		ax.XAxis.Formatter = core.FixedFormatter{Labels: tlabels}
+		if shouldRotateDateLabels(tlabels) {
+			ax.XAxis.MajorLabelStyle = core.TickLabelStyle{Rotation: 30, AutoAlign: true}
+		}
+	}
+
+	legend := ax.AddLegend()
+	legend.Location = core.LegendUpperLeft
+	legend.NumColumns = 2
+
+	return saveMatplotlibFigure(fig, opts.Output, width, height)
+}
+
+type MatplotlibParallelCoordinatesSeries struct {
+	// Values holds the normalized y position (0..1) of one developer at each
+	// vertical axis, ordered left to right.
+	Values []float64
+}
+
+type MatplotlibParallelCoordinatesOptions struct {
+	Title        string
+	Output       string
+	WidthInches  float64
+	HeightInches float64
+	// Axes is the number of vertical axes (Python uses 5).
+	Axes int
+}
+
+// PlotParallelCoordinatesMatplotlib renders the Python labours devs-parallel
+// chart: each developer is a cubic-spline curve flowing across the vertical
+// axes, drawn as short segments tinted along the viridis colormap.
+func PlotParallelCoordinatesMatplotlib(series []MatplotlibParallelCoordinatesSeries, opts MatplotlibParallelCoordinatesOptions) error {
+	if len(series) == 0 {
+		return fmt.Errorf("no series to plot")
+	}
+	axesCount := opts.Axes
+	if axesCount <= 0 {
+		axesCount = 5
+	}
+
+	width, height := pythonPlotPixelSize(defaultPlotWidth(opts.WidthInches), defaultPlotHeight(opts.HeightInches))
+	fig := core.NewFigure(width, height, pythonTransparentFigureOptions()...)
+	ax := fig.AddSubplot(1, 1, 1)
+	if ax == nil {
+		return fmt.Errorf("failed to create axes")
+	}
+	ax.SetTitle(opts.Title)
+
+	cmap := matcolor.GetColormap("viridis")
+	const perGap = 20
+	// Slightly wider than matplotlib's default so the per-segment gradient reads
+	// as a continuous ribbon instead of stippling at 1px.
+	lineWidth := 1.5
+	for _, item := range series {
+		px, py := parallelSplinePolyline(item.Values, perGap)
+		if len(px) < 2 {
+			continue
+		}
+		segments := len(px) - 1
+		for k := 0; k < segments; k++ {
+			t := 0.0
+			if segments > 1 {
+				t = float64(k) / float64(segments-1)
+			}
+			c := cmap.At(t)
+			ax.Plot(px[k:k+2], py[k:k+2], core.PlotOptions{Color: &c, LineWidth: &lineWidth})
+		}
+	}
+
+	ax.SetXLim(0, float64(axesCount)+1)
+	ax.SetYLim(-0.1, 1.1)
+
+	return saveMatplotlibFigure(fig, opts.Output, width, height)
+}
+
+// parallelSplinePolyline expands per-axis y values into a smooth polyline using
+// the same zero-slope cubic between adjacent axes that Python labours uses.
+func parallelSplinePolyline(values []float64, perGap int) (xs, ys []float64) {
+	if len(values) < 2 {
+		return nil, nil
+	}
+	if perGap < 1 {
+		perGap = 1
+	}
+	for i := 0; i < len(values)-1; i++ {
+		x1 := float64(i + 1)
+		y1 := values[i]
+		x2 := float64(i + 2)
+		y2 := values[i+1]
+		a, b, c, d := solveSplineEquations(x1, y1, x2, y2)
+		for j := 0; j <= perGap; j++ {
+			if i > 0 && j == 0 {
+				continue // the join point was already emitted by the previous gap
+			}
+			t := x1 + (x2-x1)*float64(j)/float64(perGap)
+			xs = append(xs, t)
+			ys = append(ys, a*t*t*t+b*t*t+c*t+d)
+		}
+	}
+	return xs, ys
+}
+
+func solveSplineEquations(x1, y1, x2, y2 float64) (a, b, c, d float64) {
+	xcube := math.Pow(x1-x2, 3)
+	if xcube == 0 {
+		return 0, 0, 0, y1
+	}
+	a = 2 * (y2 - y1) / xcube
+	b = 3 * (y1 - y2) * (x1 + x2) / xcube
+	c = 6 * (y2 - y1) * x1 * x2 / xcube
+	d = y1 - a*x1*x1*x1 - b*x1*x1 - c*x1
+	return a, b, c, d
+}
+
+// stackedSumMax returns the largest column sum across stacked layers.
+func stackedSumMax(layers [][]float64) float64 {
+	if len(layers) == 0 || len(layers[0]) == 0 {
+		return 0
+	}
+	maxValue := math.Inf(-1)
+	for d := range layers[0] {
+		sum := 0.0
+		for _, row := range layers {
+			if d < len(row) {
+				sum += row[d]
+			}
+		}
+		if sum > maxValue {
+			maxValue = sum
+		}
+	}
+	if math.IsInf(maxValue, -1) {
+		return 0
+	}
+	return maxValue
+}
+
+// stackedSumMin returns the smallest column sum across stacked layers.
+func stackedSumMin(layers [][]float64) float64 {
+	if len(layers) == 0 || len(layers[0]) == 0 {
+		return 0
+	}
+	minValue := math.Inf(1)
+	for d := range layers[0] {
+		sum := 0.0
+		for _, row := range layers {
+			if d < len(row) {
+				sum += row[d]
+			}
+		}
+		if sum < minValue {
+			minValue = sum
+		}
+	}
+	if math.IsInf(minValue, 1) {
+		return 0
+	}
+	return minValue
+}
+
+// nonNegativeNiceTicks produces 1-2-5 rounded ticks from 0 up to maxValue.
+func nonNegativeNiceTicks(maxValue float64) []float64 {
+	if maxValue <= 0 || math.IsInf(maxValue, 0) || math.IsNaN(maxValue) {
+		return []float64{0}
+	}
+	const target = 6.0
+	raw := maxValue / target
+	magnitude := math.Pow(10, math.Floor(math.Log10(raw)))
+	step := magnitude
+	switch norm := raw / magnitude; {
+	case norm <= 1:
+		step = magnitude
+	case norm <= 2:
+		step = 2 * magnitude
+	case norm <= 5:
+		step = 5 * magnitude
+	default:
+		step = 10 * magnitude
+	}
+	ticks := make([]float64, 0, int(maxValue/step)+1)
+	for v := 0.0; v <= maxValue+step*0.001; v += step {
+		ticks = append(ticks, v)
+	}
+	return ticks
+}
+
 func pythonTransparentFigureOptions() []style.Option {
 	transparent := render.Color{R: 1, G: 1, B: 1, A: 0}
 	white := render.Color{R: 1, G: 1, B: 1, A: 1}
@@ -726,7 +992,7 @@ func pythonTransparentFigureOptions() []style.Option {
 	// composited against a non-white surface.
 	return []style.Option{
 		style.WithTheme(style.ThemeGGPlot),
-		style.WithFont("DejaVu Sans", 12),
+		style.WithFont(PythonPlotFontFamily, PythonPlotFontSize()),
 		style.WithBackground(1, 1, 1, 0),
 		style.WithAxesBackground(transparent),
 		style.WithAxesEdgeColor(text),
@@ -780,14 +1046,14 @@ func defaultPlotWidth(width float64) float64 {
 	if width > 0 {
 		return width
 	}
-	return 16
+	return PythonPlotDefaultWidthInches
 }
 
 func defaultPlotHeight(height float64) float64 {
 	if height > 0 {
 		return height
 	}
-	return 12
+	return PythonPlotDefaultHeightInches
 }
 
 func maxFloat64(values []float64) float64 {

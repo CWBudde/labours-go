@@ -55,21 +55,66 @@ func DevsParallel(reader readers.Reader, output string, maxPeople int, allowSynt
 		return fmt.Errorf("%w: devs-parallel", readers.ErrAnalysisMissing)
 	}
 
+	// Primary output: the Python-parity parallel-coordinates "Developers" chart.
+	if err := plotDevsParallelCoordinates(parallelData, output); err != nil {
+		return fmt.Errorf("failed to create parallel coordinates plot: %v", err)
+	}
+
 	metrics := calculateParallelismMetricsFromParallelData(parallelData, timeSeries)
 
+	// The concurrency timeline is a Go-only auxiliary chart, emitted as a
+	// sibling only when detail is requested.
 	if detail {
-		if err := plotParallelActivity(metrics, output); err != nil {
+		timelineOutput := siblingOutputPath(output, "devs-parallel.png", "concurrency_timeline")
+		if err := plotParallelActivity(metrics, timelineOutput); err != nil {
 			return fmt.Errorf("failed to create parallel activity plot: %v", err)
 		}
 	}
 
 	// Print summary statistics
 	printParallelismSummary(metrics)
-	if !detail {
-		fmt.Println("Concurrency timeline chart skipped (pass --devs-parallel-detail to render it).")
-	}
 
 	fmt.Println("Parallel development analysis completed successfully.")
+	return nil
+}
+
+// plotDevsParallelCoordinates renders the parallel-coordinates chart that Python
+// labours' show_devs_parallel draws: each developer is a smooth curve flowing
+// across the commits / lines / ownership / couples / commit-cooccurrence rank
+// axes, normalized by the developer count.
+func plotDevsParallelCoordinates(data []ParallelDeveloperData, output string) error {
+	if output == "" {
+		output = "devs-parallel.png"
+	}
+	n := len(data)
+	if n == 0 {
+		return fmt.Errorf("no developer data for parallel coordinates")
+	}
+
+	series := make([]graphics.MatplotlibParallelCoordinatesSeries, 0, n)
+	for _, dev := range data {
+		series = append(series, graphics.MatplotlibParallelCoordinatesSeries{
+			Values: []float64{
+				float64(dev.CommitsRank) / float64(n),
+				float64(dev.LinesRank) / float64(n),
+				float64(dev.OwnershipRank) / float64(n),
+				float64(dev.CouplesIndex) / float64(n),
+				float64(dev.CommitCooccIndex) / float64(n),
+			},
+		})
+	}
+
+	if err := graphics.PlotParallelCoordinatesMatplotlib(series, graphics.MatplotlibParallelCoordinatesOptions{
+		Title:        "Developers",
+		Output:       output,
+		WidthInches:  16,
+		HeightInches: 12,
+		Axes:         5,
+	}); err != nil {
+		return err
+	}
+
+	fmt.Printf("Saved devs-parallel plot to %s\n", output)
 	return nil
 }
 

@@ -345,12 +345,9 @@ func plotOwnershipBurndown(repoName string, names []string, people [][]float64, 
 		normalizeOwnershipColumns(matrix)
 	}
 
-	width, height := ownershipPlotPixelSize(16, 12)
-	fontSize := viper.GetInt("font-size")
-	if fontSize <= 0 {
-		fontSize = 12
-	}
-	background, foreground := ownershipPlotColors(viper.GetString("background"))
+	width, height := ownershipPlotPixelSize(graphics.PythonPlotDefaultWidthInches, graphics.PythonPlotDefaultHeightInches)
+	fontSize := graphics.PythonPlotFontSize()
+	background, foreground := graphics.LaboursPlotColors(viper.GetString("background"))
 	transparentBackground := background
 	transparentBackground.A = 0
 	legendBackground := background
@@ -359,7 +356,7 @@ func plotOwnershipBurndown(repoName string, names []string, people [][]float64, 
 		width,
 		height,
 		style.WithTheme(style.ThemeGGPlot),
-		style.WithFont("DejaVu Sans", float64(fontSize)),
+		style.WithFont(graphics.PythonPlotFontFamily, fontSize),
 		style.WithBackground(background.R, background.G, background.B, 0),
 		style.WithAxesBackground(transparentBackground),
 		style.WithAxesEdgeColor(foreground),
@@ -522,13 +519,6 @@ func maxOwnershipStackY(matrix [][]float64) float64 {
 	return maxY
 }
 
-func ownershipPlotColors(backgroundName string) (background, foreground render.Color) {
-	if strings.EqualFold(backgroundName, "black") {
-		return render.Color{R: 0, G: 0, B: 0, A: 1}, render.Color{R: 1, G: 1, B: 1, A: 1}
-	}
-	return render.Color{R: 1, G: 1, B: 1, A: 1}, render.Color{R: 0, G: 0, B: 0, A: 1}
-}
-
 func ownershipRenderColor(c color.Color) render.Color {
 	r, g, b, a := c.RGBA()
 	return render.Color{
@@ -549,7 +539,7 @@ func ownershipPlotPixelSize(defaultWidth, defaultHeight float64) (int, int) {
 			fmt.Printf("Warning: %v, using default size\n", err)
 		}
 	}
-	return max(1, int(math.Round(width*100))), max(1, int(math.Round(height*100)))
+	return graphics.InchesToPixels(width), graphics.InchesToPixels(height)
 }
 
 func parseOwnershipPlotSize(sizeStr string) (float64, float64, error) {

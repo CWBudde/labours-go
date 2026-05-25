@@ -61,7 +61,7 @@ func initializeFlags() {
 	// Python labours; enable to render the extra Go-specific charts.
 	rootCmd.PersistentFlags().Bool("run-times-detail", false, "Render the Go-only run-times breakdown chart (Python labours is text-only)")
 	rootCmd.PersistentFlags().Bool("devs-efforts-detail", false, "Also render the Go-only developer productivity ranking chart")
-	rootCmd.PersistentFlags().Bool("devs-parallel-detail", false, "Render the Go-only devs-parallel concurrency timeline chart")
+	rootCmd.PersistentFlags().Bool("devs-parallel-detail", false, "Also render the Go-only devs-parallel concurrency timeline sibling chart")
 	rootCmd.PersistentFlags().Bool("knowledge-diffusion-detail", false, "Also render the Go-only knowledge-diffusion trend chart")
 
 	// Progress and output control flags

@@ -273,7 +273,7 @@ func plotRuntimePercentageMatplotlib(labels []string, values []float64, output s
 		width,
 		height,
 		style.WithTheme(style.ThemeDefault),
-		style.WithFont("DejaVu Sans", 12),
+		style.WithFont(graphics.PythonPlotFontFamily, graphics.PythonPlotFontSize()),
 		style.WithTextColor(0, 0, 0, 1),
 		style.WithBackground(1, 1, 1, 1),
 		style.WithAxesBackground(render.Color{R: 1, G: 1, B: 1, A: 1}),

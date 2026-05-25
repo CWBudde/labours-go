@@ -98,13 +98,13 @@ func plotOverwritesMatrix(people, colLabels []string, matrix [][]float64, output
 
 	minValue, maxValue := matrixRange(matrix)
 
-	width, height := ownershipPlotPixelSize(16, 12)
-	background, foreground := ownershipPlotColors("")
+	width, height := ownershipPlotPixelSize(graphics.PythonPlotDefaultWidthInches, graphics.PythonPlotDefaultHeightInches)
+	background, foreground := graphics.LaboursPlotColors("")
 	graphics.RegisterPythonLaboursHeatmapColormaps()
 	fig := core.NewFigure(
 		width,
 		height,
-		style.WithFont("DejaVu Sans", 12),
+		style.WithFont(graphics.PythonPlotFontFamily, graphics.PythonPlotFontSize()),
 		style.WithBackground(background.R, background.G, background.B, 0),
 		style.WithAxesBackground(render.Color{R: background.R, G: background.G, B: background.B, A: 0}),
 		style.WithAxesEdgeColor(foreground),

@@ -353,8 +353,8 @@ var modeOutputConventions = map[string]outputConvention{
 	},
 	"devs-parallel": {
 		Kind:        outputSingleFile,
-		Description: "prints a parallel-development summary; the Go-only concurrency timeline chart is written only with --devs-parallel-detail (Python parity: text-only)",
-		Assets:      []string{"<output> (only with --devs-parallel-detail)"},
+		Description: "writes the parallel-coordinates developer chart and prints a parallel-development summary; --devs-parallel-detail also writes a Go-only concurrency timeline sibling",
+		Assets:      []string{"<output>", "<base>_concurrency_timeline<ext> (only with --devs-parallel-detail)"},
 	},
 	"run-times": {
 		Kind:        outputSingleFile,

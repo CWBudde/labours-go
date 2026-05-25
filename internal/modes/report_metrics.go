@@ -318,12 +318,16 @@ func plotTemporalHeatmap(repoName string, data *readers.TemporalActivityData, mo
 	}
 	rowLabels := append([]string(nil), temporalWeekdayLabels...)
 
+	// Python's heatmap sets figsize=(19.2,8) at creation but apply_plot_style
+	// then overrides it back to args.size or "16,10", so the effective size
+	// matches the temporal-activity bar charts (1600×1000).
+	heatmapWidth, heatmapHeight := reportPlotInches("temporal-activity.png")
 	if err := graphics.PlotHeatmapMatplotlib(matrix, rowLabels, colLabels, graphics.MatplotlibHeatmapOptions{
 		Title:        fmt.Sprintf("%s - Activity Heatmap: Weekday × Hour (%s)", repoName, mode),
 		Output:       output,
 		Colormap:     "YlOrRd",
-		WidthInches:  19.2,
-		HeightInches: 8,
+		WidthInches:  heatmapWidth,
+		HeightInches: heatmapHeight,
 	}); err != nil {
 		return fmt.Errorf("failed to plot temporal heatmap: %v", err)
 	}
@@ -716,9 +720,8 @@ func OwnershipConcentration(reader readers.Reader, output string) error {
 	}
 
 	if len(data.SubsystemGini) > 0 {
-		labels, values := subsystemFloatPairs(data.SubsystemGini, 0)
 		subsystemOutput := siblingOutputPath(output, "ownership-concentration.png", "subsystems")
-		if err := plotOwnershipSubsystemsBar(reader.GetName(), labels, values, subsystemOutput); err != nil {
+		if err := plotOwnershipSubsystemsBar(reader.GetName(), data.SubsystemGini, data.SubsystemHHI, subsystemOutput); err != nil {
 			return fmt.Errorf("failed to plot subsystem ownership concentration: %v", err)
 		}
 		fmt.Printf("Ownership concentration subsystem summary: %d subsystems\n", len(data.SubsystemGini))
@@ -726,56 +729,90 @@ func OwnershipConcentration(reader readers.Reader, output string) error {
 	return nil
 }
 
-func subsystemFloatPairs(values map[string]float64, limit int) ([]string, []float64) {
-	type pair struct {
-		Key   string
-		Value float64
-	}
-	pairs := make([]pair, 0, len(values))
-	for key, value := range values {
-		pairs = append(pairs, pair{Key: key, Value: value})
-	}
-	sort.Slice(pairs, func(i, j int) bool {
-		if pairs[i].Value != pairs[j].Value {
-			return pairs[i].Value < pairs[j].Value
-		}
-		return pairs[i].Key < pairs[j].Key
-	})
-	if limit > 0 && len(pairs) > limit {
-		pairs = pairs[:limit]
-	}
-	labels := make([]string, len(pairs))
-	resultValues := make([]float64, len(pairs))
-	for i, p := range pairs {
-		labels[i] = p.Key
-		resultValues[i] = p.Value
-	}
-	return labels, resultValues
-}
-
-func plotOwnershipSubsystemsBar(repoName string, labels []string, values []float64, output string) error {
+// plotOwnershipSubsystemsBar mirrors Python labours' ownership_concentration
+// _plot_subsystems: a grouped *horizontal* bar chart with two series (Gini and
+// HHI) per subsystem, subsystems sorted alphabetically (not by value).
+func plotOwnershipSubsystemsBar(repoName string, giniByDir, hhiByDir map[string]float64, output string) error {
 	output, err := resolveReportOutput(output, "ownership-concentration-subsystems.png")
 	if err != nil {
 		return err
 	}
-	title := "Ownership Concentration (Gini) by Subsystem"
+
+	dirs := make([]string, 0, len(giniByDir))
+	for dir := range giniByDir {
+		dirs = append(dirs, dir)
+	}
+	sort.Strings(dirs) // Python: sorted(subsystem_gini.keys())
+	n := len(dirs)
+
+	heightInches := math.Max(4, float64(n)*0.5+2)
+	width, height := graphics.InchesToPixels(12), graphics.InchesToPixels(heightInches)
+	fig := newReportFigure(width, height)
+	grid := fig.Subplots(1, 1)
+	if len(grid) == 0 || len(grid[0]) == 0 || grid[0][0] == nil {
+		return fmt.Errorf("failed to create ownership subsystem axes")
+	}
+	ax := grid[0][0]
+
+	title := "Ownership Concentration by Subsystem"
 	if repoName != "" {
 		title = fmt.Sprintf("%s - %s", repoName, title)
 	}
-	heightInches := math.Max(4, float64(len(labels))*0.5+2)
-	return graphics.PlotBarChartMatplotlib(labels, values, graphics.MatplotlibBarOptions{
-		Title:        title,
-		XLabel:       "Subsystem",
-		YLabel:       "Gini Coefficient",
-		Output:       output,
-		WidthInches:  12,
-		HeightInches: heightInches,
-		RotateX:      true,
-		Color:        color.RGBA{R: 84, G: 162, B: 75, A: 255},
-		DisableGrid:  true,
-		Opaque:       true,
-		DefaultStyle: true,
-	})
+	ax.SetTitle(title)
+	ax.SetXLabel("Concentration Index")
+
+	const barHeight = 0.35
+	yGini := make([]float64, n)
+	yHHI := make([]float64, n)
+	giniVals := make([]float64, n)
+	hhiVals := make([]float64, n)
+	ticks := make([]float64, n)
+	for i, dir := range dirs {
+		ticks[i] = float64(i)
+		yGini[i] = float64(i) - barHeight/2
+		yHHI[i] = float64(i) + barHeight/2
+		giniVals[i] = giniByDir[dir]
+		hhiVals[i] = hhiByDir[dir] // missing subsystem → 0, matching dict.get(d, 0)
+	}
+
+	orientation := core.BarHorizontal
+	bh := barHeight
+	// Matches Python's alpha=0.8. matplotlib-go's AGG backend lightens semi-
+	// transparent fills on the transparent report surface (PLAN Stage D5), so
+	// these read a bit pale until that renderer bug is fixed; alpha still beats
+	// opaque on RMSE here because bar position, not fill, dominates the diff.
+	giniColor := render.Color{R: 233.0 / 255, G: 30.0 / 255, B: 99.0 / 255, A: 0.8}  // #E91E63
+	hhiColor := render.Color{R: 63.0 / 255, G: 81.0 / 255, B: 181.0 / 255, A: 0.8}   // #3F51B5
+	ax.Bar(yGini, giniVals, core.BarOptions{Color: &giniColor, Width: &bh, Orientation: &orientation, Label: "Gini"})
+	ax.Bar(yHHI, hhiVals, core.BarOptions{Color: &hhiColor, Width: &bh, Orientation: &orientation, Label: "HHI"})
+
+	clipOff := false
+	labelColor := render.Color{R: 0, G: 0, B: 0, A: 1}
+	for i := range dirs {
+		ax.Text(giniVals[i]+0.02, yGini[i], fmt.Sprintf("%.2f", giniVals[i]), core.TextOptions{
+			FontSize: 8.4, Color: labelColor, VAlign: core.TextVAlignMiddle, ClipOn: &clipOff,
+		})
+		ax.Text(hhiVals[i]+0.02, yHHI[i], fmt.Sprintf("%.2f", hhiVals[i]), core.TextOptions{
+			FontSize: 8.4, Color: labelColor, VAlign: core.TextVAlignMiddle, ClipOn: &clipOff,
+		})
+	}
+
+	ax.SetXLim(0, 1.1)
+	// Match matplotlib's default y-autoscale (5% margin) for the grouped bars.
+	dataMin := -barHeight
+	dataMax := float64(n-1) + barHeight
+	margin := 0.05 * (dataMax - dataMin)
+	ax.SetYLim(dataMin-margin, dataMax+margin)
+	ax.YAxis.Locator = core.FixedLocator{TicksList: ticks}
+	ax.YAxis.Formatter = core.FixedFormatter{Labels: append([]string(nil), dirs...)}
+	yLabelStyle := ax.YAxis.MajorLabelStyle
+	yLabelStyle.FontSize = 9.6 // Python: fontsize=font_size*0.8
+	ax.YAxis.MajorLabelStyle = yLabelStyle
+
+	legend := ax.AddLegend() // default LegendBest mirrors Python's ax.legend()
+	legend.FontSize = 9.6
+
+	return saveReportFigure(fig, output, width, height) // TightLayout ~ Python tight_layout
 }
 
 func KnowledgeDiffusion(reader readers.Reader, output string, detail bool) error {
@@ -1161,7 +1198,7 @@ func plotBusFactorSubsystemsMatplotlib(repoName string, labels []string, values 
 	}
 	width, height := busFactorSubsystemPlotPixels(len(labels))
 	fig := newReportFigure(width, height)
-	grid := fig.Subplots(1, 1, core.WithSubplotPadding(0.24, 0.945, 0.100, 0.936))
+	grid := fig.Subplots(1, 1)
 	if len(grid) == 0 || len(grid[0]) == 0 || grid[0][0] == nil {
 		return fmt.Errorf("failed to create bus factor subsystem axes")
 	}
@@ -1201,7 +1238,7 @@ func plotBusFactorSubsystemsMatplotlib(repoName string, labels []string, values 
 		})
 	}
 
-	limitColor := renderColor(color.RGBA{R: 244, G: 67, B: 54, A: 255})
+	limitColor := render.Color{R: 1, G: 0, B: 0, A: 0.4} // Python: axvline color="red", alpha=0.4
 	lineWidth := 1.0
 	ax.AxVLine(1, core.VLineOptions{
 		Color:     &limitColor,
@@ -1209,14 +1246,22 @@ func plotBusFactorSubsystemsMatplotlib(repoName string, labels []string, values 
 		Dashes:    []float64{6, 4},
 	})
 	ax.SetXLim(0, math.Max(maxValue*1.05, 1.05))
-	ax.SetYLim(-0.78, float64(len(labels))-0.22)
+	// Match matplotlib's default y-autoscale (5% margin) for barh height=0.6
+	// instead of hand-tuned limits, so bar vertical density matches Python.
+	yMin := -0.3
+	yMax := float64(len(labels)-1) + 0.3
+	yMargin := 0.05 * (yMax - yMin)
+	ax.SetYLim(yMin-yMargin, yMax+yMargin)
 	if busFactorSubsystemInvertY() {
 		ax.InvertY()
 	}
 	ax.YAxis.Locator = core.FixedLocator{TicksList: ticks}
 	ax.YAxis.Formatter = core.FixedFormatter{Labels: append([]string(nil), labels...)}
+	yLabelStyle := ax.YAxis.MajorLabelStyle
+	yLabelStyle.FontSize = 9.6 // Python: fontsize=font_size*0.8
+	ax.YAxis.MajorLabelStyle = yLabelStyle
 
-	if err := saveReportFigureWithoutTightLayout(fig, output, width, height); err != nil {
+	if err := saveReportFigure(fig, output, width, height); err != nil { // TightLayout ~ Python tight_layout
 		return err
 	}
 	fmt.Printf("Saved %s\n", output)
@@ -1225,7 +1270,7 @@ func plotBusFactorSubsystemsMatplotlib(repoName string, labels []string, values 
 
 func busFactorSubsystemPlotPixels(subsystemCount int) (int, int) {
 	heightInches := math.Max(4, float64(subsystemCount)*0.4+2)
-	return 1200, int(heightInches * 100)
+	return 1200, graphics.InchesToPixels(heightInches)
 }
 
 func busFactorSubsystemInvertY() bool {
@@ -1338,7 +1383,7 @@ func plotKnowledgeSilosMatplotlib(repoName string, labels []string, uniqueValues
 	ax.YAxis.Locator = core.FixedLocator{TicksList: ticks}
 	ax.YAxis.Formatter = core.FixedFormatter{Labels: append([]string(nil), labels...)}
 	yLabelStyle := ax.YAxis.MajorLabelStyle
-	yLabelStyle.FontKey = "DejaVu Sans Mono"
+	yLabelStyle.FontKey = graphics.PythonPlotMonoFontFamily
 	ax.YAxis.MajorLabelStyle = yLabelStyle
 	legend := ax.AddLegend()
 	legend.Location = core.LegendLowerRight
@@ -1772,7 +1817,7 @@ func reportPlotInches(defaultOutput string) (float64, float64) {
 
 func reportPlotPixels(defaultOutput string) (int, int) {
 	width, height := reportPlotInches(defaultOutput)
-	return int(width * 100), int(height * 100)
+	return graphics.InchesToPixels(width), graphics.InchesToPixels(height)
 }
 
 func newReportFigure(width, height int) *core.Figure {
@@ -1782,7 +1827,7 @@ func newReportFigure(width, height int) *core.Figure {
 		width,
 		height,
 		style.WithTheme(style.ThemeGGPlot),
-		style.WithFont("DejaVu Sans", 12),
+		style.WithFont(graphics.PythonPlotFontFamily, graphics.PythonPlotFontSize()),
 		style.WithTextColor(0, 0, 0, 1),
 		style.WithBackground(1, 1, 1, 0),
 		style.WithAxesBackground(background),
@@ -1798,7 +1843,7 @@ func newKnowledgeSilosFigure(width, height int) *core.Figure {
 		width,
 		height,
 		style.WithTheme(style.ThemeGGPlot),
-		style.WithFont("DejaVu Sans", 12),
+		style.WithFont(graphics.PythonPlotFontFamily, graphics.PythonPlotFontSize()),
 		style.WithTextColor(0, 0, 0, 1),
 		style.WithBackground(1, 1, 1, 0),
 		style.WithAxesBackground(background),
@@ -1818,7 +1863,7 @@ func newHotspotRiskFigure(width, height int) *core.Figure {
 		width,
 		height,
 		style.WithTheme(style.ThemeGGPlot),
-		style.WithFont("DejaVu Sans", 12),
+		style.WithFont(graphics.PythonPlotFontFamily, graphics.PythonPlotFontSize()),
 		style.WithTextColor(0, 0, 0, 1),
 		style.WithBackground(1, 1, 1, 0),
 		style.WithAxesBackground(background),
