@@ -1,6 +1,11 @@
 # Labours-go
 
-Labours-go is a Go port of the Python [labours](https://github.com/src-d/hercules/tree/master/python/labours) command used by Hercules to render repository analysis data. The target is a drop-in `labours` binary for pipelines such as:
+> [!IMPORTANT]
+> **This repository is superseded and archived (maintenance freeze).**
+> The renderer has been merged into the [hercules](https://github.com/cwbudde/hercules) repository: it now lives under `internal/render`, the `labours` binary is built from `cmd/labours`, and `hercules report` renders in-process. The migration itself is lossless: on identical inputs the merged renderer produces byte-identical output to this repository's renderer, so nothing was gained or lost by the move. The separate, still-imperfect visual parity versus the original _Python_ labours (tracked as RMSE numbers in [PLAN.md](PLAN.md)) is unchanged by the merge and continues to be tracked in hercules (`docs/RENDER_PARITY.md`).
+> No further development happens here — please open issues and pull requests in [hercules](https://github.com/cwbudde/hercules) instead.
+
+Labours-go is a Go port of the Python [labours](https://github.com/src-d/hercules/tree/master/python/labours) command used by Hercules to render repository analysis data. The description below documents the pre-merge standalone tool and is kept for historical reference. The target is a drop-in `labours` binary for pipelines such as:
 
 ```bash
 hercules --burndown --pb /path/to/repo | labours -f pb -m burndown-project -o chart.png
