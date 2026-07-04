@@ -1,3 +1,5 @@
+> **Note:** This plan concluded with the merge of the renderer into [hercules](https://github.com/cwbudde/hercules) (`internal/render` + `cmd/labours`); this repository is archived and kept for historical reference.
+
 # Plan: `labours-go` Visual Parity with Python `labours`
 
 Date: 2026-04-26 · Rebalanced: 2026-05-25
